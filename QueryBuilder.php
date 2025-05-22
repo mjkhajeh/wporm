@@ -97,6 +97,15 @@ class QueryBuilder {
         $this->wpdb->query('ROLLBACK');
     }
 
+    public function __call($method, $parameters) {
+        $scopeMethod = 'scope' . ucfirst($method);
+        if (method_exists($this->model, $scopeMethod)) {
+            array_unshift($parameters, $this);
+            return call_user_func_array([$this->model, $scopeMethod], $parameters);
+        }
+        throw new \BadMethodCallException("Method {$method} does not exist.");
+    }
+
     protected function buildSelectQuery() {
         $sql = "SELECT " . implode(", ", $this->selects) . " FROM {$this->table}";
 
