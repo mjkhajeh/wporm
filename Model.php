@@ -18,6 +18,30 @@ abstract class Model implements \ArrayAccess {
 	protected $original = [];
 	protected $exists = false;
 	protected static $booted = [];
+	protected static $globalScopes = [];
+
+	// Register a global scope
+	public static function addGlobalScope($identifier, callable $scope) {
+		static::$globalScopes[static::class][$identifier] = $scope;
+	}
+
+	// Remove a global scope
+	public static function removeGlobalScope($identifier) {
+		unset(static::$globalScopes[static::class][$identifier]);
+	}
+
+	// Get all global scopes for this model
+	public static function getGlobalScopes() {
+		return static::$globalScopes[static::class] ?? [];
+	}
+
+	// Apply global scopes to a query builder
+	public static function applyGlobalScopes(QueryBuilder $query) {
+		foreach (static::getGlobalScopes() as $scope) {
+			$scope($query);
+		}
+		return $query;
+	}
 
 	public function __construct(array $attributes = []) {
 		global $wpdb;
@@ -162,7 +186,8 @@ abstract class Model implements \ArrayAccess {
 	}
 
 	public static function query() {
-		return new QueryBuilder(new static);
+		$query = new QueryBuilder(new static);
+		return static::applyGlobalScopes($query);
 	}
 
 	public static function all() {
