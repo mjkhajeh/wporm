@@ -361,21 +361,11 @@ abstract class Model implements \ArrayAccess {
 
 	public function toArray() {
 		$attributes = [];
-		$publicVars = get_object_vars($this);
-	
-		if( !empty( $publicVars['attributes'] ) ) {
-			foreach($publicVars['attributes'] as $key => $value) {
-		
-				if (isset($this->casts[$key])) {
-					$castClass = $this->casts[$key];
-					$caster = new $castClass;
-					$value = $caster->get($value);
-				}
-		
-				$attributes[$key] = $value;
-			}
+		foreach ($this->attributes as $key => $value) {
+			$attributes[$key] = isset($this->casts[$key])
+				? (new $this->casts[$key])->get($value)
+				: $value;
 		}
-	
 		return $attributes;
 	}
 
@@ -395,21 +385,11 @@ abstract class Model implements \ArrayAccess {
 
 	public function getChanges() {
 		$changes = [];
-	
-		foreach (get_object_vars($this) as $key => $value) {
-			if (in_array($key, ['fillable', 'guarded', 'casts', 'exists', 'original'])) {
-				continue;
-			}
-	
-			if (!array_key_exists($key, $this->original)) {
-				continue;
-			}
-	
-			if ($value !== $this->original[$key]) {
+		foreach ($this->attributes as $key => $value) {
+			if (!array_key_exists($key, $this->original) || $value !== $this->original[$key]) {
 				$changes[$key] = $value;
 			}
 		}
-	
 		return $changes;
 	}    
 
