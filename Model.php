@@ -92,7 +92,10 @@ abstract class Model {
 
 	public function fill(array $attributes) {
 		foreach ($attributes as $key => $value) {
-			if (in_array($key, $this->fillable)) {
+			if (
+				(empty($this->fillable) || in_array($key, $this->fillable)) &&
+				!in_array($key, $this->guarded)
+			) {
 				$this->__set($key, $value);
 			}
 		}
@@ -118,7 +121,10 @@ abstract class Model {
 		if (method_exists($this, $method)) {
 			return $this->$method($value);
 		}
-		if (in_array($key, $this->fillable)) {
+		if (
+			(empty($this->fillable) || in_array($key, $this->fillable)) &&
+			!in_array($key, $this->guarded)
+		) {
 			$this->attributes[$key] = $this->castSet($key, $value);
 		}
 	}
