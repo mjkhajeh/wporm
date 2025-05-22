@@ -100,6 +100,10 @@ abstract class Model {
 	}
 
 	public function __get($key) {
+		$method = 'get' . ucfirst($key) . 'Attribute';
+		if (method_exists($this, $method)) {
+			return $this->$method();
+		}
 		if (method_exists($this, $key)) {
 			return $this->$key();
 		}
@@ -110,6 +114,10 @@ abstract class Model {
 	}
 
 	public function __set($key, $value) {
+		$method = 'set' . ucfirst($key) . 'Attribute';
+		if (method_exists($this, $method)) {
+			return $this->$method($value);
+		}
 		if (in_array($key, $this->fillable)) {
 			$this->attributes[$key] = $this->castSet($key, $value);
 		}
