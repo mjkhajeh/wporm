@@ -255,28 +255,57 @@ abstract class Model implements \ArrayAccess {
 	}
 
 	// Relationships
-	public function hasOne($related, $foreignKey = null, $localKey = null) {
+	/**
+	 * @template T of Model
+	 * @param class-string<T> $related
+	 * @param string|null $foreignKey
+	 * @param string|null $localKey
+	 * @return T|null
+	 */
+	public function hasOne($related, $foreignKey = null, $localKey = null): ?Model {
 		$instance = new $related;
 		$foreignKey = $foreignKey ?: strtolower(class_basename(static::class)) . '_id';
 		$localKey = $localKey ?: $this->primaryKey;
 		return $related::query()->where($foreignKey, $this->$localKey)->first();
 	}
 
-	public function hasMany($related, $foreignKey = null, $localKey = null) {
+	/**
+	 * @template T of Model
+	 * @param class-string<T> $related
+	 * @param string|null $foreignKey
+	 * @param string|null $localKey
+	 * @return T[]
+	 */
+	public function hasMany($related, $foreignKey = null, $localKey = null): array {
 		$instance = new $related;
 		$foreignKey = $foreignKey ?: strtolower(class_basename(static::class)) . '_id';
 		$localKey = $localKey ?: $this->primaryKey;
 		return $related::query()->where($foreignKey, $this->$localKey)->get();
 	}
 
-	public function belongsTo($related, $foreignKey = null, $ownerKey = null) {
+	/**
+	 * @template T of Model
+	 * @param class-string<T> $related
+	 * @param string|null $foreignKey
+	 * @param string|null $ownerKey
+	 * @return T|null
+	 */
+	public function belongsTo($related, $foreignKey = null, $ownerKey = null): ?Model {
 		$instance = new $related;
 		$foreignKey = $foreignKey ?: strtolower(class_basename($related)) . '_id';
 		$ownerKey = $ownerKey ?: $instance->primaryKey;
 		return $related::query()->where($ownerKey, $this->$foreignKey)->first();
 	}
 
-	public function belongsToMany($related, $pivotTable = null, $foreignPivotKey = null, $relatedPivotKey = null) {
+	/**
+	 * @template T of Model
+	 * @param class-string<T> $related
+	 * @param string|null $pivotTable
+	 * @param string|null $foreignPivotKey
+	 * @param string|null $relatedPivotKey
+	 * @return T[]
+	 */
+	public function belongsToMany($related, $pivotTable = null, $foreignPivotKey = null, $relatedPivotKey = null): array {
 		global $wpdb;
 		$relatedInstance = new $related;
 		$pivotTable = $pivotTable ?: $this->getTable() . '_' . $relatedInstance->getTable();
@@ -291,7 +320,17 @@ abstract class Model implements \ArrayAccess {
 		return array_map(fn($data) => new $related($data), $results);
 	}
 
-	public function hasManyThrough($related, $through, $firstKey = null, $secondKey = null, $localKey = null) {
+	/**
+	 * @template T of Model
+	 * @template Through of Model
+	 * @param class-string<T> $related
+	 * @param class-string<Through> $through
+	 * @param string|null $firstKey
+	 * @param string|null $secondKey
+	 * @param string|null $localKey
+	 * @return T[]
+	 */
+	public function hasManyThrough($related, $through, $firstKey = null, $secondKey = null, $localKey = null): array {
 		global $wpdb;
 		$throughInstance = new $through;
 		$relatedInstance = new $related;
