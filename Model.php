@@ -6,7 +6,7 @@ use WPORM\Casts\CastableInterface;
 use WPORM\Schema\Blueprint;
 use WPORM\Schema\SchemaBuilder;
 
-abstract class Model {
+abstract class Model implements \ArrayAccess {
 	protected $table;
 	protected $primaryKey = 'id';
 	protected $fillable = [];
@@ -346,4 +346,20 @@ abstract class Model {
 	
 		return $changes;
 	}    
+
+	public function offsetExists($offset): bool {
+		return isset($this->attributes[$offset]);
+	}
+
+	public function offsetGet($offset): mixed {
+		return $this->__get($offset);
+	}
+
+	public function offsetSet($offset, $value): void {
+		$this->__set($offset, $value);
+	}
+
+	public function offsetUnset($offset): void {
+		unset($this->attributes[$offset]);
+	}
 }
