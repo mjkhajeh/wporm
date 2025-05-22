@@ -19,6 +19,8 @@ abstract class Model implements \ArrayAccess {
 	protected $exists = false;
 	protected static $booted = [];
 	protected static $globalScopes = [];
+	protected $createdAtColumn = 'created_at';
+	protected $updatedAtColumn = 'updated_at';
 
 	// Register a global scope
 	public static function addGlobalScope($identifier, callable $scope) {
@@ -209,8 +211,8 @@ abstract class Model implements \ArrayAccess {
 		global $wpdb;
 		if ($this->timestamps) {
 			$now = current_time('mysql');
-			$this->attributes['created_at'] = $now;
-			$this->attributes['updated_at'] = $now;
+			$this->attributes[$this->createdAtColumn] = $now;
+			$this->attributes[$this->updatedAtColumn] = $now;
 		}
 		$wpdb->insert($this->getTable(), $this->attributes);
 		$this->exists = true;
@@ -224,7 +226,7 @@ abstract class Model implements \ArrayAccess {
 		}
 		global $wpdb;
 		if ($this->timestamps) {
-			$this->attributes['updated_at'] = current_time('mysql');
+			$this->attributes[$this->updatedAtColumn] = current_time('mysql');
 		}
 		$wpdb->update($this->getTable(), $this->attributes, [$this->primaryKey => $this->attributes[$this->primaryKey]]);
 		return true;
