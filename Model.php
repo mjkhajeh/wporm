@@ -164,6 +164,9 @@ abstract class Model {
 	}
 
 	protected function insert() {
+		if (method_exists($this, 'creating')) { // Event
+			$this->creating();
+		}
 		global $wpdb;
 		if ($this->timestamps) {
 			$now = current_time('mysql');
@@ -177,6 +180,9 @@ abstract class Model {
 	}
 
 	protected function update() {
+		if (method_exists($this, 'updating')) { // Event
+			$this->updating();
+		}
 		global $wpdb;
 		if ($this->timestamps) {
 			$this->attributes['updated_at'] = current_time('mysql');
@@ -186,6 +192,9 @@ abstract class Model {
 	}
 
 	public function delete() {
+		if (method_exists($this, 'deleting')) { // Event
+			$this->deleting();
+		}
 		global $wpdb;
 		$wpdb->delete($this->getTable(), [$this->primaryKey => $this->attributes[$this->primaryKey]]);
 		$this->exists = false;
