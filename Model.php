@@ -166,25 +166,66 @@ abstract class Model implements \ArrayAccess {
 	protected function castGet($key, $value) {
 		if (!isset($this->casts[$key])) return $value;
 		$cast = $this->casts[$key];
-		if (class_exists($cast)) {
-			$castInstance = new $cast();
-			if ($castInstance instanceof CastableInterface) {
-				return $castInstance->get($value);
-			}
+
+		switch ($cast) {
+			case 'int':
+			case 'integer':
+				return (int) $value;
+			case 'float':
+			case 'double':
+				return (float) $value;
+			case 'bool':
+			case 'boolean':
+				return (bool) $value;
+			case 'array':
+				return is_array($value) ? $value : json_decode($value, true);
+			case 'json':
+				return json_decode($value, true);
+			case 'datetime':
+				return $value ? new \DateTime($value) : null;
+			case 'timestamp':
+				return $value ? (new \DateTime())->setTimestamp((int)$value) : null;
+			default:
+				if (class_exists($cast)) {
+					$castInstance = new $cast();
+					if ($castInstance instanceof \WPORM\Casts\CastableInterface) {
+						return $castInstance->get($value);
+					}
+				}
+				return $value;
 		}
-		return $value;
 	}
 
 	protected function castSet($key, $value) {
 		if (!isset($this->casts[$key])) return $value;
 		$cast = $this->casts[$key];
-		if (class_exists($cast)) {
-			$castInstance = new $cast();
-			if ($castInstance instanceof CastableInterface) {
-				return $castInstance->set($value);
-			}
+
+		switch ($cast) {
+			case 'int':
+			case 'integer':
+				return (int) $value;
+			case 'float':
+			case 'double':
+				return (float) $value;
+			case 'bool':
+			case 'boolean':
+				return (bool) $value;
+			case 'array':
+			case 'json':
+				return json_encode($value);
+			case 'datetime':
+				return $value instanceof \DateTime ? $value->format('Y-m-d H:i:s') : $value;
+			case 'timestamp':
+				return $value instanceof \DateTime ? $value->getTimestamp() : (is_numeric($value) ? (int)$value : strtotime($value));
+			default:
+				if (class_exists($cast)) {
+					$castInstance = new $cast();
+					if ($castInstance instanceof \WPORM\Casts\CastableInterface) {
+						return $castInstance->set($value);
+					}
+				}
+				return $value;
 		}
-		return $value;
 	}
 
 	public static function query() {
