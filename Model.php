@@ -119,8 +119,7 @@ abstract class Model implements \ArrayAccess {
 	public function fill(array $attributes) {
 		foreach ($attributes as $key => $value) {
 			if (
-				(empty($this->fillable) || in_array($key, $this->fillable)) &&
-				!in_array($key, $this->guarded)
+				(empty($this->fillable) || in_array($key, $this->fillable))
 			) {
 				$this->__set($key, $value);
 			}
@@ -148,8 +147,7 @@ abstract class Model implements \ArrayAccess {
 			return $this->$method($value);
 		}
 		if (
-			(empty($this->fillable) || in_array($key, $this->fillable)) &&
-			!in_array($key, $this->guarded)
+			(empty($this->fillable) || in_array($key, $this->fillable))
 		) {
 			$this->attributes[$key] = $this->castSet($key, $value);
 		}
