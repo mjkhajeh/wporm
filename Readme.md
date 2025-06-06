@@ -202,8 +202,21 @@ $parts = Parts::query()
     ->orWhere('qty', '<', 2)
     ->get();
 ```
-
 > Note: For very advanced SQL, you can always use `$wpdb` directly.
+> 
+You can also use `$wpdb` directly for complex SQL logic:
+
+```php
+global $wpdb;
+$table = (new User)->getTable();
+$results = $wpdb->get_results(
+    $wpdb->prepare(
+        "SELECT * FROM $table WHERE (country = %s AND (age >= %d OR verified = %d)) OR (country = %s AND subscribed = %d)",
+        'US', 18, 1, 'CA', 1
+    ),
+    ARRAY_A
+);
+```
 
 ## Extending/Improving
 - Add more casts by implementing `WPORM\Casts\CastableInterface`.
