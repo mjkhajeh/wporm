@@ -225,3 +225,198 @@ $results = $wpdb->get_results(
 
 ## License
 MIT
+
+---
+
+# Full Example: Using Every Feature of WPORM
+
+```php
+use WPORM\Model;
+use WPORM\Schema\Blueprint;
+use WPORM\Schema\SchemaBuilder;
+
+global $wpdb;
+
+// 1. Define Models
+class User extends Model {
+    protected $table = 'users';
+    protected $fillable = ['id', 'name', 'email', 'country', 'age', 'verified', 'subscribed', 'meta'];
+    protected $casts = [
+        'age' => 'int',
+        'verified' => 'bool',
+        'subscribed' => 'bool',
+        'meta' => 'json',
+    ];
+    public function up(Blueprint $table) {
+        $table->id();
+        $table->string('name');
+        $table->string('email');
+        $table->string('country', 2);
+        $table->integer('age');
+        $table->boolean('verified');
+        $table->boolean('subscribed');
+        $table->json('meta');
+        $table->timestamps();
+        $this->schema = $table->toSql();
+    }
+    // Accessor
+    public function getNameAttribute() {
+        return strtoupper($this->attributes['name']);
+    }
+    // Mutator
+    public function setNameAttribute($value) {
+        $this->attributes['name'] = ucfirst($value);
+    }
+    // Relationship
+    public function posts() {
+        return $this->hasMany(Post::class, 'user_id');
+    }
+}
+
+class Post extends Model {
+    protected $table = 'posts';
+    protected $fillable = ['id', 'user_id', 'title', 'content', 'meta'];
+    protected $casts = [
+        'meta' => 'json',
+    ];
+    public function up(Blueprint $table) {
+        $table->id();
+        $table->unsignedBigInteger('user_id');
+        $table->string('title');
+        $table->text('content');
+        $table->json('meta');
+        $table->timestamps();
+        $table->foreign('user_id', 'users');
+        $this->schema = $table->toSql();
+    }
+    public function user() {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+}
+
+// 2. Schema Management
+$schema = new SchemaBuilder($wpdb);
+$schema->create('users', function($table) {
+    $table->id();
+    $table->string('name');
+    $table->string('email');
+    $table->string('country', 2);
+    $table->integer('age');
+    $table->boolean('verified');
+    $table->boolean('subscribed');
+    $table->json('meta');
+    $table->timestamps();
+});
+$schema->create('posts', function($table) {
+    $table->id();
+    $table->unsignedBigInteger('user_id');
+    $table->string('title');
+    $table->text('content');
+    $table->json('meta');
+    $table->timestamps();
+    $table->foreign('user_id', 'users');
+});
+
+// 3. Creating Records
+$user = new User([
+    'name' => 'alice',
+    'email' => 'alice@example.com',
+    'country' => 'US',
+    'age' => 30,
+    'verified' => true,
+    'subscribed' => false,
+    'meta' => ['newsletter' => true]
+]);
+$user->save();
+
+$post = new Post([
+    'user_id' => $user->id,
+    'title' => 'Hello World',
+    'content' => 'This is a post.',
+    'meta' => ['tags' => ['intro', 'welcome']]
+]);
+$post->save();
+
+// 4. Querying Records
+$allUsers = User::all();
+$found = User::find($user->id);
+$adults = User::query()->where('age', '>=', 18)->get();
+$firstUser = User::query()->where('country', 'US')->first();
+
+// 5. Updating Records
+$found->subscribed = true;
+$found->save();
+
+// 6. Deleting Records
+$post->delete();
+
+// 7. Attribute Casting
+$casted = $found->meta; // array
+
+// 8. Relationships
+$userPosts = $user->posts(); // hasMany
+$postUser = $post->user();  // belongsTo
+
+// 9. Custom Accessors/Mutators
+$name = $user->name; // Accessor (uppercased)
+$user->name = 'bob'; // Mutator (ucfirst)
+$user->save();
+
+// 10. Transactions
+User::query()->beginTransaction();
+try {
+    $user2 = new User([
+        'name' => 'eve',
+        'email' => 'eve@example.com',
+        'country' => 'CA',
+        'age' => 22,
+        'verified' => false,
+        'subscribed' => true,
+        'meta' => []
+    ]);
+    $user2->save();
+    User::query()->commit();
+} catch (Exception $e) {
+    User::query()->rollBack();
+}
+
+// 11. Global Scopes
+User::addGlobalScope('active', function($query) {
+    $query->where('verified', true);
+});
+$activeUsers = User::all();
+User::removeGlobalScope('active');
+
+// 12. Complex Where Statements
+$complex = User::query()
+    ->where(function ($q) {
+        $q->where('country', 'US')
+          ->where(function ($q2) {
+              $q2->where('age', '>=', 18)
+                  ->orWhere('verified', true);
+          });
+    })
+    ->orWhere(function ($q) {
+        $q->where('country', 'CA')
+          ->where('subscribed', true);
+    })
+    ->get();
+
+// 13. Custom Queries
+$custom = User::query()
+    ->select(['country', 'COUNT(*) as total'])
+    ->groupBy('country')
+    ->get();
+
+// 14. $wpdb Direct SQL
+$table = (new User)->getTable();
+$results = $wpdb->get_results(
+    $wpdb->prepare(
+        "SELECT * FROM $table WHERE (country = %s AND (age >= %d OR verified = %d)) OR (country = %s AND subscribed = %d)",
+        'US', 18, 1, 'CA', 1
+    ),
+    ARRAY_A
+);
+```
+
+This example demonstrates every major feature of WPORM: model definition, schema, CRUD, casting, relationships, accessors/mutators, transactions, global scopes, complex queries, custom queries, and direct SQL.
