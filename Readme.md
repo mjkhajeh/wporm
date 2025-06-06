@@ -422,3 +422,59 @@ $results = $wpdb->get_results(
 ```
 
 This example demonstrates every major feature of WPORM: model definition, schema, CRUD, casting, relationships, accessors/mutators, transactions, global scopes, complex queries, custom queries, and direct SQL.
+
+## Troubleshooting & Tips
+
+- **Table Prefixing:** Always use `$table = (new ModelName)->getTable();` to get the correct, prefixed table name for custom SQL. Do not manually prepend `$wpdb->prefix`.
+- **Model Booting:** If you add static boot methods or global scopes, ensure you call them before querying if not using the model's constructor.
+- **Schema Changes:** If you change your model's `up()` schema, you may need to drop and recreate the table or use the `SchemaBuilder`'s `table()` method for migrations.
+- **Events:** You can add `creating`, `updating`, and `deleting` methods to your models for event hooks.
+- **Extending Casts:** Implement `WPORM\Casts\CastableInterface` for custom attribute casting logic.
+- **Testing:** Always test your queries and schema changes on a staging environment before deploying to production.
+
+## Contributing
+
+Contributions, bug reports, and feature requests are welcome! Please open an issue or submit a pull request.
+
+## Credits
+
+WPORM is inspired by Laravel's Eloquent ORM and adapted for the WordPress ecosystem.
+
+---
+
+## Version
+
+- **Current Version:** 1.0.0
+- **Changelog:**
+  - Initial release with full Eloquent-style ORM features for WordPress.
+
+## Security Note
+
+- Always validate and sanitize user input, even when using the ORM. The ORM helps prevent SQL injection, but you are responsible for data integrity and security.
+
+## Performance Tips
+
+- Use indexes for columns you frequently query (e.g., foreign keys, search fields). The ORM's schema builder supports `$table->index('column')`.
+- For large datasets, use pagination and limit/offset queries to avoid memory issues.
+
+## FAQ
+
+**Q: Why is my table not created?**
+- A: Ensure your model's `up()` method is correct and that you call the schema builder. Check for errors in your SQL or schema definition.
+
+**Q: How do I debug a failed query?**
+- A: Use `$wpdb->last_query` and `$wpdb->last_error` after running a query to inspect the last executed SQL and any errors.
+
+**Q: Can I use this ORM outside of WordPress?**
+- A: No, it is tightly coupled to WordPress's `$wpdb` and plugin environment.
+
+## Resources
+
+- [WordPress Plugin Developer Handbook](https://developer.wordpress.org/plugins/)
+- [Laravel Eloquent ORM Documentation](https://laravel.com/docs/eloquent)
+
+## License Details
+
+This project is licensed under the MIT License. See the LICENSE file or [MIT License](https://opensource.org/licenses/MIT) for details.
+
+---
