@@ -47,6 +47,8 @@ class Parts extends Model {
 }
 ```
 
+> **Note:** When using `$table` in custom SQL queries, do **not** manually add the WordPress prefix (e.g., `$wpdb->prefix`). The ORM automatically handles table prefixing. Use `$table = (new User)->getTable();` as shown in the next, which returns the fully-prefixed table name.
+
 ## Schema Management
 Create or update tables using the model's `up` method and the `SchemaBuilder`:
 
