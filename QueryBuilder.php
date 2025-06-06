@@ -27,12 +27,45 @@ class QueryBuilder {
         return $this;
     }
 
-    public function where($column, $operator = '=', $value = null) {
+    public function where($column, $operator = null, $value = null) {
+        if (is_callable($column)) {
+            // Nested group
+            $nested = new self($this->model);
+            $column($nested);
+            $group = $nested->wheres;
+            $bindings = $nested->bindings;
+            if (!empty($group)) {
+                $this->wheres[] = '(' . implode(' AND ', $group) . ')';
+                $this->bindings = array_merge($this->bindings, $bindings);
+            }
+            return $this;
+        }
         if (func_num_args() === 2) {
             $value = $operator;
             $operator = '=';
         }
         $this->wheres[] = "$column $operator %s";
+        $this->bindings[] = $value;
+        return $this;
+    }
+
+    public function orWhere($column, $operator = null, $value = null) {
+        if (is_callable($column)) {
+            $nested = new self($this->model);
+            $column($nested);
+            $group = $nested->wheres;
+            $bindings = $nested->bindings;
+            if (!empty($group)) {
+                $this->wheres[] = 'OR (' . implode(' AND ', $group) . ')';
+                $this->bindings = array_merge($this->bindings, $bindings);
+            }
+            return $this;
+        }
+        if (func_num_args() === 2) {
+            $value = $operator;
+            $operator = '=';
+        }
+        $this->wheres[] = 'OR ' . "$column $operator %s";
         $this->bindings[] = $value;
         return $this;
     }
@@ -107,25 +140,36 @@ class QueryBuilder {
     }
 
     protected function buildSelectQuery() {
-        $sql = "SELECT " . implode(", ", $this->selects) . " FROM {$this->table}";
-
-        if (!empty($this->wheres)) {
-            $sql .= " WHERE " . implode(" AND ", $this->wheres);
+        if (empty($this->wheres)) {
+            $where = '';
+        } else {
+            // Rebuild where clause to support OR and AND logic
+            $where = '';
+            foreach ($this->wheres as $i => $clause) {
+                if ($i === 0) {
+                    $where .= $clause;
+                } else {
+                    if (strpos(trim($clause), 'OR ') === 0) {
+                        $where .= ' ' . $clause;
+                    } else {
+                        $where .= ' AND ' . $clause;
+                    }
+                }
+            }
         }
-
+        $sql = "SELECT " . implode(", ", $this->selects) . " FROM {$this->table}";
+        if (!empty($where)) {
+            $sql .= " WHERE $where";
+        }
         if (!empty($this->orders)) {
             $sql .= " ORDER BY " . implode(", ", $this->orders);
         }
-
         if (isset($this->limit)) {
             $sql .= " LIMIT {$this->limit}";
         }
-
         if (isset($this->offset)) {
             $sql .= " OFFSET {$this->offset}";
         }
-
-
         return $sql;
     }
 
