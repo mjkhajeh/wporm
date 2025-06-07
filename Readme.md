@@ -19,7 +19,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 You can install WPORM via Composer. In your plugin or theme directory, run:
 
 ```sh
-composer require your-vendor/wporm
+composer require mjkhajeh/wporm
 ```
 
 Then include Composer's autoloader in your plugin bootstrap file:
