@@ -14,7 +14,7 @@
             "email": "iron.atoms2@gmail.com"
         }
     ],
-    "require": {},
-    "minimum-stability": "dev",
-    "prefer-stable": true
+    "require": {
+        "php": ">=7.4"
+    }
 }
