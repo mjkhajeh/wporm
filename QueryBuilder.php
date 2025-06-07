@@ -28,23 +28,23 @@ class QueryBuilder {
     }
 
     public function where($column, $operator = null, $value = null) {
-        // Eloquent-style: support array of conditions
+        // Support associative array: ['col' => 'val', ...]
         if (is_array($column)) {
-            // Check if it's an array of arrays (multiple conditions)
-            $isMulti = isset($column[0]) && is_array($column[0]);
-            if ($isMulti) {
-                foreach ($column as $cond) {
-                    // ['col', 'op', 'val'] or ['col', 'val']
-                    if (count($cond) === 3) {
-                        $this->where($cond[0], $cond[1], $cond[2]);
-                    } elseif (count($cond) === 2) {
-                        $this->where($cond[0], '=', $cond[1]);
-                    }
-                }
-            } else {
-                // Associative array: ['col' => 'val', ...]
+            $isAssoc = array_keys($column) !== range(0, count($column) - 1);
+            if ($isAssoc) {
                 foreach ($column as $key => $val) {
                     $this->where($key, '=', $val);
+                }
+            } else {
+                // Array of arrays: [['col', 'op', 'val']] or [['col', 'val']]
+                foreach ($column as $cond) {
+                    if (is_array($cond)) {
+                        if (count($cond) === 3) {
+                            $this->where($cond[0], $cond[1], $cond[2]);
+                        } elseif (count($cond) === 2) {
+                            $this->where($cond[0], '=', $cond[1]);
+                        }
+                    }
                 }
             }
             return $this;
