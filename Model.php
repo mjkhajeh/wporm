@@ -1,11 +1,6 @@
 <?php
 namespace MJ\WPORM;
 
-use WPORM\QueryBuilder;
-use WPORM\Casts\CastableInterface;
-use WPORM\Schema\Blueprint;
-use WPORM\Schema\SchemaBuilder;
-
 abstract class Model implements \ArrayAccess {
 	protected $table;
 	protected $primaryKey = 'id';
@@ -186,7 +181,7 @@ abstract class Model implements \ArrayAccess {
 			default:
 				if (class_exists($cast)) {
 					$castInstance = new $cast();
-					if ($castInstance instanceof \WPORM\Casts\CastableInterface) {
+					if ($castInstance instanceof \MJ\WPORM\Casts\CastableInterface) {
 						return $castInstance->get($value);
 					}
 				}
@@ -218,7 +213,7 @@ abstract class Model implements \ArrayAccess {
 			default:
 				if (class_exists($cast)) {
 					$castInstance = new $cast();
-					if ($castInstance instanceof \WPORM\Casts\CastableInterface) {
+					if ($castInstance instanceof \MJ\WPORM\Casts\CastableInterface) {
 						return $castInstance->set($value);
 					}
 				}

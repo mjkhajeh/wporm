@@ -42,11 +42,11 @@ require_once __DIR__ . '/ORM/ColumnDefinition.php';
 ```
 
 ## Defining a Model
-Create a model class extending `WPORM\Model`:
+Create a model class extending `MJ\WPORM\Model`:
 
 ```php
-use WPORM\Model;
-use WPORM\Schema\Blueprint;
+use MJ\WPORM\Model;
+use MJ\WPORM\Blueprint;
 
 class Parts extends Model {
     protected $table = 'parts';
@@ -70,7 +70,7 @@ class Parts extends Model {
 Create or update tables using the model's `up` method and the `SchemaBuilder`:
 
 ```php
-use WPORM\Schema\SchemaBuilder;
+use MJ\WPORM\SchemaBuilder;
 
 $schema = new SchemaBuilder($wpdb);
 $schema->create('parts', function($table) {
@@ -237,8 +237,61 @@ $results = $wpdb->get_results(
 );
 ```
 
+## Timestamp Columns
+
+You can customize how WPORM handles timestamp columns in your models. By default, models will automatically manage `created_at` and `updated_at` columns if `$timestamps = true` (the default).
+
+### Example: Customizing Timestamp Column Names
+
+```php
+use MJ\WPORM\Model;
+use MJ\WPORM\Blueprint;
+
+class Article extends Model {
+    protected $table = 'articles';
+    protected $fillable = ['id', 'title', 'content', 'created_on', 'changed_on'];
+    protected $timestamps = true; // default is true
+    protected $createdAtColumn = 'created_on';
+    protected $updatedAtColumn = 'changed_on';
+
+    public function up(Blueprint $table) {
+        $table->id();
+        $table->string('title');
+        $table->text('content');
+        $table->timestamp('created_on');
+        $table->timestamp('changed_on');
+        $this->schema = $table->toSql();
+    }
+}
+```
+
+With this setup, WPORM will automatically set `created_on` and `changed_on` when you create or update an `Article` record.
+
+### Example: Disabling Timestamps
+
+If you do not want WPORM to manage any timestamp columns, set `$timestamps = false` in your model:
+
+```php
+use MJ\WPORM\Model;
+use MJ\WPORM\Blueprint;
+
+class LogEntry extends Model {
+    protected $table = 'log_entries';
+    protected $fillable = ['id', 'message'];
+    protected $timestamps = false;
+
+    public function up(Blueprint $table) {
+        $table->id();
+        $table->string('message');
+        $this->schema = $table->toSql();
+    }
+}
+```
+
+In this case, WPORM will not attempt to set or update any timestamp columns automatically.
+
 ## Extending/Improving
-- Add more casts by implementing `WPORM\Casts\CastableInterface`.
+- Add more casts by implementing `MJ\WPORM\Casts\CastableInterface`.
 - Add more schema types in `Blueprint` as needed.
 - Add more model events as needed.
 
@@ -250,9 +303,9 @@ MIT
 # Full Example: Using Every Feature of WPORM
 
 ```php
-use WPORM\Model;
-use WPORM\Schema\Blueprint;
-use WPORM\Schema\SchemaBuilder;
+use MJ\WPORM\Model;
+use MJ\WPORM\Blueprint;
+use MJ\WPORM\SchemaBuilder;
 
 global $wpdb;
 
@@ -446,7 +499,7 @@ This example demonstrates every major feature of WPORM: model definition, schema
 - **Model Booting:** If you add static boot methods or global scopes, ensure you call them before querying if not using the model's constructor.
 - **Schema Changes:** If you change your model's `up()` schema, you may need to drop and recreate the table or use the `SchemaBuilder`'s `table()` method for migrations.
 - **Events:** You can add `creating`, `updating`, and `deleting` methods to your models for event hooks.
-- **Extending Casts:** Implement `WPORM\Casts\CastableInterface` for custom attribute casting logic.
+- **Extending Casts:** Implement `MJ\WPORM\Casts\CastableInterface` for custom attribute casting logic.
 - **Testing:** Always test your queries and schema changes on a staging environment before deploying to production.
 
 ## Contributing

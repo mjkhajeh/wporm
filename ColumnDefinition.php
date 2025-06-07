@@ -1,6 +1,6 @@
 <?php
 
-namespace MJ\WPORM\Schema;
+namespace MJ\WPORM;
 
 class ColumnDefinition
 {
