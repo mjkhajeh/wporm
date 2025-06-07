@@ -1,5 +1,5 @@
 <?php
-namespace WPORM;
+namespace MJ\WPORM;
 
 use WPORM\QueryBuilder;
 use WPORM\Casts\CastableInterface;

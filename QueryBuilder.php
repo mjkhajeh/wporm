@@ -1,6 +1,6 @@
 <?php
 
-namespace WPORM;
+namespace MJ\WPORM;
 
 use wpdb;
 

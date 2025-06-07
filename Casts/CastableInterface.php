@@ -1,5 +1,5 @@
 <?php
-namespace WPORM\Casts;
+namespace MJ\WPORM\Casts;
 
 interface CastableInterface {
     public function get($value);
