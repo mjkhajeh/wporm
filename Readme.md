@@ -98,7 +98,7 @@ $all = Parts::all();
 $part = Parts::find(1);
 
 // Where clause
-$parts = Parts::query()->where('qty', '>', 5)->orderBy('qty', 'desc')->get();
+$parts = Parts::query()->where('qty', '>', 5)->orderBy('qty', 'desc')->limit(10)->get(); // Limit to 10 results
 
 // First result
 $first = Parts::query()->where('product_id', 2)->first();
@@ -241,6 +241,7 @@ $results = Parts::query()
     ->select(['part_id', 'SUM(qty) as total_qty'])
     ->where('product_id', 2)
     ->orderBy('total_qty', 'desc')
+    ->limit(5) // Limit to top 5 parts
     ->get();
 
 // Using $wpdb directly for full custom SQL
@@ -612,7 +613,11 @@ WPORM is inspired by Laravel's Eloquent ORM and adapted for the WordPress ecosys
 ## Performance Tips
 
 - Use indexes for columns you frequently query (e.g., foreign keys, search fields). The ORM's schema builder supports `$table->index('column')`.
-- For large datasets, use pagination and limit/offset queries to avoid memory issues.
+- For large datasets, use pagination and limit/offset queries to avoid memory issues:
+  ```php
+  // For large datasets, use limit and offset for pagination:
+  $usersPage2 = User::query()->orderBy('id')->limit(20)->offset(20)->get(); // Get users 21-40
+  ```
 
 ## FAQ
 
