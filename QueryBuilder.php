@@ -28,6 +28,27 @@ class QueryBuilder {
     }
 
     public function where($column, $operator = null, $value = null) {
+        // Eloquent-style: support array of conditions
+        if (is_array($column)) {
+            // Check if it's an array of arrays (multiple conditions)
+            $isMulti = isset($column[0]) && is_array($column[0]);
+            if ($isMulti) {
+                foreach ($column as $cond) {
+                    // ['col', 'op', 'val'] or ['col', 'val']
+                    if (count($cond) === 3) {
+                        $this->where($cond[0], $cond[1], $cond[2]);
+                    } elseif (count($cond) === 2) {
+                        $this->where($cond[0], '=', $cond[1]);
+                    }
+                }
+            } else {
+                // Associative array: ['col' => 'val', ...]
+                foreach ($column as $key => $val) {
+                    $this->where($key, '=', $val);
+                }
+            }
+            return $this;
+        }
         if (is_callable($column)) {
             // Nested group
             $nested = new self($this->model);
