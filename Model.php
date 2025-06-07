@@ -239,6 +239,57 @@ abstract class Model implements \ArrayAccess {
 		return static::query()->where('id', $id)->first();
 	}
 
+	/**
+	 * updateOrCreate: Find a record matching attributes, update it or create a new one.
+	 *
+	 * @param array $attributes
+	 * @param array $values
+	 * @return static
+	 */
+	public static function updateOrCreate(array $attributes, array $values = []) {
+		$instance = static::query()->where($attributes)->first();
+		if ($instance) {
+			$instance->fill($values);
+			$instance->save();
+			return $instance;
+		}
+		$instance = new static(array_merge($attributes, $values));
+		$instance->save();
+		return $instance;
+	}
+
+	/**
+	 * firstOrCreate: Return the first record matching attributes or create it.
+	 *
+	 * @param array $attributes
+	 * @param array $values
+	 * @return static
+	 */
+	public static function firstOrCreate(array $attributes, array $values = []) {
+		$instance = static::query()->where($attributes)->first();
+		if ($instance) {
+			return $instance;
+		}
+		$instance = new static(array_merge($attributes, $values));
+		$instance->save();
+		return $instance;
+	}
+
+	/**
+	 * firstOrNew: Return the first record matching attributes or instantiate a new one (not saved).
+	 *
+	 * @param array $attributes
+	 * @param array $values
+	 * @return static
+	 */
+	public static function firstOrNew(array $attributes, array $values = []) {
+		$instance = static::query()->where($attributes)->first();
+		if ($instance) {
+			return $instance;
+		}
+		return new static(array_merge($attributes, $values));
+	}
+
 	public function save() {
 		return $this->exists ? $this->update() : $this->insert();
 	}

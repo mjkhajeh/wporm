@@ -126,6 +126,57 @@ $recentUsers = User::query()->where('created_at', '>=', '2025-01-01')->get();
 
 This approach works for any column in your table.
 
+### Creating or Updating Records: updateOrCreate
+
+WPORM provides an `updateOrCreate` method, similar to Laravel Eloquent, for easily updating an existing record or creating a new one if it doesn't exist.
+
+**Usage:**
+
+```php
+// Update if a user with this email exists, otherwise create a new one
+$user = User::updateOrCreate(
+    ['email' => 'user@example.com'],
+    ['name' => 'John Doe', 'country' => 'US']
+);
+```
+
+- The first argument is an array of attributes to search for.
+- The second argument is an array of values to update or set if creating.
+- Returns the updated or newly created model instance.
+
+This is useful for upsert operations, such as syncing data or ensuring a record exists with certain values.
+
+### Creating or Getting Records: firstOrCreate and firstOrNew
+
+WPORM also provides `firstOrCreate` and `firstOrNew` methods, similar to Laravel Eloquent, for convenient record retrieval or creation.
+
+**firstOrCreate Usage:**
+
+```php
+// Get the first user with this email, or create if not found
+$user = User::firstOrCreate(
+    ['email' => 'user@example.com'],
+    ['name' => 'Jane Doe', 'country' => 'US']
+);
+```
+- Returns the first matching record, or creates and saves a new one if none exists.
+
+**firstOrNew Usage:**
+
+```php
+// Get the first user with this email, or instantiate (but do not save) if not found
+$user = User::firstOrNew(
+    ['email' => 'user@example.com'],
+    ['name' => 'Jane Doe', 'country' => 'US']
+);
+if (!$user->exists) {
+    $user->save(); // Save if you want to persist
+}
+```
+- Returns the first matching record, or a new (unsaved) instance if none exists.
+
+These methods are useful for ensuring a record exists, or for preparing a new record with default values if not found.
+
 ### Updating a Record
 ```php
 $part = Parts::find(1);
