@@ -226,6 +226,11 @@ abstract class Model implements \ArrayAccess {
 		return static::applyGlobalScopes($query);
 	}
 
+	public static function newQuery() {
+		$query = new QueryBuilder(new static);
+		return static::applyGlobalScopes($query);
+	}
+
 	public static function all() {
 		return static::query()->get();
 	}

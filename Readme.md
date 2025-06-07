@@ -104,6 +104,28 @@ $parts = Parts::query()->where('qty', '>', 5)->orderBy('qty', 'desc')->get();
 $first = Parts::query()->where('product_id', 2)->first();
 ```
 
+### Querying by a Specific Column
+
+You can easily retrieve records by a specific column using the query builder's `where` method. For example, to get all parts with a specific `product_id`:
+
+```php
+$parts = Parts::query()->where('product_id', 123)->get();
+```
+
+Or, to get the first user by email:
+
+```php
+$user = User::query()->where('email', 'user@example.com')->first();
+```
+
+You can also use other comparison operators:
+
+```php
+$recentUsers = User::query()->where('created_at', '>=', '2025-01-01')->get();
+```
+
+This approach works for any column in your table.
+
 ### Updating a Record
 ```php
 $part = Parts::find(1);
@@ -236,6 +258,20 @@ $results = $wpdb->get_results(
     ARRAY_A
 );
 ```
+
+## Using newQuery()
+
+The `newQuery()` method returns a fresh query builder instance for your model. This is useful when you want to start a new query chain, especially in custom scopes or advanced use cases. It is functionally similar to `query()`, but is a common convention in many ORMs.
+
+**Example:**
+
+```php
+// Start a new query chain for the User model
+$query = User::newQuery();
+$activeUsers = $query->where('active', true)->get();
+```
+
+You can use `newQuery()` anywhere you would use `query()`. Both methods are available for convenience and compatibility with common ORM patterns.
 
 ## Timestamp Columns
 
