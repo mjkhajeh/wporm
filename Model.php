@@ -207,7 +207,14 @@ abstract class Model implements \ArrayAccess {
 			case 'json':
 				return json_encode($value);
 			case 'datetime':
-				return $value instanceof \DateTime ? $value->format('Y-m-d H:i:s') : $value;
+				if ($value instanceof \DateTime) {
+					return $value->format('Y-m-d H:i:s');
+				} elseif (is_numeric($value)) {
+					return date('Y-m-d H:i:s', (int)$value);
+				} elseif (is_string($value)) {
+					return date( 'Y-m-d H:i:s', strtotime($value) );
+				}
+				return $value;
 			case 'timestamp':
 				return $value instanceof \DateTime ? $value->getTimestamp() : (is_numeric($value) ? (int)$value : strtotime($value));
 			default:
