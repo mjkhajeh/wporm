@@ -44,6 +44,24 @@ class QueryBuilder {
             $value = $operator;
             $operator = '=';
         }
+        // Cast DateTime for casted columns (handle nulls too)
+        if (isset($this->model->casts[$column])) {
+            $cast = $this->model->casts[$column];
+            if (($cast === 'datetime' || $cast === 'timestamp') && $value instanceof \DateTime) {
+                if ($cast === 'datetime') {
+                    $value = $value->format('Y-m-d H:i:s');
+                } else {
+                    $value = $value->getTimestamp();
+                }
+            } elseif ($cast === 'datetime' && is_string($value) && strtotime($value) !== false) {
+                // If a string is passed, normalize to Y-m-d H:i:s
+                $value = date('Y-m-d H:i:s', strtotime($value));
+            }
+        }
+        // Always convert DateTime to string for SQL
+        if ($value instanceof \DateTime) {
+            $value = $value->format('Y-m-d H:i:s');
+        }
         $this->wheres[] = "$column $operator %s";
         $this->bindings[] = $value;
         return $this;
