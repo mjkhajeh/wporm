@@ -221,8 +221,17 @@ abstract class Model implements \ArrayAccess {
 		}
 	}
 
+	/**
+	 * Called after a model is retrieved from the database (get/first/find).
+	 * Override in your model to add custom logic.
+	 *
+	 * @return void
+	 */
+	protected function retrieved() {}
+
 	public static function query() {
 		$query = new QueryBuilder(new static);
+		// No property assignment; event logic handled in wrappers and all()/find()
 		return static::applyGlobalScopes($query);
 	}
 
@@ -232,11 +241,40 @@ abstract class Model implements \ArrayAccess {
 	}
 
 	public static function all() {
-		return static::query()->get();
+		$results = static::query()->get();
+		foreach ($results as $instance) {
+			if (method_exists($instance, 'retrieved')) {
+				$instance->retrieved();
+			}
+		}
+		return $results;
 	}
 
 	public static function find($id) {
-		return static::query()->where('id', $id)->first();
+		$instance = static::query()->where('id', $id)->first();
+		if ($instance && method_exists($instance, 'retrieved')) {
+			$instance->retrieved();
+		}
+		return $instance;
+	}
+
+	// Add a wrapper for triggering retrieved() after get/first
+	public static function getWithEvent($query) {
+		$results = $query->get();
+		foreach ($results as $instance) {
+			if (method_exists($instance, 'retrieved')) {
+				$instance->retrieved();
+			}
+		}
+		return $results;
+	}
+
+	public static function firstWithEvent($query) {
+		$instance = $query->first();
+		if ($instance && method_exists($instance, 'retrieved')) {
+			$instance->retrieved();
+		}
+		return $instance;
 	}
 
 	/**
