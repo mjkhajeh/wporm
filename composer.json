@@ -1,0 +1,18 @@
+{
+    "name": "mjkhajeh/wporm",
+    "description": "WPORM is a lightweight, Eloquent-inspired ORM for WordPress plugins and themes. It provides expressive, fluent query building, model relationships, schema management, attribute casting, and event hooks—while fully supporting the WordPress database API and table prefixing. WPORM makes it easy to build modern, maintainable database code in any WordPress project.",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Mjkhajeh\\Wporm\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "MohammadJafar Khajeh",
+            "email": "iron.atoms2@gmail.com"
+        }
+    ],
+    "require": {}
+}
