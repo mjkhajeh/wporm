@@ -12,6 +12,21 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Global scopes**: Add global query constraints to models.
 
 ## Installation
+
+### With Composer (Recommended)
+You can install WPORM via Composer. In your plugin or theme directory, run:
+
+```sh
+composer require your-vendor/wporm
+```
+
+Then include Composer's autoloader in your plugin bootstrap file:
+
+```php
+require_once __DIR__ . '/vendor/autoload.php';
+```
+
+### Manual Installation
 1. Place the `ORM` directory in your plugin folder.
 2. Include the ORM in your plugin bootstrap:
 
