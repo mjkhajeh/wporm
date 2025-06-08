@@ -109,6 +109,58 @@ class QueryBuilder {
         return $this;
     }
 
+    public function whereIn($column, array $values) {
+        if (empty($values)) {
+            // Always false
+            $this->wheres[] = '0=1';
+            return $this;
+        }
+        $placeholders = implode(', ', array_fill(0, count($values), '%s'));
+        $this->wheres[] = "$column IN ($placeholders)";
+        foreach ($values as $v) {
+            $this->bindings[] = $v;
+        }
+        return $this;
+    }
+
+    public function whereNotIn($column, array $values) {
+        if (empty($values)) {
+            // Always true
+            return $this;
+        }
+        $placeholders = implode(', ', array_fill(0, count($values), '%s'));
+        $this->wheres[] = "$column NOT IN ($placeholders)";
+        foreach ($values as $v) {
+            $this->bindings[] = $v;
+        }
+        return $this;
+    }
+
+    public function orWhereIn($column, array $values) {
+        if (empty($values)) {
+            $this->wheres[] = 'OR 0=1';
+            return $this;
+        }
+        $placeholders = implode(', ', array_fill(0, count($values), '%s'));
+        $this->wheres[] = "OR $column IN ($placeholders)";
+        foreach ($values as $v) {
+            $this->bindings[] = $v;
+        }
+        return $this;
+    }
+
+    public function orWhereNotIn($column, array $values) {
+        if (empty($values)) {
+            return $this;
+        }
+        $placeholders = implode(', ', array_fill(0, count($values), '%s'));
+        $this->wheres[] = "OR $column NOT IN ($placeholders)";
+        foreach ($values as $v) {
+            $this->bindings[] = $v;
+        }
+        return $this;
+    }
+
     public function orderBy($column, $direction = 'asc') {
         $this->orders[] = "$column $direction";
         return $this;

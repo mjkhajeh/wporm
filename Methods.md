@@ -83,6 +83,38 @@ $users = User::query()->where('role', 'admin')->get();
 $query = User::newQuery();
 ```
 
+### whereIn($column, array $values)
+**Description:** Add a WHERE ... IN (...) clause to the query.
+
+**Example:**
+```php
+$users = User::query()->whereIn('status', ['active', 'pending'])->get();
+```
+
+### whereNotIn($column, array $values)
+**Description:** Add a WHERE ... NOT IN (...) clause to the query.
+
+**Example:**
+```php
+$users = User::query()->whereNotIn('status', ['banned', 'deleted'])->get();
+```
+
+### orWhereIn($column, array $values)
+**Description:** Add an OR WHERE ... IN (...) clause to the query.
+
+**Example:**
+```php
+$users = User::query()->where('role', 'admin')->orWhereIn('status', ['active', 'pending'])->get();
+```
+
+### orWhereNotIn($column, array $values)
+**Description:** Add an OR WHERE ... NOT IN (...) clause to the query.
+
+**Example:**
+```php
+$users = User::query()->where('role', 'admin')->orWhereNotIn('status', ['banned', 'deleted'])->get();
+```
+
 ---
 
 ## Retrieval Methods
