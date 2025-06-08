@@ -424,6 +424,81 @@ class QueryBuilder {
         throw new \BadMethodCallException("Method {$method} does not exist.");
     }
 
+    // JSON WHERE CLAUSES
+    public function whereJson($column, $operator = null, $value = null) {
+        if (func_num_args() === 2) {
+            $value = $operator;
+            $operator = '=';
+        }
+        $jsonPath = $this->parseJsonPath($column);
+        $this->wheres[] = "JSON_UNQUOTE(JSON_EXTRACT($jsonPath)) $operator %s";
+        $this->bindings[] = $value;
+        return $this;
+    }
+
+    public function orWhereJson($column, $operator = null, $value = null) {
+        if (func_num_args() === 2) {
+            $value = $operator;
+            $operator = '=';
+        }
+        $jsonPath = $this->parseJsonPath($column);
+        $this->wheres[] = "OR JSON_UNQUOTE(JSON_EXTRACT($jsonPath)) $operator %s";
+        $this->bindings[] = $value;
+        return $this;
+    }
+
+    public function whereJsonContains($column, $value) {
+        $jsonPath = $this->parseJsonPath($column);
+        $this->wheres[] = "JSON_CONTAINS(JSON_EXTRACT($jsonPath), %s)";
+        $this->bindings[] = is_array($value) ? json_encode($value) : json_encode([$value]);
+        return $this;
+    }
+
+    public function orWhereJsonContains($column, $value) {
+        $jsonPath = $this->parseJsonPath($column);
+        $this->wheres[] = "OR JSON_CONTAINS(JSON_EXTRACT($jsonPath), %s)";
+        $this->bindings[] = is_array($value) ? json_encode($value) : json_encode([$value]);
+        return $this;
+    }
+
+    public function whereJsonLength($column, $operator = null, $value = null) {
+        if (func_num_args() === 2) {
+            $value = $operator;
+            $operator = '=';
+        }
+        $jsonPath = $this->parseJsonPath($column);
+        $this->wheres[] = "JSON_LENGTH(JSON_EXTRACT($jsonPath)) $operator %s";
+        $this->bindings[] = $value;
+        return $this;
+    }
+
+    public function orWhereJsonLength($column, $operator = null, $value = null) {
+        if (func_num_args() === 2) {
+            $value = $operator;
+            $operator = '=';
+        }
+        $jsonPath = $this->parseJsonPath($column);
+        $this->wheres[] = "OR JSON_LENGTH(JSON_EXTRACT($jsonPath)) $operator %s";
+        $this->bindings[] = $value;
+        return $this;
+    }
+
+    // Helper to convert 'col->foo->bar' to JSON_EXTRACT(col, '$.foo.bar')
+    protected function parseJsonPath($column) {
+        if (strpos($column, '->') === false && strpos($column, '=>') === false) {
+            return $column;
+        }
+        $col = str_replace('=>', '->', $column);
+        $parts = explode('->', $col);
+        $field = array_shift($parts);
+        $path = '$';
+        foreach ($parts as $p) {
+            $p = trim($p, "'\"");
+            $path .= "." . $p;
+        }
+        return "$field, '$path'";
+    }
+
     protected function buildSelectQuery() {
         if (empty($this->wheres)) {
             $where = '';

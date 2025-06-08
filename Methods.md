@@ -12,6 +12,7 @@ This document describes all public and static methods of the `MJ\WPORM\Model` cl
 - [Persistence Methods](#persistence-methods)
 - [Relationship Methods](#relationship-methods)
 - [Utility Methods](#utility-methods)
+- [JSON Where Clauses](#json-where-clauses)
 
 ---
 
@@ -400,6 +401,54 @@ if ($user->isDirty('name')) { /* ... */ }
 ```php
 $changes = $user->getChanges();
 ```
+
+---
+
+## JSON Where Clauses
+
+### whereJson / orWhereJson
+Query a value inside a JSON column using MySQL/MariaDB JSON path syntax. The `->` operator is used to specify the path.
+
+```php
+// Find users where preferences->dining->meal is 'salad'
+$users = $query->whereJson('preferences->dining->meal', 'salad')->get();
+
+// With operator
+$users = $query->whereJson('preferences->dining->meal', '!=', 'pizza')->get();
+
+// OR variant
+$users = $query->orWhereJson('preferences->dining->meal', 'salad')->get();
+```
+
+### whereJsonContains / orWhereJsonContains
+Query if a JSON array column contains a value or set of values.
+
+```php
+// Find users where options->languages contains 'en'
+$users = $query->whereJsonContains('options->languages', 'en')->get();
+
+// Find users where options->languages contains both 'en' and 'de'
+$users = $query->whereJsonContains('options->languages', ['en', 'de'])->get();
+
+// OR variant
+$users = $query->orWhereJsonContains('options->languages', 'fr')->get();
+```
+
+### whereJsonLength / orWhereJsonLength
+Query the length of a JSON array at a given path.
+
+```php
+// Find users where options->languages array is empty
+$users = $query->whereJsonLength('options->languages', 0)->get();
+
+// Find users where options->languages array has more than 1 element
+$users = $query->whereJsonLength('options->languages', '>', 1)->get();
+
+// OR variant
+$users = $query->orWhereJsonLength('options->languages', '>=', 3)->get();
+```
+
+**Note:** These methods require your database to support JSON column types and functions (MySQL 5.7+/MariaDB 10.2+/PostgreSQL 9.2+).
 
 ---
 
