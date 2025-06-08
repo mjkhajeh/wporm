@@ -361,6 +361,36 @@ class QueryBuilder {
         return $this;
     }
 
+    /**
+     * Order by latest (descending, default column 'created_at')
+     */
+    public function latest($column = 'created_at') {
+        return $this->orderBy($column, 'desc');
+    }
+
+    /**
+     * Order by oldest (ascending, default column 'created_at')
+     */
+    public function oldest($column = 'created_at') {
+        return $this->orderBy($column, 'asc');
+    }
+
+    /**
+     * Order randomly
+     */
+    public function inRandomOrder() {
+        $this->orders[] = 'RAND()';
+        return $this;
+    }
+
+    /**
+     * Remove all order by clauses
+     */
+    public function reorder() {
+        $this->orders = [];
+        return $this;
+    }
+
     public function limit($limit) {
         $this->limit = (int) $limit;
         return $this;

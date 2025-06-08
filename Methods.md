@@ -280,6 +280,41 @@ $sizes = DB::table('sizes')
     ->get();
 ```
 
+### latest($column = 'created_at')
+**Description:** Order the results by the given column in descending order (default: 'created_at').
+
+**Example:**
+```php
+$users = User::query()->latest()->get();
+$users = User::query()->latest('id')->get();
+```
+
+### oldest($column = 'created_at')
+**Description:** Order the results by the given column in ascending order (default: 'created_at').
+
+**Example:**
+```php
+$users = User::query()->oldest()->get();
+$users = User::query()->oldest('id')->get();
+```
+
+### inRandomOrder()
+**Description:** Order the results randomly (ORDER BY RAND()).
+
+**Example:**
+```php
+$users = User::query()->inRandomOrder()->get();
+```
+
+### reorder()
+**Description:** Remove all previous order by clauses from the query.
+
+**Example:**
+```php
+$query = User::query()->orderBy('name');
+$unorderedUsers = $query->reorder()->get();
+```
+
 ---
 
 ## Retrieval Methods
