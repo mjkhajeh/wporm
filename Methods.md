@@ -147,6 +147,24 @@ $users = User::query()->whereNotLike('name', '%test%')->get();
 $users = User::query()->where('role', 'admin')->orWhereNotLike('name', '%test%')->get();
 ```
 
+### whereNot($column, $operator = null, $value = null)
+**Description:** Add a WHERE ... NOT ... clause to the query (e.g., WHERE column NOT = value).
+
+**Example:**
+```php
+$users = User::query()->whereNot('status', 'active')->get();
+$users = User::query()->whereNot('age', '>=', 18)->get();
+```
+
+### orWhereNot($column, $operator = null, $value = null)
+**Description:** Add an OR WHERE ... NOT ... clause to the query (e.g., OR column NOT = value).
+
+**Example:**
+```php
+$users = User::query()->where('role', 'admin')->orWhereNot('status', 'active')->get();
+$users = User::query()->orWhereNot('age', '<', 18)->get();
+```
+
 ---
 
 ## Retrieval Methods

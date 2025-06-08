@@ -185,6 +185,26 @@ class QueryBuilder {
         return $this;
     }
 
+    public function whereNot($column, $operator = null, $value = null) {
+        if (func_num_args() === 2) {
+            $value = $operator;
+            $operator = '=';
+        }
+        $this->wheres[] = "$column NOT $operator %s";
+        $this->bindings[] = $value;
+        return $this;
+    }
+
+    public function orWhereNot($column, $operator = null, $value = null) {
+        if (func_num_args() === 2) {
+            $value = $operator;
+            $operator = '=';
+        }
+        $this->wheres[] = "OR $column NOT $operator %s";
+        $this->bindings[] = $value;
+        return $this;
+    }
+
     public function orderBy($column, $direction = 'asc') {
         $this->orders[] = "$column $direction";
         return $this;
