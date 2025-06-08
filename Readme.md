@@ -4,6 +4,10 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 
 ![wporm](https://github.com/user-attachments/assets/f84f6905-4279-4ee3-9e1f-9fb9a3fd2e51)
 
+- [Methods list and documents](https://github.com/mjkhajeh/wporm/blob/main/Methods.md)
+- [Blueprint and column types documents](https://github.com/mjkhajeh/wporm/blob/main/Blueprint.md)
+- [Casts types and define custom casts](https://github.com/mjkhajeh/wporm/blob/main/CastsType.md)
+
 ## Features
 - **Model-based data access**: Define models for your tables and interact with them using PHP objects.
 - **Schema management**: Create and modify tables using a fluent schema builder.
