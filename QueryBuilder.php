@@ -15,6 +15,8 @@ class QueryBuilder {
     protected $limit;
     protected $offset;
     protected $joins = [];
+    protected $groups = [];
+    protected $havings = [];
 
     public function __construct($model) {
         global $wpdb;
@@ -575,6 +577,42 @@ class QueryBuilder {
         return $this;
     }
 
+    /**
+     * Add GROUP BY clause(s) to the query.
+     */
+    public function groupBy($columns) {
+        if (!is_array($columns)) {
+            $columns = func_get_args();
+        }
+        foreach ($columns as $col) {
+            $this->groups[] = $col;
+        }
+        return $this;
+    }
+
+    /**
+     * Add a HAVING clause to the query.
+     */
+    public function having($column, $operator = null, $value = null) {
+        if (func_num_args() === 2) {
+            $value = $operator;
+            $operator = '=';
+        }
+        $this->havings[] = ["$column $operator %s", [$value]];
+        return $this;
+    }
+
+    /**
+     * Add a HAVING BETWEEN ... AND ... clause to the query.
+     */
+    public function havingBetween($column, array $values) {
+        if (count($values) !== 2) {
+            throw new \InvalidArgumentException('havingBetween expects exactly 2 values.');
+        }
+        $this->havings[] = ["$column BETWEEN %s AND %s", $values];
+        return $this;
+    }
+
     // Helper to convert 'col->foo->bar' to JSON_EXTRACT(col, '$.foo.bar')
     protected function parseJsonPath($column) {
         if (strpos($column, '->') === false && strpos($column, '=>') === false) {
@@ -626,6 +664,21 @@ class QueryBuilder {
         }
         if (!empty($where)) {
             $sql .= " WHERE $where";
+        }
+        // GROUP BY
+        if (!empty($this->groups)) {
+            $sql .= " GROUP BY " . implode(", ", $this->groups);
+        }
+        // HAVING
+        if (!empty($this->havings)) {
+            $havingParts = [];
+            foreach ($this->havings as [$expr, $vals]) {
+                $havingParts[] = $expr;
+                foreach ($vals as $v) {
+                    $this->bindings[] = $v;
+                }
+            }
+            $sql .= " HAVING " . implode(' AND ', $havingParts);
         }
         if (!empty($this->orders)) {
             $sql .= " ORDER BY " . implode(", ", $this->orders);

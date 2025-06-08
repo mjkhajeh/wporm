@@ -315,6 +315,38 @@ $query = User::query()->orderBy('name');
 $unorderedUsers = $query->reorder()->get();
 ```
 
+### groupBy($columns)
+**Description:** Add GROUP BY clause(s) to the query. Accepts a string, array, or multiple arguments.
+
+**Example:**
+```php
+$users = User::query()->groupBy('country')->get();
+$users = User::query()->groupBy(['country', 'status'])->get();
+$users = User::query()->groupBy('country', 'status')->get();
+```
+
+### having($column, $operator = null, $value = null)
+**Description:** Add a HAVING clause to the query. Usage is similar to where().
+
+**Example:**
+```php
+$users = User::query()
+    ->groupBy('country')
+    ->having('count(*)', '>', 10)
+    ->get();
+```
+
+### havingBetween($column, array $values)
+**Description:** Add a HAVING ... BETWEEN ... AND ... clause to the query.
+
+**Example:**
+```php
+$users = User::query()
+    ->groupBy('country')
+    ->havingBetween('count(*)', [5, 20])
+    ->get();
+```
+
 ---
 
 ## Retrieval Methods
