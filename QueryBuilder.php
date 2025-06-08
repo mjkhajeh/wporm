@@ -161,6 +161,30 @@ class QueryBuilder {
         return $this;
     }
 
+    public function whereLike($column, $value) {
+        $this->wheres[] = "$column LIKE %s";
+        $this->bindings[] = $value;
+        return $this;
+    }
+
+    public function orWhereLike($column, $value) {
+        $this->wheres[] = "OR $column LIKE %s";
+        $this->bindings[] = $value;
+        return $this;
+    }
+
+    public function whereNotLike($column, $value) {
+        $this->wheres[] = "$column NOT LIKE %s";
+        $this->bindings[] = $value;
+        return $this;
+    }
+
+    public function orWhereNotLike($column, $value) {
+        $this->wheres[] = "OR $column NOT LIKE %s";
+        $this->bindings[] = $value;
+        return $this;
+    }
+
     public function orderBy($column, $direction = 'asc') {
         $this->orders[] = "$column $direction";
         return $this;

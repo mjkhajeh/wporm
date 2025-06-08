@@ -115,6 +115,38 @@ $users = User::query()->where('role', 'admin')->orWhereIn('status', ['active', '
 $users = User::query()->where('role', 'admin')->orWhereNotIn('status', ['banned', 'deleted'])->get();
 ```
 
+### whereLike($column, $value)
+**Description:** Add a WHERE ... LIKE ... clause to the query.
+
+**Example:**
+```php
+$users = User::query()->whereLike('name', '%john%')->get();
+```
+
+### orWhereLike($column, $value)
+**Description:** Add an OR WHERE ... LIKE ... clause to the query.
+
+**Example:**
+```php
+$users = User::query()->where('role', 'admin')->orWhereLike('name', '%john%')->get();
+```
+
+### whereNotLike($column, $value)
+**Description:** Add a WHERE ... NOT LIKE ... clause to the query.
+
+**Example:**
+```php
+$users = User::query()->whereNotLike('name', '%test%')->get();
+```
+
+### orWhereNotLike($column, $value)
+**Description:** Add an OR WHERE ... NOT LIKE ... clause to the query.
+
+**Example:**
+```php
+$users = User::query()->where('role', 'admin')->orWhereNotLike('name', '%test%')->get();
+```
+
 ---
 
 ## Retrieval Methods
