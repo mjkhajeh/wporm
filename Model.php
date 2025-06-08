@@ -1,6 +1,12 @@
 <?php
 namespace MJ\WPORM;
 
+/**
+ * Class Model
+ *
+ * @method string getTable()   Get the table name for the model instance
+ * @method static string tableName()   Get the table name for the model statically
+ */
 abstract class Model implements \ArrayAccess {
 	protected $table;
 	protected $primaryKey = 'id';
@@ -382,7 +388,22 @@ abstract class Model implements \ArrayAccess {
 		return true;
 	}
 
-	public function getTable() {
+	/**
+	 * Get the table name for the model (static context).
+	 * @return string
+	 */
+	public static function tableName()
+	{
+		$instance = new static;
+		return $instance->getTable();
+	}
+
+	/**
+	 * Get the table name for the model (instance context).
+	 * @return string
+	 */
+	public function getTable(): string
+	{
 		global $wpdb;
 		// Only add prefix if not already present
 		if (isset($this->table) && strpos($this->table, $wpdb->prefix) === 0) {
