@@ -14,6 +14,7 @@ class QueryBuilder {
     protected $orders = [];
     protected $limit;
     protected $offset;
+    protected $joins = [];
 
     public function __construct($model) {
         global $wpdb;
@@ -483,6 +484,67 @@ class QueryBuilder {
         return $this;
     }
 
+    /**
+     * Add an INNER JOIN clause to the query.
+     * Usage: ->join('table', 'table.col', '=', 'other.col')
+     */
+    public function join($table, $first = null, $operator = null, $second = null, $type = 'INNER') {
+        if (is_callable($first)) {
+            // Support closure for advanced join conditions
+            $join = new static($this->model);
+            $first($join);
+            $this->joins[] = [
+                'type' => $type,
+                'table' => $table,
+                'clause' => $join->wheres ? '(' . implode(' AND ', $join->wheres) . ')' : '1=1',
+                'bindings' => $join->bindings,
+            ];
+        } elseif ($first && $operator && $second) {
+            $this->joins[] = [
+                'type' => $type,
+                'table' => $table,
+                'clause' => "$first $operator $second",
+                'bindings' => [],
+            ];
+        } else {
+            $this->joins[] = [
+                'type' => $type,
+                'table' => $table,
+                'clause' => null,
+                'bindings' => [],
+            ];
+        }
+        return $this;
+    }
+
+    /**
+     * Add a LEFT JOIN clause to the query.
+     */
+    public function leftJoin($table, $first = null, $operator = null, $second = null) {
+        return $this->join($table, $first, $operator, $second, 'LEFT');
+    }
+
+    /**
+     * Add a RIGHT JOIN clause to the query.
+     */
+    public function rightJoin($table, $first = null, $operator = null, $second = null) {
+        return $this->join($table, $first, $operator, $second, 'RIGHT');
+    }
+
+    /**
+     * Add a CROSS JOIN clause to the query.
+     * Usage: ->crossJoin('table')
+     */
+    public function crossJoin($table) {
+        $this->joins[] = [
+            'type' => 'CROSS',
+            'table' => $table,
+            'clause' => null,
+            'bindings' => [],
+        ];
+        return $this;
+    }
+
     // Helper to convert 'col->foo->bar' to JSON_EXTRACT(col, '$.foo.bar')
     protected function parseJsonPath($column) {
         if (strpos($column, '->') === false && strpos($column, '=>') === false) {
@@ -518,6 +580,20 @@ class QueryBuilder {
             }
         }
         $sql = "SELECT " . implode(", ", $this->selects) . " FROM {$this->table}";
+        // Add JOIN clauses
+        if (!empty($this->joins)) {
+            foreach ($this->joins as $join) {
+                $type = $join['type'];
+                $table = $join['table'];
+                if ($type === 'CROSS') {
+                    $sql .= " CROSS JOIN $table";
+                } elseif ($join['clause']) {
+                    $sql .= " $type JOIN $table ON {$join['clause']}";
+                } else {
+                    $sql .= " $type JOIN $table";
+                }
+            }
+        }
         if (!empty($where)) {
             $sql .= " WHERE $where";
         }

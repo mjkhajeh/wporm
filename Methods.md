@@ -232,6 +232,54 @@ $users = User::query()->where('country', 'US')->orWhereNone([
 ])->get();
 ```
 
+### join($table, $first = null, $operator = null, $second = null, $type = 'INNER')
+**Description:** Add an INNER JOIN clause to the query. Supports closure for advanced ON conditions.
+
+**Example:**
+```php
+// Simple join
+$users = User::query()
+    ->join('profiles', 'users.id', '=', 'profiles.user_id')
+    ->get();
+
+// Join with closure for complex ON
+$users = User::query()
+    ->join('profiles', function($join) {
+        $join->where('profiles.active', 1);
+    })
+    ->get();
+```
+
+### leftJoin($table, $first = null, $operator = null, $second = null)
+**Description:** Add a LEFT JOIN clause to the query.
+
+**Example:**
+```php
+$users = User::query()
+    ->leftJoin('profiles', 'users.id', '=', 'profiles.user_id')
+    ->get();
+```
+
+### rightJoin($table, $first = null, $operator = null, $second = null)
+**Description:** Add a RIGHT JOIN clause to the query.
+
+**Example:**
+```php
+$users = User::query()
+    ->rightJoin('profiles', 'users.id', '=', 'profiles.user_id')
+    ->get();
+```
+
+### crossJoin($table)
+**Description:** Add a CROSS JOIN clause to the query (cartesian product).
+
+**Example:**
+```php
+$sizes = DB::table('sizes')
+    ->crossJoin('colors')
+    ->get();
+```
+
 ---
 
 ## Retrieval Methods
