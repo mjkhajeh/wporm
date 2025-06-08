@@ -205,6 +205,156 @@ class QueryBuilder {
         return $this;
     }
 
+    public function whereAny(array $conditions) {
+        $orGroup = [];
+        $bindings = [];
+        foreach ($conditions as $cond) {
+            if (is_array($cond)) {
+                if (count($cond) === 3) {
+                    $orGroup[] = "$cond[0] $cond[1] %s";
+                    $bindings[] = $cond[2];
+                } elseif (count($cond) === 2) {
+                    $orGroup[] = "$cond[0] = %s";
+                    $bindings[] = $cond[1];
+                }
+            } elseif (is_string($cond)) {
+                $orGroup[] = $cond;
+            }
+        }
+        if ($orGroup) {
+            $this->wheres[] = '(' . implode(' OR ', $orGroup) . ')';
+            foreach ($bindings as $b) {
+                $this->bindings[] = $b;
+            }
+        }
+        return $this;
+    }
+
+    public function orWhereAny(array $conditions) {
+        $orGroup = [];
+        $bindings = [];
+        foreach ($conditions as $cond) {
+            if (is_array($cond)) {
+                if (count($cond) === 3) {
+                    $orGroup[] = "$cond[0] $cond[1] %s";
+                    $bindings[] = $cond[2];
+                } elseif (count($cond) === 2) {
+                    $orGroup[] = "$cond[0] = %s";
+                    $bindings[] = $cond[1];
+                }
+            } elseif (is_string($cond)) {
+                $orGroup[] = $cond;
+            }
+        }
+        if ($orGroup) {
+            $this->wheres[] = 'OR (' . implode(' OR ', $orGroup) . ')';
+            foreach ($bindings as $b) {
+                $this->bindings[] = $b;
+            }
+        }
+        return $this;
+    }
+
+    public function whereAll(array $conditions) {
+        $andGroup = [];
+        $bindings = [];
+        foreach ($conditions as $cond) {
+            if (is_array($cond)) {
+                if (count($cond) === 3) {
+                    $andGroup[] = "$cond[0] $cond[1] %s";
+                    $bindings[] = $cond[2];
+                } elseif (count($cond) === 2) {
+                    $andGroup[] = "$cond[0] = %s";
+                    $bindings[] = $cond[1];
+                }
+            } elseif (is_string($cond)) {
+                $andGroup[] = $cond;
+            }
+        }
+        if ($andGroup) {
+            $this->wheres[] = '(' . implode(' AND ', $andGroup) . ')';
+            foreach ($bindings as $b) {
+                $this->bindings[] = $b;
+            }
+        }
+        return $this;
+    }
+
+    public function orWhereAll(array $conditions) {
+        $andGroup = [];
+        $bindings = [];
+        foreach ($conditions as $cond) {
+            if (is_array($cond)) {
+                if (count($cond) === 3) {
+                    $andGroup[] = "$cond[0] $cond[1] %s";
+                    $bindings[] = $cond[2];
+                } elseif (count($cond) === 2) {
+                    $andGroup[] = "$cond[0] = %s";
+                    $bindings[] = $cond[1];
+                }
+            } elseif (is_string($cond)) {
+                $andGroup[] = $cond;
+            }
+        }
+        if ($andGroup) {
+            $this->wheres[] = 'OR (' . implode(' AND ', $andGroup) . ')';
+            foreach ($bindings as $b) {
+                $this->bindings[] = $b;
+            }
+        }
+        return $this;
+    }
+
+    public function whereNone(array $conditions) {
+        $notGroup = [];
+        $bindings = [];
+        foreach ($conditions as $cond) {
+            if (is_array($cond)) {
+                if (count($cond) === 3) {
+                    $notGroup[] = "$cond[0] $cond[1] %s";
+                    $bindings[] = $cond[2];
+                } elseif (count($cond) === 2) {
+                    $notGroup[] = "$cond[0] = %s";
+                    $bindings[] = $cond[1];
+                }
+            } elseif (is_string($cond)) {
+                $notGroup[] = $cond;
+            }
+        }
+        if ($notGroup) {
+            $this->wheres[] = 'NOT (' . implode(' OR ', $notGroup) . ')';
+            foreach ($bindings as $b) {
+                $this->bindings[] = $b;
+            }
+        }
+        return $this;
+    }
+
+    public function orWhereNone(array $conditions) {
+        $notGroup = [];
+        $bindings = [];
+        foreach ($conditions as $cond) {
+            if (is_array($cond)) {
+                if (count($cond) === 3) {
+                    $notGroup[] = "$cond[0] $cond[1] %s";
+                    $bindings[] = $cond[2];
+                } elseif (count($cond) === 2) {
+                    $notGroup[] = "$cond[0] = %s";
+                    $bindings[] = $cond[1];
+                }
+            } elseif (is_string($cond)) {
+                $notGroup[] = $cond;
+            }
+        }
+        if ($notGroup) {
+            $this->wheres[] = 'OR NOT (' . implode(' OR ', $notGroup) . ')';
+            foreach ($bindings as $b) {
+                $this->bindings[] = $b;
+            }
+        }
+        return $this;
+    }
+
     public function orderBy($column, $direction = 'asc') {
         $this->orders[] = "$column $direction";
         return $this;

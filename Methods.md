@@ -165,6 +165,72 @@ $users = User::query()->where('role', 'admin')->orWhereNot('status', 'active')->
 $users = User::query()->orWhereNot('age', '<', 18)->get();
 ```
 
+### whereAny(array $conditions)
+**Description:** Add a group of OR conditions (any must match) to the query. Equivalent to Eloquent's whereAny.
+
+**Example:**
+```php
+$users = User::query()->whereAny([
+    ['status', 'active'],
+    ['role', 'admin'],
+])->get();
+```
+
+### orWhereAny(array $conditions)
+**Description:** Add a group of OR conditions (any must match) as an OR clause to the query.
+
+**Example:**
+```php
+$users = User::query()->where('country', 'US')->orWhereAny([
+    ['status', 'active'],
+    ['role', 'admin'],
+])->get();
+```
+
+### whereAll(array $conditions)
+**Description:** Add a group of AND conditions (all must match) to the query. Equivalent to Eloquent's whereAll.
+
+**Example:**
+```php
+$users = User::query()->whereAll([
+    ['status', 'active'],
+    ['role', 'admin'],
+])->get();
+```
+
+### orWhereAll(array $conditions)
+**Description:** Add a group of AND conditions (all must match) as an OR clause to the query.
+
+**Example:**
+```php
+$users = User::query()->where('country', 'US')->orWhereAll([
+    ['status', 'active'],
+    ['role', 'admin'],
+])->get();
+```
+
+### whereNone(array $conditions)
+**Description:** Add a group of OR conditions, none of which must match (NOT (cond1 OR cond2 ...)). Equivalent to Eloquent's whereNone.
+
+**Example:**
+```php
+$users = User::query()->whereNone([
+    ['status', 'banned'],
+    ['role', 'guest'],
+])->get();
+```
+
+### orWhereNone(array $conditions)
+**Description:** Add a group of OR conditions, none of which must match, as an OR clause (OR NOT (...)).
+
+**Example:**
+```php
+$users = User::query()->where('country', 'US')->orWhereNone([
+    ['status', 'banned'],
+    ['role', 'guest'],
+])->get();
+```
+
 ---
 
 ## Retrieval Methods
