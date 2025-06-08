@@ -149,12 +149,17 @@ abstract class Model implements \ArrayAccess {
 	}
 
 	public function __call($method, $parameters) {
-		// Handle dynamic scopes: scopeXyz()
-		if (strpos($method, 'scope') === 0 && method_exists($this, $method)) {
-			return $this->$method(...$parameters);
-		}
-		throw new \BadMethodCallException("Method {$method} does not exist.");
-	}
+        // Proxy query builder methods to QueryBuilder for fluent API
+        $query = static::query();
+        if (method_exists($query, $method)) {
+            return $query->$method(...$parameters);
+        }
+        // Handle dynamic scopes: scopeXyz()
+        if (strpos($method, 'scope') === 0 && method_exists($this, $method)) {
+            return $this->$method(...$parameters);
+        }
+        throw new \BadMethodCallException("Method {$method} does not exist.");
+    }
 
 	protected function castGet($key, $value) {
 		if (!isset($this->casts[$key])) return $value;
