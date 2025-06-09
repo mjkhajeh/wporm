@@ -427,6 +427,46 @@ Model::query()->orWhereNotBetweenColumns('created_at', ['start_date', 'end_date'
 
 ---
 
+### whereNull($column)
+Add a WHERE ... IS NULL clause to the query.
+
+**Usage:**
+```php
+Model::query()->whereNull('deleted_at')->get();
+```
+
+---
+
+### orWhereNull($column)
+Add an OR ... IS NULL clause to the query.
+
+**Usage:**
+```php
+Model::query()->where('status', 'active')->orWhereNull('deleted_at')->get();
+```
+
+---
+
+### whereNotNull($column)
+Add a WHERE ... IS NOT NULL clause to the query.
+
+**Usage:**
+```php
+Model::query()->whereNotNull('email_verified_at')->get();
+```
+
+---
+
+### orWhereNotNull($column)
+Add an OR ... IS NOT NULL clause to the query.
+
+**Usage:**
+```php
+Model::query()->where('status', 'active')->orWhereNotNull('email_verified_at')->get();
+```
+
+---
+
 ## Retrieval Methods
 
 ### all()

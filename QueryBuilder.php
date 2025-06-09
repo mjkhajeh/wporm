@@ -432,6 +432,27 @@ class QueryBuilder {
         return $this;
     }
 
+    // WHERE NULL / NOT NULL
+    public function whereNull($column) {
+        $this->wheres[] = "$column IS NULL";
+        return $this;
+    }
+
+    public function orWhereNull($column) {
+        $this->wheres[] = "OR $column IS NULL";
+        return $this;
+    }
+
+    public function whereNotNull($column) {
+        $this->wheres[] = "$column IS NOT NULL";
+        return $this;
+    }
+
+    public function orWhereNotNull($column) {
+        $this->wheres[] = "OR $column IS NOT NULL";
+        return $this;
+    }
+
     public function orderBy($column, $direction = 'asc') {
         $this->orders[] = "$column $direction";
         return $this;
