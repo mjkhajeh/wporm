@@ -347,6 +347,26 @@ $users = User::query()
     ->get();
 ```
 
+### whereBetween($column, array $values)
+Add a WHERE ... BETWEEN ... AND ... clause to the query.
+
+**Usage:**
+```php
+Model::query()->whereBetween('price', [100, 200])->get();
+```
+
+---
+
+### orWhereBetween($column, array $values)
+Add an OR ... BETWEEN ... AND ... clause to the query.
+
+**Usage:**
+```php
+Model::query()->orWhereBetween('created_at', ['2024-01-01', '2024-12-31'])->get();
+```
+
+---
+
 ---
 
 ## Retrieval Methods
