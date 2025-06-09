@@ -589,6 +589,54 @@ Model::query()->orWhereColumn('price', 'cost')->get(); // Defaults to '='
 
 ---
 
+### whereExists(Closure $callback)
+Add a WHERE EXISTS (subquery) clause to the query. The callback receives a subquery builder.
+
+**Usage:**
+```php
+Model::query()->whereExists(function($q) {
+    $q->where('status', 'active');
+})->get();
+```
+
+---
+
+### orWhereExists(Closure $callback)
+Add an OR EXISTS (subquery) clause to the query. The callback receives a subquery builder.
+
+**Usage:**
+```php
+Model::query()->where('type', 'user')->orWhereExists(function($q) {
+    $q->where('status', 'active');
+})->get();
+```
+
+---
+
+### whereNotExists(Closure $callback)
+Add a WHERE NOT EXISTS (subquery) clause to the query. The callback receives a subquery builder.
+
+**Usage:**
+```php
+Model::query()->whereNotExists(function($q) {
+    $q->where('deleted_at', '!=', null);
+})->get();
+```
+
+---
+
+### orWhereNotExists(Closure $callback)
+Add an OR NOT EXISTS (subquery) clause to the query. The callback receives a subquery builder.
+
+**Usage:**
+```php
+Model::query()->where('type', 'user')->orWhereNotExists(function($q) {
+    $q->where('deleted_at', '!=', null);
+})->get();
+```
+
+---
+
 ## Retrieval Methods
 
 ### all()

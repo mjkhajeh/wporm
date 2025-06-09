@@ -952,4 +952,43 @@ class QueryBuilder {
             }
         }
     }
+
+    // WHERE EXISTS / NOT EXISTS
+    public function whereExists($callback) {
+        $sub = new self($this->model);
+        $callback($sub);
+        $sql = $sub->buildSelectQuery();
+        // Remove SELECT ... FROM ... to just the subquery
+        $sql = preg_replace('/^SELECT .* FROM /i', 'SELECT 1 FROM ', $sql);
+        $this->wheres[] = "EXISTS ($sql)";
+        $this->bindings = array_merge($this->bindings, $sub->bindings);
+        return $this;
+    }
+    public function orWhereExists($callback) {
+        $sub = new self($this->model);
+        $callback($sub);
+        $sql = $sub->buildSelectQuery();
+        $sql = preg_replace('/^SELECT .* FROM /i', 'SELECT 1 FROM ', $sql);
+        $this->wheres[] = "OR EXISTS ($sql)";
+        $this->bindings = array_merge($this->bindings, $sub->bindings);
+        return $this;
+    }
+    public function whereNotExists($callback) {
+        $sub = new self($this->model);
+        $callback($sub);
+        $sql = $sub->buildSelectQuery();
+        $sql = preg_replace('/^SELECT .* FROM /i', 'SELECT 1 FROM ', $sql);
+        $this->wheres[] = "NOT EXISTS ($sql)";
+        $this->bindings = array_merge($this->bindings, $sub->bindings);
+        return $this;
+    }
+    public function orWhereNotExists($callback) {
+        $sub = new self($this->model);
+        $callback($sub);
+        $sql = $sub->buildSelectQuery();
+        $sql = preg_replace('/^SELECT .* FROM /i', 'SELECT 1 FROM ', $sql);
+        $this->wheres[] = "OR NOT EXISTS ($sql)";
+        $this->bindings = array_merge($this->bindings, $sub->bindings);
+        return $this;
+    }
 }
