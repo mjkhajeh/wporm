@@ -17,6 +17,7 @@ class QueryBuilder {
     protected $joins = [];
     protected $groups = [];
     protected $havings = [];
+    protected $with = [];
 
     public function __construct($model) {
         global $wpdb;
@@ -403,6 +404,24 @@ class QueryBuilder {
         return $this;
     }
 
+    /**
+     * Eager load relation with constraints (closure).
+     * Usage: ->with(['history' => function($query) { $query->where(...); }])
+     */
+    public function with($relations) {
+        if (!is_array($relations)) {
+            $relations = func_get_args();
+        }
+        foreach ($relations as $key => $value) {
+            if (is_int($key)) {
+                $this->with[] = $value;
+            } else {
+                $this->with[$key] = $value;
+            }
+        }
+        return $this;
+    }
+
     public function get() {
         $sql = $this->buildSelectQuery();
         if (!empty($this->bindings)) {
@@ -411,11 +430,21 @@ class QueryBuilder {
         $results = $this->wpdb->get_results($sql, ARRAY_A);
         if (!$results) return [];
         $modelClass = get_class($this->model);
-        return array_map(function ($row) use ($modelClass) {
-            // Always hydrate using newFromBuilder to ensure $exists is set
+        $models = array_map(function ($row) use ($modelClass) {
             $instance = (new $modelClass)->newFromBuilder($row);
             return $instance;
         }, $results);
+        // Eager load relations if requested
+        if (!empty($this->with) && !empty($models)) {
+            foreach ($this->with as $relation => $constraint) {
+                if (is_int($relation)) {
+                    $relation = $constraint;
+                    $constraint = null;
+                }
+                $this->eagerLoadRelation($models, $relation, $constraint);
+            }
+        }
+        return $models;
     }
 
     public function first() {
@@ -704,5 +733,62 @@ class QueryBuilder {
             $sql .= " WHERE " . implode(" AND ", $this->wheres);
         }
         return $sql;
+    }
+
+    protected function eagerLoadRelation(array &$models, $relation, $constraint = null) {
+        if (empty($models)) return;
+        $model = $models[0];
+        if (!method_exists($model, $relation)) return;
+        $related = $model->$relation();
+        // hasMany
+        if (is_array($related)) {
+            $foreignKey = null;
+            $localKey = $model->primaryKey;
+            $ref = new \ReflectionMethod($model, $relation);
+            $params = $ref->getParameters();
+            if (isset($params[1])) {
+                $foreignKey = $params[1]->getDefaultValue();
+            }
+            $ids = array_map(fn($m) => $m->$localKey, $models);
+            $relatedModel = $related ? get_class($related[0]) : null;
+            if ($relatedModel && $foreignKey) {
+                $query = $relatedModel::query()->whereIn($foreignKey, $ids);
+                if ($constraint) {
+                    $constraint($query);
+                }
+                $allRelated = $query->get();
+                $grouped = [];
+                foreach ($allRelated as $rel) {
+                    $grouped[$rel->$foreignKey][] = $rel;
+                }
+                foreach ($models as $m) {
+                    $m->_eagerLoaded[$relation] = $grouped[$m->$localKey] ?? [];
+                }
+            }
+        }
+        // belongsTo
+        elseif ($related instanceof \MJ\WPORM\Model) {
+            $foreignKey = null;
+            $ownerKey = $related->primaryKey;
+            $ref = new \ReflectionMethod($model, $relation);
+            $params = $ref->getParameters();
+            if (isset($params[1])) {
+                $foreignKey = $params[1]->getDefaultValue();
+            }
+            $ids = array_map(fn($m) => $m->$foreignKey, $models);
+            $relatedModel = get_class($related);
+            $query = $relatedModel::query()->whereIn($ownerKey, $ids);
+            if ($constraint) {
+                $constraint($query);
+            }
+            $allRelated = $query->get();
+            $map = [];
+            foreach ($allRelated as $rel) {
+                $map[$rel->$ownerKey] = $rel;
+            }
+            foreach ($models as $m) {
+                $m->_eagerLoaded[$relation] = $map[$m->$foreignKey] ?? null;
+            }
+        }
     }
 }

@@ -22,6 +22,7 @@ abstract class Model implements \ArrayAccess {
 	protected static $globalScopes = [];
 	protected $createdAtColumn = 'created_at';
 	protected $updatedAtColumn = 'updated_at';
+    protected $_eagerLoaded = [];
 
 	// Register a global scope
 	public static function addGlobalScope($identifier, callable $scope) {
@@ -129,6 +130,10 @@ abstract class Model implements \ArrayAccess {
 	}
 
 	public function __get($key) {
+        // Eager loaded relations
+        if (isset($this->_eagerLoaded[$key])) {
+            return $this->_eagerLoaded[$key];
+        }
 		$method = 'get' . ucfirst($key) . 'Attribute';
 		if (method_exists($this, $method)) {
 			return $this->$method();
