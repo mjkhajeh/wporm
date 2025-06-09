@@ -379,6 +379,26 @@ class QueryBuilder {
         return $this;
     }
 
+    public function whereNotBetween($column, array $values) {
+        if (count($values) !== 2) {
+            throw new \InvalidArgumentException('whereNotBetween expects exactly 2 values.');
+        }
+        $this->wheres[] = "$column NOT BETWEEN %s AND %s";
+        $this->bindings[] = $values[0];
+        $this->bindings[] = $values[1];
+        return $this;
+    }
+
+    public function orWhereNotBetween($column, array $values) {
+        if (count($values) !== 2) {
+            throw new \InvalidArgumentException('orWhereNotBetween expects exactly 2 values.');
+        }
+        $this->wheres[] = "OR $column NOT BETWEEN %s AND %s";
+        $this->bindings[] = $values[0];
+        $this->bindings[] = $values[1];
+        return $this;
+    }
+
     public function orderBy($column, $direction = 'asc') {
         $this->orders[] = "$column $direction";
         return $this;

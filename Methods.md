@@ -367,6 +367,24 @@ Model::query()->orWhereBetween('created_at', ['2024-01-01', '2024-12-31'])->get(
 
 ---
 
+### whereNotBetween($column, array $values)
+Add a WHERE ... NOT BETWEEN ... AND ... clause to the query.
+
+**Usage:**
+```php
+Model::query()->whereNotBetween('price', [100, 200])->get();
+```
+
+---
+
+### orWhereNotBetween($column, array $values)
+Add an OR ... NOT BETWEEN ... AND ... clause to the query.
+
+**Usage:**
+```php
+Model::query()->orWhereNotBetween('created_at', ['2024-01-01', '2024-12-31'])->get();
+```
+
 ---
 
 ## Retrieval Methods
