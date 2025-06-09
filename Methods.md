@@ -517,6 +517,56 @@ Model::query()->whereTime('created_at', '14:00:00')->get();
 
 ---
 
+### wherePast($column)
+Add a WHERE column < CURDATE() clause to the query (date is in the past).
+
+**Usage:**
+```php
+Model::query()->wherePast('created_at')->get();
+```
+
+---
+
+### whereFuture($column)
+Add a WHERE column > CURDATE() clause to the query (date is in the future).
+
+**Usage:**
+```php
+Model::query()->whereFuture('expires_at')->get();
+```
+
+---
+
+### whereToday($column)
+Add a WHERE DATE(column) = CURDATE() clause to the query (date is today).
+
+**Usage:**
+```php
+Model::query()->whereToday('created_at')->get();
+```
+
+---
+
+### whereBeforeToday($column)
+Add a WHERE DATE(column) < CURDATE() clause to the query (date is before today).
+
+**Usage:**
+```php
+Model::query()->whereBeforeToday('created_at')->get();
+```
+
+---
+
+### whereAfterToday($column)
+Add a WHERE DATE(column) > CURDATE() clause to the query (date is after today).
+
+**Usage:**
+```php
+Model::query()->whereAfterToday('created_at')->get();
+```
+
+---
+
 ## Retrieval Methods
 
 ### all()

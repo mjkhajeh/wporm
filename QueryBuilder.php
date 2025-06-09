@@ -480,6 +480,28 @@ class QueryBuilder {
         return $this;
     }
 
+    // WHERE PAST/FUTURE/TODAY
+    public function wherePast($column) {
+        $this->wheres[] = "$column < CURDATE()";
+        return $this;
+    }
+    public function whereFuture($column) {
+        $this->wheres[] = "$column > CURDATE()";
+        return $this;
+    }
+    public function whereToday($column) {
+        $this->wheres[] = "DATE($column) = CURDATE()";
+        return $this;
+    }
+    public function whereBeforeToday($column) {
+        $this->wheres[] = "DATE($column) < CURDATE()";
+        return $this;
+    }
+    public function whereAfterToday($column) {
+        $this->wheres[] = "DATE($column) > CURDATE()";
+        return $this;
+    }
+
     public function orderBy($column, $direction = 'asc') {
         $this->orders[] = "$column $direction";
         return $this;
