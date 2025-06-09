@@ -405,17 +405,15 @@ class QueryBuilder {
 
     public function get() {
         $sql = $this->buildSelectQuery();
-        if( !empty( $this->bindings ) ) {
+        if (!empty($this->bindings)) {
             $sql = $this->wpdb->prepare($sql, ...$this->bindings);
         }
         $results = $this->wpdb->get_results($sql, ARRAY_A);
         if (!$results) return [];
         $modelClass = get_class($this->model);
         return array_map(function ($row) use ($modelClass) {
-            $instance = new $modelClass;
-            $instance->fill($row);
-            $instance->original = $row;
-            $instance->exists = true;
+            // Always hydrate using newFromBuilder to ensure $exists is set
+            $instance = (new $modelClass)->newFromBuilder($row);
             return $instance;
         }, $results);
     }
