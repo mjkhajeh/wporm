@@ -567,6 +567,28 @@ Model::query()->whereAfterToday('created_at')->get();
 
 ---
 
+### whereColumn($first, $operator, $second = null)
+Add a WHERE first_column operator second_column clause to the query (column-to-column comparison, Eloquent-style). If only two arguments are given, operator defaults to '='.
+
+**Usage:**
+```php
+Model::query()->whereColumn('start_date', '<', 'end_date')->get();
+Model::query()->whereColumn('price', 'cost')->get(); // Defaults to '='
+```
+
+---
+
+### orWhereColumn($first, $operator, $second = null)
+Add an OR first_column operator second_column clause to the query (column-to-column comparison, Eloquent-style). If only two arguments are given, operator defaults to '='.
+
+**Usage:**
+```php
+Model::query()->where('status', 'active')->orWhereColumn('price', '>', 'cost')->get();
+Model::query()->orWhereColumn('price', 'cost')->get(); // Defaults to '='
+```
+
+---
+
 ## Retrieval Methods
 
 ### all()

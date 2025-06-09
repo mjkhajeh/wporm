@@ -502,6 +502,24 @@ class QueryBuilder {
         return $this;
     }
 
+    // WHERE COLUMN COMPARISON
+    public function whereColumn($first, $operator, $second = null) {
+        if ($second === null) {
+            $second = $operator;
+            $operator = '=';
+        }
+        $this->wheres[] = "$first $operator $second";
+        return $this;
+    }
+    public function orWhereColumn($first, $operator, $second = null) {
+        if ($second === null) {
+            $second = $operator;
+            $operator = '=';
+        }
+        $this->wheres[] = "OR $first $operator $second";
+        return $this;
+    }
+
     public function orderBy($column, $direction = 'asc') {
         $this->orders[] = "$column $direction";
         return $this;
