@@ -453,6 +453,33 @@ class QueryBuilder {
         return $this;
     }
 
+    // WHERE DATE/TIME PARTS
+    public function whereDate($column, $value) {
+        $this->wheres[] = "DATE($column) = %s";
+        $this->bindings[] = $value;
+        return $this;
+    }
+    public function whereMonth($column, $value) {
+        $this->wheres[] = "MONTH($column) = %s";
+        $this->bindings[] = $value;
+        return $this;
+    }
+    public function whereDay($column, $value) {
+        $this->wheres[] = "DAY($column) = %s";
+        $this->bindings[] = $value;
+        return $this;
+    }
+    public function whereYear($column, $value) {
+        $this->wheres[] = "YEAR($column) = %s";
+        $this->bindings[] = $value;
+        return $this;
+    }
+    public function whereTime($column, $value) {
+        $this->wheres[] = "TIME($column) = %s";
+        $this->bindings[] = $value;
+        return $this;
+    }
+
     public function orderBy($column, $direction = 'asc') {
         $this->orders[] = "$column $direction";
         return $this;

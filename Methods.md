@@ -467,6 +467,56 @@ Model::query()->where('status', 'active')->orWhereNotNull('email_verified_at')->
 
 ---
 
+### whereDate($column, $value)
+Add a WHERE DATE(column) = value clause to the query.
+
+**Usage:**
+```php
+Model::query()->whereDate('created_at', '2025-06-10')->get();
+```
+
+---
+
+### whereMonth($column, $value)
+Add a WHERE MONTH(column) = value clause to the query.
+
+**Usage:**
+```php
+Model::query()->whereMonth('created_at', 6)->get();
+```
+
+---
+
+### whereDay($column, $value)
+Add a WHERE DAY(column) = value clause to the query.
+
+**Usage:**
+```php
+Model::query()->whereDay('created_at', 10)->get();
+```
+
+---
+
+### whereYear($column, $value)
+Add a WHERE YEAR(column) = value clause to the query.
+
+**Usage:**
+```php
+Model::query()->whereYear('created_at', 2025)->get();
+```
+
+---
+
+### whereTime($column, $value)
+Add a WHERE TIME(column) = value clause to the query.
+
+**Usage:**
+```php
+Model::query()->whereTime('created_at', '14:00:00')->get();
+```
+
+---
+
 ## Retrieval Methods
 
 ### all()
