@@ -387,6 +387,46 @@ Model::query()->orWhereNotBetween('created_at', ['2024-01-01', '2024-12-31'])->g
 
 ---
 
+### whereBetweenColumns($column, array $columns)
+Add a WHERE ... BETWEEN column1 AND column2 clause to the query, using column names for the range (Eloquent-style).
+
+**Usage:**
+```php
+Model::query()->whereBetweenColumns('score', ['min_score', 'max_score'])->get();
+```
+
+---
+
+### orWhereBetweenColumns($column, array $columns)
+Add an OR ... BETWEEN column1 AND column2 clause to the query, using column names for the range.
+
+**Usage:**
+```php
+Model::query()->orWhereBetweenColumns('created_at', ['start_date', 'end_date'])->get();
+```
+
+---
+
+### whereNotBetweenColumns($column, array $columns)
+Add a WHERE ... NOT BETWEEN column1 AND column2 clause to the query, using column names for the range.
+
+**Usage:**
+```php
+Model::query()->whereNotBetweenColumns('score', ['min_score', 'max_score'])->get();
+```
+
+---
+
+### orWhereNotBetweenColumns($column, array $columns)
+Add an OR ... NOT BETWEEN column1 AND column2 clause to the query, using column names for the range.
+
+**Usage:**
+```php
+Model::query()->orWhereNotBetweenColumns('created_at', ['start_date', 'end_date'])->get();
+```
+
+---
+
 ## Retrieval Methods
 
 ### all()

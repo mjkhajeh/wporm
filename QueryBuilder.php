@@ -399,6 +399,39 @@ class QueryBuilder {
         return $this;
     }
 
+    // WHERE BETWEEN COLUMNS
+    public function whereBetweenColumns($column, array $columns) {
+        if (count($columns) !== 2) {
+            throw new \InvalidArgumentException('whereBetweenColumns expects exactly 2 columns.');
+        }
+        $this->wheres[] = "$column BETWEEN {$columns[0]} AND {$columns[1]}";
+        return $this;
+    }
+
+    public function orWhereBetweenColumns($column, array $columns) {
+        if (count($columns) !== 2) {
+            throw new \InvalidArgumentException('orWhereBetweenColumns expects exactly 2 columns.');
+        }
+        $this->wheres[] = "OR $column BETWEEN {$columns[0]} AND {$columns[1]}";
+        return $this;
+    }
+
+    public function whereNotBetweenColumns($column, array $columns) {
+        if (count($columns) !== 2) {
+            throw new \InvalidArgumentException('whereNotBetweenColumns expects exactly 2 columns.');
+        }
+        $this->wheres[] = "$column NOT BETWEEN {$columns[0]} AND {$columns[1]}";
+        return $this;
+    }
+
+    public function orWhereNotBetweenColumns($column, array $columns) {
+        if (count($columns) !== 2) {
+            throw new \InvalidArgumentException('orWhereNotBetweenColumns expects exactly 2 columns.');
+        }
+        $this->wheres[] = "OR $column NOT BETWEEN {$columns[0]} AND {$columns[1]}";
+        return $this;
+    }
+
     public function orderBy($column, $direction = 'asc') {
         $this->orders[] = "$column $direction";
         return $this;
