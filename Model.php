@@ -514,14 +514,15 @@ abstract class Model implements \ArrayAccess {
 
 	public function newFromBuilder(array $attributes) {
 		$instance = new static;
-	
 		foreach ($attributes as $key => $value) {
-			$instance->$key = $value;
+			$instance->attributes[$key] = $value;
 		}
-	
+		// Ensure primary key property is set (for eager loading)
+		if (isset($attributes[$instance->primaryKey])) {
+			$instance->{$instance->primaryKey} = $attributes[$instance->primaryKey];
+		}
 		$instance->original = $attributes;
 		$instance->exists = true;
-	
 		return $instance;
 	}    
 
