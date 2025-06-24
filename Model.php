@@ -572,4 +572,6 @@ abstract class Model implements \ArrayAccess {
 	public function offsetUnset($offset): void {
 		unset($this->attributes[$offset]);
 	}
+
+    // The collectionToArray helper is no longer needed because get() now returns a Collection with toArray().
 }

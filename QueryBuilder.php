@@ -638,7 +638,7 @@ class QueryBuilder {
             error_log('[WPORM][get] Bindings: ' . print_r($this->bindings, true));
         }
         $results = $this->wpdb->get_results($sql, ARRAY_A);
-        if (!$results) return [];
+        if (!$results) return new \MJ\WPORM\Collection([]);
         $modelClass = get_class($this->model);
         $models = array_map(function ($row) use ($modelClass) {
             $instance = (new $modelClass)->newFromBuilder($row);
@@ -654,7 +654,7 @@ class QueryBuilder {
                 $this->eagerLoadRelation($models, $relation, $constraint);
             }
         }
-        return $models;
+        return new \MJ\WPORM\Collection($models);
     }
 
     public function first() {
