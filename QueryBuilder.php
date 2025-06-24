@@ -194,7 +194,12 @@ class QueryBuilder {
             $value = $operator;
             $operator = '=';
         }
-        $this->wheres[] = "$column NOT $operator %s";
+        // Use '!=' instead of 'NOT =' for equality
+        if ($operator === '=') {
+            $this->wheres[] = "$column != %s";
+        } else {
+            $this->wheres[] = "$column NOT $operator %s";
+        }
         $this->bindings[] = $value;
         return $this;
     }
@@ -204,7 +209,12 @@ class QueryBuilder {
             $value = $operator;
             $operator = '=';
         }
-        $this->wheres[] = "OR $column NOT $operator %s";
+        // Use '!=' instead of 'NOT =' for equality
+        if ($operator === '=') {
+            $this->wheres[] = "OR $column != %s";
+        } else {
+            $this->wheres[] = "OR $column NOT $operator %s";
+        }
         $this->bindings[] = $value;
         return $this;
     }
