@@ -862,6 +862,31 @@ class QueryBuilder {
     }
 
     /**
+     * Add an OR HAVING clause to the query.
+     * Example: ->orHaving('count', '>', 5)
+     */
+    public function orHaving($column, $operator = null, $value = null) {
+        if (func_num_args() === 2) {
+            $value = $operator;
+            $operator = '=';
+        }
+        $this->havings[] = ["OR $column $operator %s", [$value]];
+        return $this;
+    }
+
+    /**
+     * Add an OR HAVING BETWEEN ... AND ... clause to the query.
+     * Example: ->orHavingBetween('score', [10, 20])
+     */
+    public function orHavingBetween($column, array $values) {
+        if (count($values) !== 2) {
+            throw new \InvalidArgumentException('orHavingBetween expects exactly 2 values.');
+        }
+        $this->havings[] = ["OR $column BETWEEN %s AND %s", $values];
+        return $this;
+    }
+
+    /**
      * Disable global scopes for this query.
      * Usage: Model::query()->withoutGlobalScopes()
      */
