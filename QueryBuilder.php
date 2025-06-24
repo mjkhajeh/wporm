@@ -872,6 +872,36 @@ class QueryBuilder {
         return $this;
     }
 
+    /**
+     * Return the raw SQL with placeholders (for debugging).
+     */
+    public function toSql() {
+        return $this->buildSelectQuery();
+    }
+
+    /**
+     * Return the current bindings array (for debugging).
+     */
+    public function getBindings() {
+        return $this->bindings;
+    }
+
+    /**
+     * Dump the SQL and bindings for debugging.
+     */
+    public function dumpSql() {
+        $sql = $this->toSql();
+        $bindings = $this->getBindings();
+        if (php_sapi_name() === 'cli') {
+            echo "[WPORM][dumpSql] SQL: $sql\n";
+            echo "[WPORM][dumpSql] Bindings: ".print_r($bindings, true)."\n";
+        } else {
+            echo '<pre>[WPORM][dumpSql] SQL: ' . htmlspecialchars($sql) . "\n";
+            echo '[WPORM][dumpSql] Bindings: ' . htmlspecialchars(print_r($bindings, true)) . "</pre>\n";
+        }
+        return $this;
+    }
+
     // Helper to convert 'col->foo->bar' to JSON_EXTRACT(col, '$.foo.bar')
     protected function parseJsonPath($column) {
         if (strpos($column, '->') === false && strpos($column, '=>') === false) {

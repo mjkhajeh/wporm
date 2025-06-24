@@ -4,7 +4,7 @@ This document provides tips and built-in features to help you debug queries and 
 
 ## 1. Viewing the Generated SQL
 
-- **Use the `toSql()` method** (if implemented) to return the raw SQL (with placeholders):
+- **Use the `toSql()` method** to return the raw SQL (with placeholders):
   ```php
   $sql = Model::query()->where('id', 1)->toSql();
   echo $sql;
@@ -25,7 +25,7 @@ This document provides tips and built-in features to help you debug queries and 
 
 ## 3. Dumping SQL and Bindings
 
-- **Add a `dumpSql()` method** to print both SQL and bindings for quick inspection:
+- **Use the `dumpSql()` method** to print both SQL and bindings for quick inspection:
   ```php
   Model::query()->where('id', 1)->dumpSql();
   ```
