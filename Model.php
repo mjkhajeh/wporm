@@ -512,14 +512,12 @@ protected function castSet($key, $value) {
 	}    
 
 	public function toArray() {
-		$attributes = [];
-		foreach ($this->attributes as $key => $value) {
-			$attributes[$key] = isset($this->casts[$key])
-				? (new $this->casts[$key])->get($value)
-				: $value;
-		}
-		return $attributes;
-	}
+        $attributes = [];
+        foreach ($this->attributes as $key => $value) {
+            $attributes[$key] = $this->castGet($key, $value);
+        }
+        return $attributes;
+    }
 
 	public function getOriginal($key = null) {
 		return $key ? ($this->original[$key] ?? null) : $this->original;
