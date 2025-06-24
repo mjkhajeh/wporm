@@ -699,3 +699,30 @@ db::table('custom_table')->where('status', 'active')->get();
 ```
 
 See [DB.md](./DB.md) for more details.
+
+## Array Conversion and Casting
+
+- Call `->toArray()` on a model or a collection to get an array representation with all casts applied.
+- Built-in types (e.g. 'int', 'bool', 'float', 'json', etc.) are handled natively and will not be instantiated as classes.
+- Custom cast classes must implement `MJ\WPORM\Casts\CastableInterface`.
+
+Example:
+
+```php
+protected $casts = [
+    'user_id'    => 'int',
+    'from'       => Time::class, // custom cast
+    'to'         => Time::class, // custom cast
+    'use_default'=> 'bool',
+    'status'     => 'bool',
+];
+
+$model = Times::find(1);
+$array = $model->toArray();
+
+$collection = Times::query()->get();
+$arrays = $collection->toArray();
+```
+
+- Custom cast classes will be instantiated and their `get()` method called.
+- Built-in types will be cast using native PHP logic.

@@ -775,7 +775,9 @@ $user->fill(['name' => 'Baz']);
 ```
 
 ### toArray()
-**Description:** Convert the model's attributes to an array.
+- Converts a model or collection to an array, applying all casts.
+- Built-in types (int, bool, float, json, etc.) are handled natively.
+- Custom cast classes must implement `MJ\WPORM\Casts\CastableInterface`.
 
 **Example:**
 ```php
