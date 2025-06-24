@@ -18,6 +18,7 @@ class QueryBuilder {
     protected $groups = [];
     protected $havings = [];
     protected $with = [];
+    protected $applyGlobalScopes = true;
 
     /**
      * If true, SQL and bindings will be logged before execution.
@@ -33,11 +34,16 @@ class QueryBuilder {
         return $this;
     }
 
-    public function __construct($model) {
+    public function __construct($model, $applyGlobalScopes = true) {
         global $wpdb;
         $this->wpdb = $wpdb;
         $this->model = $model;
         $this->table = $model->getTable();
+        $this->applyGlobalScopes = $applyGlobalScopes;
+        // Apply global scopes if enabled
+        if ($this->applyGlobalScopes && method_exists($model, 'applyGlobalScopes')) {
+            $model::applyGlobalScopes($this);
+        }
     }
 
     // Helper to quote identifiers (table/column names) with backticks
@@ -852,6 +858,17 @@ class QueryBuilder {
             throw new \InvalidArgumentException('havingBetween expects exactly 2 values.');
         }
         $this->havings[] = ["$column BETWEEN %s AND %s", $values];
+        return $this;
+    }
+
+    /**
+     * Disable global scopes for this query.
+     * Usage: Model::query()->withoutGlobalScopes()
+     */
+    public function withoutGlobalScopes() {
+        $this->applyGlobalScopes = false;
+        $this->wheres = [];
+        $this->bindings = [];
         return $this;
     }
 

@@ -382,6 +382,43 @@ class LogEntry extends Model {
 
 In this case, WPORM will not attempt to set or update any timestamp columns automatically.
 
+## Global Scopes
+
+You can define global scopes on your model to automatically apply query constraints to all queries for that model.
+
+Example:
+
+```php
+class Post extends \MJ\WPORM\Model {
+    protected static function boot() {
+        parent::boot();
+        static::addGlobalScope('published', function($query) {
+            $query->where('status', 'published');
+        });
+    }
+}
+```
+
+All queries will now include `status = 'published'` automatically:
+
+```php
+$posts = Post::all(); // Only published posts
+```
+
+To disable global scopes for a query:
+
+```php
+$allPosts = Post::query(false)->get(); // disables all global scopes
+// or
+$allPosts = Post::query()->withoutGlobalScopes()->get();
+```
+
+To remove a specific global scope at runtime:
+
+```php
+Post::removeGlobalScope('published');
+```
+
 ## Extending/Improving
 - Add more casts by implementing `MJ\WPORM\Casts\CastableInterface`.
 - Add more schema types in `Blueprint` as needed.
