@@ -19,6 +19,20 @@ class QueryBuilder {
     protected $havings = [];
     protected $with = [];
 
+    /**
+     * If true, SQL and bindings will be logged before execution.
+     * Set via QueryBuilder::setDebug(true) or $query->debug = true
+     */
+    public $debug = false;
+
+    /**
+     * Set debug mode for this query instance.
+     */
+    public function setDebug($debug = true) {
+        $this->debug = (bool)$debug;
+        return $this;
+    }
+
     public function __construct($model) {
         global $wpdb;
         $this->wpdb = $wpdb;
@@ -613,6 +627,10 @@ class QueryBuilder {
         if (!empty($this->bindings)) {
             $sql = $this->wpdb->prepare($sql, ...$this->bindings);
         }
+        if ($this->debug) {
+            error_log('[WPORM][get] SQL: ' . $sql);
+            error_log('[WPORM][get] Bindings: ' . print_r($this->bindings, true));
+        }
         $results = $this->wpdb->get_results($sql, ARRAY_A);
         if (!$results) return [];
         $modelClass = get_class($this->model);
@@ -636,16 +654,27 @@ class QueryBuilder {
     public function first() {
         $this->limit(1);
         $results = $this->get();
+        if ($this->debug) {
+            error_log('[WPORM][first] Results: ' . print_r($results, true));
+        }
         return $results[0] ?? null;
     }
 
     public function count() {
         $sql = $this->buildCountQuery();
+        if ($this->debug) {
+            error_log('[WPORM][count] SQL: ' . $sql);
+            error_log('[WPORM][count] Bindings: ' . print_r($this->bindings, true));
+        }
         return (int) $this->wpdb->get_var($this->wpdb->prepare($sql, ...$this->bindings));
     }
 
     public function delete() {
         $sql = $this->buildDeleteQuery();
+        if ($this->debug) {
+            error_log('[WPORM][delete] SQL: ' . $sql);
+            error_log('[WPORM][delete] Bindings: ' . print_r($this->bindings, true));
+        }
         return $this->wpdb->query($this->wpdb->prepare($sql, ...$this->bindings));
     }
 
