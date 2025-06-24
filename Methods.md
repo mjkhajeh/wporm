@@ -13,6 +13,7 @@ This document describes all public and static methods of the `MJ\WPORM\Model` cl
 - [Relationship Methods](#relationship-methods)
 - [Utility Methods](#utility-methods)
 - [JSON Where Clauses](#json-where-clauses)
+- [Raw Table Queries with DB::table()](#raw-table-queries-with-dbtable)
 
 ---
 
@@ -918,3 +919,19 @@ unset($user['name']);
 ## Notes
 - All methods assume a model class extending `MJ\WPORM\Model` (e.g., `class User extends Model { ... }`).
 - For more advanced usage, see the main `Readme.md`.
+
+---
+
+## Raw Table Queries with DB::table()
+
+You can use the static `DB::table()` method to run queries on any table, not just models. This is useful for quick updates, inserts, or selects on tables without a model class.
+
+**Example:**
+```php
+use MJ\WPORM\DB;
+
+DB::table('post')->where('id', 1)->update(['title' => 'Updated Title']);
+DB::table('custom_table')->where('status', 'active')->get();
+```
+
+See [DB.md](./DB.md) for more details.

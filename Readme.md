@@ -644,3 +644,21 @@ WPORM is inspired by Laravel's Eloquent ORM and adapted for the WordPress ecosys
 This project is licensed under the MIT License. See the LICENSE file or [MIT License](https://opensource.org/licenses/MIT) for details.
 
 ---
+
+## Raw Table Queries with DB::table()
+
+WPORM now supports Eloquent-style raw table queries using the `DB` class:
+
+```php
+use MJ\WPORM\DB;
+
+// Update posts with IDs 3, 4, 5
+db::table('post')
+    ->whereIn('id', [3, 4, 5])
+    ->update(['title' => 'Updated Title']);
+
+// Select rows from any table
+db::table('custom_table')->where('status', 'active')->get();
+```
+
+See [DB.md](./DB.md) for more details.
