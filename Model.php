@@ -433,81 +433,69 @@ protected function castSet($key, $value) {
 	}
 
 	/**
-	 * @template T of Model
-	 * @param class-string<T> $related
-	 * @param string|null $foreignKey
-	 * @param string|null $localKey
-	 * @return T[]
-	 */
-	public function hasMany($related, $foreignKey = null, $localKey = null): array {
-		$instance = new $related;
-		$foreignKey = $foreignKey ?: strtolower(class_basename(static::class)) . '_id';
-		$localKey = $localKey ?: $this->primaryKey;
-		return $related::query()->where($foreignKey, $this->$localKey)->get();
-	}
+     * @template T of Model
+     * @param class-string<T> $related
+     * @param string|null $foreignKey
+     * @param string|null $localKey
+     * @return \MJ\WPORM\Collection<T>
+     */
+    public function hasMany($related, $foreignKey = null, $localKey = null): \MJ\WPORM\Collection {
+        $instance = new $related;
+        $foreignKey = $foreignKey ?: strtolower(class_basename(static::class)) . '_id';
+        $localKey = $localKey ?: $this->primaryKey;
+        return $related::query()->where($foreignKey, $this->$localKey)->get();
+    }
 
-	/**
-	 * @template T of Model
-	 * @param class-string<T> $related
-	 * @param string|null $foreignKey
-	 * @param string|null $ownerKey
-	 * @return T|null
-	 */
-	public function belongsTo($related, $foreignKey = null, $ownerKey = null): ?Model {
-		$instance = new $related;
-		$foreignKey = $foreignKey ?: strtolower(class_basename($related)) . '_id';
-		$ownerKey = $ownerKey ?: $instance->primaryKey;
-		return $related::query()->where($ownerKey, $this->$foreignKey)->first();
-	}
+    /**
+     * @template T of Model
+     * @param class-string<T> $related
+     * @param string|null $pivotTable
+     * @param string|null $foreignPivotKey
+     * @param string|null $relatedPivotKey
+     * @return \MJ\WPORM\Collection<T>
+     */
+    public function belongsToMany($related, $pivotTable = null, $foreignPivotKey = null, $relatedPivotKey = null): \MJ\WPORM\Collection {
+        global $wpdb;
+        $relatedInstance = new $related;
+        $pivotTable = $pivotTable ?: $this->getTable() . '_' . $relatedInstance->getTable();
+        $foreignPivotKey = $foreignPivotKey ?: strtolower(class_basename(static::class)) . '_id';
+        $relatedPivotKey = $relatedPivotKey ?: strtolower(class_basename($related)) . '_id';
 
-	/**
-	 * @template T of Model
-	 * @param class-string<T> $related
-	 * @param string|null $pivotTable
-	 * @param string|null $foreignPivotKey
-	 * @param string|null $relatedPivotKey
-	 * @return T[]
-	 */
-	public function belongsToMany($related, $pivotTable = null, $foreignPivotKey = null, $relatedPivotKey = null): array {
-		global $wpdb;
-		$relatedInstance = new $related;
-		$pivotTable = $pivotTable ?: $this->getTable() . '_' . $relatedInstance->getTable();
-		$foreignPivotKey = $foreignPivotKey ?: strtolower(class_basename(static::class)) . '_id';
-		$relatedPivotKey = $relatedPivotKey ?: strtolower(class_basename($related)) . '_id';
+        $query = "SELECT r.* FROM {$wpdb->prefix}{$relatedInstance->getTable()} r
+                  JOIN {$wpdb->prefix}{$pivotTable} p ON r.id = p.{$relatedPivotKey}
+                  WHERE p.{$foreignPivotKey} = %d";
 
-		$query = "SELECT r.* FROM {$wpdb->prefix}{$relatedInstance->getTable()} r
-				  JOIN {$wpdb->prefix}{$pivotTable} p ON r.id = p.{$relatedPivotKey}
-				  WHERE p.{$foreignPivotKey} = %d";
+        $results = $wpdb->get_results($wpdb->prepare($query, $this->attributes[$this->primaryKey]), ARRAY_A);
+        $models = array_map(fn($data) => new $related($data), $results);
+        return new \MJ\WPORM\Collection($models);
+    }
 
-		$results = $wpdb->get_results($wpdb->prepare($query, $this->attributes[$this->primaryKey]), ARRAY_A);
-		return array_map(fn($data) => new $related($data), $results);
-	}
+    /**
+     * @template T of Model
+     * @template Through of Model
+     * @param class-string<T> $related
+     * @param class-string<Through> $through
+     * @param string|null $firstKey
+     * @param string|null $secondKey
+     * @param string|null $localKey
+     * @return \MJ\WPORM\Collection<T>
+     */
+    public function hasManyThrough($related, $through, $firstKey = null, $secondKey = null, $localKey = null): \MJ\WPORM\Collection {
+        global $wpdb;
+        $throughInstance = new $through;
+        $relatedInstance = new $related;
+        $firstKey = $firstKey ?: strtolower(class_basename($through)) . '_id';
+        $secondKey = $secondKey ?: strtolower(class_basename($related)) . '_id';
+        $localKey = $localKey ?: $this->primaryKey;
 
-	/**
-	 * @template T of Model
-	 * @template Through of Model
-	 * @param class-string<T> $related
-	 * @param class-string<Through> $through
-	 * @param string|null $firstKey
-	 * @param string|null $secondKey
-	 * @param string|null $localKey
-	 * @return T[]
-	 */
-	public function hasManyThrough($related, $through, $firstKey = null, $secondKey = null, $localKey = null): array {
-		global $wpdb;
-		$throughInstance = new $through;
-		$relatedInstance = new $related;
-		$firstKey = $firstKey ?: strtolower(class_basename($through)) . '_id';
-		$secondKey = $secondKey ?: strtolower(class_basename($related)) . '_id';
-		$localKey = $localKey ?: $this->primaryKey;
+        $query = "SELECT r.* FROM {$wpdb->prefix}{$relatedInstance->getTable()} r
+                  JOIN {$wpdb->prefix}{$throughInstance->getTable()} t ON r.{$secondKey} = t.id
+                  WHERE t.{$firstKey} = %d";
 
-		$query = "SELECT r.* FROM {$wpdb->prefix}{$relatedInstance->getTable()} r
-				  JOIN {$wpdb->prefix}{$throughInstance->getTable()} t ON r.{$secondKey} = t.id
-				  WHERE t.{$firstKey} = %d";
-
-		$results = $wpdb->get_results($wpdb->prepare($query, $this->$localKey), ARRAY_A);
-		return array_map(fn($data) => new $related($data), $results);
-	}
+        $results = $wpdb->get_results($wpdb->prepare($query, $this->$localKey), ARRAY_A);
+        $models = array_map(fn($data) => new $related($data), $results);
+        return new \MJ\WPORM\Collection($models);
+    }
 
 	public function newFromBuilder(array $attributes) {
 		$instance = new static;
