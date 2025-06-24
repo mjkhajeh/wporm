@@ -173,76 +173,76 @@ abstract class Model implements \ArrayAccess {
     }
 
 	protected function castGet($key, $value) {
-		if (!isset($this->casts[$key])) return $value;
-		$cast = $this->casts[$key];
+    if (!isset($this->casts[$key])) return $value;
+    $cast = $this->casts[$key];
+    // Only instantiate if not a built-in type
+    switch ($cast) {
+        case 'int':
+        case 'integer':
+            return (int) $value;
+        case 'float':
+        case 'double':
+            return (float) $value;
+        case 'bool':
+        case 'boolean':
+            return (bool) $value;
+        case 'array':
+            return is_array($value) ? $value : json_decode($value, true);
+        case 'json':
+            return json_decode($value, true);
+        case 'datetime':
+            return $value ? new \DateTime($value) : null;
+        case 'timestamp':
+            return $value ? (new \DateTime())->setTimestamp((int)$value) : null;
+        default:
+            if (class_exists($cast) && !in_array($cast, ['int','integer','float','double','bool','boolean','array','json','datetime','timestamp'])) {
+                $castInstance = new $cast();
+                if ($castInstance instanceof \MJ\WPORM\Casts\CastableInterface) {
+                    return $castInstance->get($value);
+                }
+            }
+            return $value;
+    }
+}
 
-		switch ($cast) {
-			case 'int':
-			case 'integer':
-				return (int) $value;
-			case 'float':
-			case 'double':
-				return (float) $value;
-			case 'bool':
-			case 'boolean':
-				return (bool) $value;
-			case 'array':
-				return is_array($value) ? $value : json_decode($value, true);
-			case 'json':
-				return json_decode($value, true);
-			case 'datetime':
-				return $value ? new \DateTime($value) : null;
-			case 'timestamp':
-				return $value ? (new \DateTime())->setTimestamp((int)$value) : null;
-			default:
-				if (class_exists($cast)) {
-					$castInstance = new $cast();
-					if ($castInstance instanceof \MJ\WPORM\Casts\CastableInterface) {
-						return $castInstance->get($value);
-					}
-				}
-				return $value;
-		}
-	}
-
-	protected function castSet($key, $value) {
-		if (!isset($this->casts[$key])) return $value;
-		$cast = $this->casts[$key];
-
-		switch ($cast) {
-			case 'int':
-			case 'integer':
-				return (int) $value;
-			case 'float':
-			case 'double':
-				return (float) $value;
-			case 'bool':
-			case 'boolean':
-				return (bool) $value;
-			case 'array':
-			case 'json':
-				return json_encode($value);
-			case 'datetime':
-				if ($value instanceof \DateTime) {
-					return $value->format('Y-m-d H:i:s');
-				} elseif (is_numeric($value)) {
-					return date('Y-m-d H:i:s', (int)$value);
-				} elseif (is_string($value)) {
-					return date( 'Y-m-d H:i:s', strtotime($value) );
-				}
-				return $value;
-			case 'timestamp':
-				return $value instanceof \DateTime ? $value->getTimestamp() : (is_numeric($value) ? (int)$value : strtotime($value));
-			default:
-				if (class_exists($cast)) {
-					$castInstance = new $cast();
-					if ($castInstance instanceof \MJ\WPORM\Casts\CastableInterface) {
-						return $castInstance->set($value);
-					}
-				}
-				return $value;
-		}
-	}
+protected function castSet($key, $value) {
+    if (!isset($this->casts[$key])) return $value;
+    $cast = $this->casts[$key];
+    // Only instantiate if not a built-in type
+    switch ($cast) {
+        case 'int':
+        case 'integer':
+            return (int) $value;
+        case 'float':
+        case 'double':
+            return (float) $value;
+        case 'bool':
+        case 'boolean':
+            return (bool) $value;
+        case 'array':
+        case 'json':
+            return json_encode($value);
+        case 'datetime':
+            if ($value instanceof \DateTime) {
+                return $value->format('Y-m-d H:i:s');
+            } elseif (is_numeric($value)) {
+                return date('Y-m-d H:i:s', (int)$value);
+            } elseif (is_string($value)) {
+                return date('Y-m-d H:i:s', strtotime($value));
+            }
+            return $value;
+        case 'timestamp':
+            return $value instanceof \DateTime ? $value->getTimestamp() : (is_numeric($value) ? (int)$value : strtotime($value));
+        default:
+            if (class_exists($cast) && !in_array($cast, ['int','integer','float','double','bool','boolean','array','json','datetime','timestamp'])) {
+                $castInstance = new $cast();
+                if ($castInstance instanceof \MJ\WPORM\Casts\CastableInterface) {
+                    return $castInstance->set($value);
+                }
+            }
+            return $value;
+    }
+}
 
 	/**
 	 * Called after a model is retrieved from the database (get/first/find).
