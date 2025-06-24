@@ -142,10 +142,18 @@ $user = User::updateOrCreate(
     ['email' => 'user@example.com'],
     ['name' => 'John Doe', 'country' => 'US']
 );
+
+// Disable global scopes for this call
+$user = User::updateOrCreate(
+    ['email' => 'user@example.com'],
+    ['name' => 'John Doe', 'country' => 'US'],
+    false // disables global scopes
+);
 ```
 
 - The first argument is an array of attributes to search for.
 - The second argument is an array of values to update or set if creating.
+- The optional third argument disables global scopes if set to `false` (default is `true`).
 - Returns the updated or newly created model instance.
 
 This is useful for upsert operations, such as syncing data or ensuring a record exists with certain values.
@@ -162,8 +170,16 @@ $user = User::firstOrCreate(
     ['email' => 'user@example.com'],
     ['name' => 'Jane Doe', 'country' => 'US']
 );
+
+// Disable global scopes for this call
+$user = User::firstOrCreate(
+    ['email' => 'user@example.com'],
+    ['name' => 'Jane Doe', 'country' => 'US'],
+    false // disables global scopes
+);
 ```
 - Returns the first matching record, or creates and saves a new one if none exists.
+- The optional third argument disables global scopes if set to `false` (default is `true`).
 
 **firstOrNew Usage:**
 
@@ -173,11 +189,19 @@ $user = User::firstOrNew(
     ['email' => 'user@example.com'],
     ['name' => 'Jane Doe', 'country' => 'US']
 );
+
+// Disable global scopes for this call
+$user = User::firstOrNew(
+    ['email' => 'user@example.com'],
+    ['name' => 'Jane Doe', 'country' => 'US'],
+    false // disables global scopes
+);
 if (!$user->exists) {
     $user->save(); // Save if you want to persist
 }
 ```
 - Returns the first matching record, or a new (unsaved) instance if none exists.
+- The optional third argument disables global scopes if set to `false` (default is `true`).
 
 These methods are useful for ensuring a record exists, or for preparing a new record with default values if not found.
 

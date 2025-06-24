@@ -302,10 +302,11 @@ protected function castSet($key, $value) {
 	 *
 	 * @param array $attributes
 	 * @param array $values
+	 * @param bool $applyGlobalScopes
 	 * @return static
 	 */
-	public static function updateOrCreate(array $attributes, array $values = []) {
-		$instance = static::query()->where($attributes)->first();
+	public static function updateOrCreate(array $attributes, array $values = [], $applyGlobalScopes = true) {
+		$instance = static::query($applyGlobalScopes)->where($attributes)->first();
 		if ($instance) {
 			$instance->fill($values);
 			$instance->save();
@@ -321,10 +322,11 @@ protected function castSet($key, $value) {
 	 *
 	 * @param array $attributes
 	 * @param array $values
+	 * @param bool $applyGlobalScopes
 	 * @return static
 	 */
-	public static function firstOrCreate(array $attributes, array $values = []) {
-		$instance = static::query()->where($attributes)->first();
+	public static function firstOrCreate(array $attributes, array $values = [], $applyGlobalScopes = true) {
+		$instance = static::query($applyGlobalScopes)->where($attributes)->first();
 		if ($instance) {
 			return $instance;
 		}
@@ -338,10 +340,11 @@ protected function castSet($key, $value) {
 	 *
 	 * @param array $attributes
 	 * @param array $values
+	 * @param bool $applyGlobalScopes
 	 * @return static
 	 */
-	public static function firstOrNew(array $attributes, array $values = []) {
-		$instance = static::query()->where($attributes)->first();
+	public static function firstOrNew(array $attributes, array $values = [], $applyGlobalScopes = true) {
+		$instance = static::query($applyGlobalScopes)->where($attributes)->first();
 		if ($instance) {
 			return $instance;
 		}
