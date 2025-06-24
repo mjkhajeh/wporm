@@ -21,30 +21,28 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
         return $this->items;
     }
 
+    // Countable
     public function count(): int {
         return count($this->items);
     }
-
+    // IteratorAggregate
     public function getIterator(): \Traversable {
         return new \ArrayIterator($this->items);
     }
-
+    // ArrayAccess
     public function offsetExists($offset): bool {
         return isset($this->items[$offset]);
     }
-
     public function offsetGet($offset): mixed {
-        return $this->items[$offset];
+        return isset($this->items[$offset]) ? $this->items[$offset] : null;
     }
-
     public function offsetSet($offset, $value): void {
-        if ($offset === null) {
+        if (is_null($offset)) {
             $this->items[] = $value;
         } else {
             $this->items[$offset] = $value;
         }
     }
-
     public function offsetUnset($offset): void {
         unset($this->items[$offset]);
     }
@@ -88,28 +86,28 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
     /**
      * Determine if the collection is empty.
      */
-    public function isEmpty(): bool {
+    public function isEmpty() {
         return empty($this->items);
     }
 
     /**
      * Filter items using a callback.
      */
-    public function filter(callable $callback): self {
+    public function filter(callable $callback) {
         return new static(array_filter($this->items, $callback));
     }
 
     /**
      * Map items using a callback.
      */
-    public function map(callable $callback): self {
+    public function map(callable $callback) {
         return new static(array_map($callback, $this->items));
     }
 
     /**
      * Determine if the collection contains a given value (strict).
      */
-    public function contains($value): bool {
+    public function contains($value) {
         return in_array($value, $this->items, true);
     }
 }

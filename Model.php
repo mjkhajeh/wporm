@@ -404,7 +404,7 @@ protected function castSet($key, $value) {
 	 * Get the table name for the model (instance context).
 	 * @return string
 	 */
-	public function getTable(): string
+	public function getTable()
 	{
 		global $wpdb;
 		// Only add prefix if not already present
@@ -425,7 +425,7 @@ protected function castSet($key, $value) {
 	 * @param string|null $localKey
 	 * @return T|null
 	 */
-	public function hasOne($related, $foreignKey = null, $localKey = null): ?Model {
+	public function hasOne($related, $foreignKey = null, $localKey = null) {
 		$instance = new $related;
 		$foreignKey = $foreignKey ?: strtolower(class_basename(static::class)) . '_id';
 		$localKey = $localKey ?: $this->primaryKey;
