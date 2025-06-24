@@ -1076,4 +1076,58 @@ class QueryBuilder {
         $this->bindings = array_merge($this->bindings, $sub->bindings);
         return $this;
     }
+
+    /**
+     * Update records matching the current query.
+     * Usage:
+     *   ->update(['col' => 'val', ...])
+     *   ->update('col', 'val')
+     * Returns number of affected rows.
+     */
+    public function update($data, $value = null) {
+        if (!is_array($data)) {
+            // Single column, value
+            $data = [$data => $value];
+        }
+        if (empty($data)) {
+            throw new \InvalidArgumentException('No data provided for update.');
+        }
+        $set = [];
+        $bindings = [];
+        foreach ($data as $col => $val) {
+            $set[] = $this->quoteIdentifier($col) . ' = %s';
+            $bindings[] = $val;
+        }
+        // Use wpdb prefix for table name
+        $tableName = method_exists($this->model, 'getTable') ? $this->model->getTable() : $this->table;
+        if (isset($this->wpdb->prefix) && strpos($tableName, $this->wpdb->prefix) !== 0) {
+            $tableName = $this->wpdb->prefix . ltrim($tableName, '_');
+        }
+        $sql = 'UPDATE ' . $this->quoteIdentifier($tableName) . ' SET ' . implode(', ', $set);
+        if (!empty($this->wheres)) {
+            $where = '';
+            foreach ($this->wheres as $i => $clause) {
+                if ($i === 0) {
+                    $where .= $clause;
+                } else {
+                    if (strpos(trim($clause), 'OR ') === 0) {
+                        $where .= ' ' . $clause;
+                    } else {
+                        $where .= ' AND ' . $clause;
+                    }
+                }
+            }
+            // Quote identifiers in WHERE
+            $where = preg_replace_callback('/([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)/', function($m) {
+                return $this->quoteIdentifier($m[1]);
+            }, $where);
+            $sql .= ' WHERE ' . $where;
+        }
+        $allBindings = array_merge($bindings, $this->bindings);
+        if ($this->debug) {
+            error_log('[WPORM][update] SQL: ' . $sql);
+            error_log('[WPORM][update] Bindings: ' . print_r($allBindings, true));
+        }
+        return $this->wpdb->query($this->wpdb->prepare($sql, ...$allBindings));
+    }
 }
