@@ -253,13 +253,11 @@ abstract class Model implements \ArrayAccess {
 	protected function retrieved() {}
 
 	public static function query($applyGlobalScopes = true) {
-		$query = new \MJ\WPORM\QueryBuilder(new static, $applyGlobalScopes);
-		return $applyGlobalScopes ? static::applyGlobalScopes($query) : $query;
+		return new \MJ\WPORM\QueryBuilder(new static, $applyGlobalScopes);
 	}
 
 	public static function newQuery($applyGlobalScopes = true) {
-		$query = new \MJ\WPORM\QueryBuilder(new static, $applyGlobalScopes);
-		return $applyGlobalScopes ? static::applyGlobalScopes($query) : $query;
+		return new \MJ\WPORM\QueryBuilder(new static, $applyGlobalScopes);
 	}
 
 	public static function all() {
