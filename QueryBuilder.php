@@ -26,6 +26,21 @@ class QueryBuilder {
         $this->table = $model->getTable();
     }
 
+    // Helper to quote identifiers (table/column names) with backticks
+    protected function quoteIdentifier($name) {
+        // If already quoted or is a function call, return as is
+        if ($name === '*' || strpos($name, '`') !== false || preg_match('/\w+\s*\(/', $name)) {
+            return $name;
+        }
+        // Support dot notation (table.column)
+        if (strpos($name, '.') !== false) {
+            return implode('.', array_map(function($part) {
+                return '`' . str_replace('`', '', $part) . '`';
+            }, explode('.', $name)));
+        }
+        return '`' . str_replace('`', '', $name) . '`';
+    }
+
     public function select($columns = ['*']) {
         $this->selects = is_array($columns) ? $columns : func_get_args();
         return $this;
@@ -87,7 +102,7 @@ class QueryBuilder {
         if ($value instanceof \DateTime) {
             $value = $value->format('Y-m-d H:i:s');
         }
-        $this->wheres[] = "$column $operator %s";
+        $this->wheres[] = $this->quoteIdentifier($column) . " $operator %s";
         $this->bindings[] = $value;
         return $this;
     }
@@ -108,7 +123,7 @@ class QueryBuilder {
             $value = $operator;
             $operator = '=';
         }
-        $this->wheres[] = 'OR ' . "$column $operator %s";
+        $this->wheres[] = 'OR ' . $this->quoteIdentifier($column) . " $operator %s";
         $this->bindings[] = $value;
         return $this;
     }
@@ -531,7 +546,7 @@ class QueryBuilder {
     }
 
     public function orderBy($column, $direction = 'asc') {
-        $this->orders[] = "$column $direction";
+        $this->orders[] = $this->quoteIdentifier($column) . ' ' . $direction;
         return $this;
     }
 
@@ -733,7 +748,7 @@ class QueryBuilder {
             $this->joins[] = [
                 'type' => $type,
                 'table' => $table,
-                'clause' => "$first $operator $second",
+                'clause' => $this->quoteIdentifier($first) . " $operator " . $this->quoteIdentifier($second),
                 'bindings' => [],
             ];
         } else {
@@ -783,7 +798,7 @@ class QueryBuilder {
             $columns = func_get_args();
         }
         foreach ($columns as $col) {
-            $this->groups[] = $col;
+            $this->groups[] = $this->quoteIdentifier($col);
         }
         return $this;
     }
@@ -831,7 +846,6 @@ class QueryBuilder {
         if (empty($this->wheres)) {
             $where = '';
         } else {
-            // Rebuild where clause to support OR and AND logic
             $where = '';
             foreach ($this->wheres as $i => $clause) {
                 if ($i === 0) {
@@ -845,32 +859,47 @@ class QueryBuilder {
                 }
             }
         }
-        $sql = "SELECT " . implode(", ", $this->selects) . " FROM {$this->table}";
+        // Quote columns in SELECT
+        $selects = array_map([$this, 'quoteIdentifier'], $this->selects);
+        $sql = "SELECT " . implode(", ", $selects) . " FROM " . $this->quoteIdentifier($this->table);
         // Add JOIN clauses
         if (!empty($this->joins)) {
             foreach ($this->joins as $join) {
                 $type = $join['type'];
-                $table = $join['table'];
+                $table = $this->quoteIdentifier($join['table']);
                 if ($type === 'CROSS') {
                     $sql .= " CROSS JOIN $table";
                 } elseif ($join['clause']) {
-                    $sql .= " $type JOIN $table ON {$join['clause']}";
+                    // Try to quote identifiers in ON clause
+                    $clause = preg_replace_callback('/([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)/', function($m) {
+                        return $this->quoteIdentifier($m[1]);
+                    }, $join['clause']);
+                    $sql .= " $type JOIN $table ON {$clause}";
                 } else {
                     $sql .= " $type JOIN $table";
                 }
             }
         }
         if (!empty($where)) {
+            // Quote identifiers in WHERE
+            $where = preg_replace_callback('/([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)/', function($m) {
+                return $this->quoteIdentifier($m[1]);
+            }, $where);
             $sql .= " WHERE $where";
         }
         // GROUP BY
         if (!empty($this->groups)) {
-            $sql .= " GROUP BY " . implode(", ", $this->groups);
+            $groups = array_map([$this, 'quoteIdentifier'], $this->groups);
+            $sql .= " GROUP BY " . implode(", ", $groups);
         }
         // HAVING
         if (!empty($this->havings)) {
             $havingParts = [];
             foreach ($this->havings as [$expr, $vals]) {
+                // Quote identifiers in HAVING
+                $expr = preg_replace_callback('/([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)/', function($m) {
+                    return $this->quoteIdentifier($m[1]);
+                }, $expr);
                 $havingParts[] = $expr;
                 foreach ($vals as $v) {
                     $this->bindings[] = $v;
@@ -879,7 +908,16 @@ class QueryBuilder {
             $sql .= " HAVING " . implode(' AND ', $havingParts);
         }
         if (!empty($this->orders)) {
-            $sql .= " ORDER BY " . implode(", ", $this->orders);
+            $orders = array_map(function($order) {
+                // Split by space to get column and direction
+                if (preg_match('/^([a-zA-Z0-9_\.]+)\s+(asc|desc)$/i', $order, $m)) {
+                    return $this->quoteIdentifier($m[1]) . ' ' . strtoupper($m[2]);
+                } elseif (preg_match('/^([a-zA-Z0-9_\.]+)$/', $order, $m)) {
+                    return $this->quoteIdentifier($m[1]);
+                }
+                return $order;
+            }, $this->orders);
+            $sql .= " ORDER BY " . implode(", ", $orders);
         }
         if (isset($this->limit)) {
             $sql .= " LIMIT {$this->limit}";
@@ -891,17 +929,25 @@ class QueryBuilder {
     }
 
     protected function buildCountQuery() {
-        $sql = "SELECT COUNT(*) FROM {$this->table}";
+        $sql = "SELECT COUNT(*) FROM " . $this->quoteIdentifier($this->table);
         if (!empty($this->wheres)) {
-            $sql .= " WHERE " . implode(" AND ", $this->wheres);
+            $where = implode(" AND ", $this->wheres);
+            $where = preg_replace_callback('/([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)/', function($m) {
+                return $this->quoteIdentifier($m[1]);
+            }, $where);
+            $sql .= " WHERE $where";
         }
         return $sql;
     }
 
     protected function buildDeleteQuery() {
-        $sql = "DELETE FROM {$this->table}";
+        $sql = "DELETE FROM " . $this->quoteIdentifier($this->table);
         if (!empty($this->wheres)) {
-            $sql .= " WHERE " . implode(" AND ", $this->wheres);
+            $where = implode(" AND ", $this->wheres);
+            $where = preg_replace_callback('/([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)/', function($m) {
+                return $this->quoteIdentifier($m[1]);
+            }, $where);
+            $sql .= " WHERE $where";
         }
         return $sql;
     }
