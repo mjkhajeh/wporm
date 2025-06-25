@@ -367,7 +367,10 @@ protected function castSet($key, $value) {
 		}
 		$wpdb->insert($this->getTable(), $this->attributes);
 		$this->exists = true;
-		$this->attributes[$this->primaryKey] = $wpdb->insert_id;
+		// Set the correct primary key after insert
+		$pk = $this->primaryKey;
+		$this->attributes[$pk] = $wpdb->insert_id;
+		$this->$pk = $wpdb->insert_id;
 		return true;
 	}
 
@@ -379,7 +382,16 @@ protected function castSet($key, $value) {
 		if ($this->timestamps) {
 			$this->attributes[$this->updatedAtColumn] = current_time('mysql');
 		}
-		$wpdb->update($this->getTable(), $this->attributes, [$this->primaryKey => $this->attributes[$this->primaryKey]]);
+		$pk = $this->primaryKey;
+		// Prevent undefined array key warning by checking if PK is set
+        if (!isset($this->attributes[$pk]) && isset($this->$pk)) {
+            $this->attributes[$pk] = $this->$pk;
+        }
+        if (!isset($this->attributes[$pk])) {
+            // Cannot update without a primary key value
+            return false;
+        }
+		$wpdb->update($this->getTable(), $this->attributes, [$pk => $this->attributes[$pk]]);
 		return true;
 	}
 
@@ -504,10 +516,10 @@ protected function castSet($key, $value) {
 		$instance = new static;
 		foreach ($attributes as $key => $value) {
 			$instance->attributes[$key] = $value;
-		}
-		// Ensure primary key property is set (for eager loading)
-		if (isset($attributes[$instance->primaryKey])) {
-			$instance->{$instance->primaryKey} = $attributes[$instance->primaryKey];
+			// Set the property for the primary key if present
+			if ($key === $instance->primaryKey) {
+				$instance->{$instance->primaryKey} = $value;
+			}
 		}
 		$instance->original = $attributes;
 		$instance->exists = true;
