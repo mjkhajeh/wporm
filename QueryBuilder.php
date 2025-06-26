@@ -1202,4 +1202,64 @@ class QueryBuilder {
         }
         return $this->wpdb->query($this->wpdb->prepare($sql, ...$allBindings));
     }
+
+    /**
+     * Paginate the results (Eloquent-style).
+     * Returns an array: [
+     *   'data' => Collection,
+     *   'total' => int,
+     *   'per_page' => int,
+     *   'current_page' => int,
+     *   'last_page' => int,
+     *   'from' => int,
+     *   'to' => int
+     * ]
+     * Usage: ->paginate(10, 2) // 10 per page, page 2
+     */
+    public function paginate($perPage = 15, $page = null) {
+        $perPage = (int)$perPage;
+        $page = $page ?: (isset($_GET['page']) ? (int)$_GET['page'] : 1);
+        $page = max($page, 1);
+        $total = $this->count();
+        $this->limit($perPage)->offset(($page - 1) * $perPage);
+        $results = $this->get();
+        $lastPage = (int) ceil($total / $perPage);
+        $from = $total ? (($page - 1) * $perPage) + 1 : 0;
+        $to = $from + count($results) - 1;
+        return [
+            'data' => $results,
+            'total' => $total,
+            'per_page' => $perPage,
+            'current_page' => $page,
+            'last_page' => $lastPage,
+            'from' => $from,
+            'to' => $to
+        ];
+    }
+
+    /**
+     * Simple paginate (no total count, more efficient for large tables).
+     * Returns an array: [
+     *   'data' => Collection,
+     *   'per_page' => int,
+     *   'current_page' => int,
+     *   'next_page' => int|null
+     * ]
+     * Usage: ->simplePaginate(10, 2)
+     */
+    public function simplePaginate($perPage = 15, $page = null) {
+        $perPage = (int)$perPage;
+        $page = $page ?: (isset($_GET['page']) ? (int)$_GET['page'] : 1);
+        $page = max($page, 1);
+        $this->limit($perPage + 1)->offset(($page - 1) * $perPage);
+        $results = $this->get();
+        $hasMore = count($results) > $perPage;
+        $data = $hasMore ? $results->slice(0, $perPage) : $results;
+        return [
+            'data' => $data,
+            'per_page' => $perPage,
+            'current_page' => $page,
+            'next_page' => $hasMore ? $page + 1 : null
+        ];
+    }
 }

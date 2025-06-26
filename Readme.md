@@ -223,6 +223,43 @@ $part = Parts::find(1);
 $part->delete();
 ```
 
+## Pagination
+
+WPORM supports Eloquent-style pagination with the following methods on the query builder:
+
+### paginate($perPage = 15, $page = null)
+
+Returns a paginated result array with total count and page info:
+
+```php
+$result = User::query()->where('active', true)->paginate(10, 2);
+// $result = [
+//   'data' => Collection,
+//   'total' => int,
+//   'per_page' => int,
+//   'current_page' => int,
+//   'last_page' => int,
+//   'from' => int,
+//   'to' => int
+// ]
+```
+
+### simplePaginate($perPage = 15, $page = null)
+
+Returns a paginated result array without total count (more efficient for large tables):
+
+```php
+$result = User::query()->where('active', true)->simplePaginate(10, 2);
+// $result = [
+//   'data' => Collection,
+//   'per_page' => int,
+//   'current_page' => int,
+//   'next_page' => int|null
+// ]
+```
+
+See [Methods.md](./Methods.md) for more details and options.
+
 ## Attribute Casting
 Add a `$casts` property to your model:
 ```php
@@ -492,14 +529,6 @@ To remove a specific global scope at runtime:
 ```php
 Post::removeGlobalScope('published');
 ```
-
-## Extending/Improving
-- Add more casts by implementing `MJ\WPORM\Casts\CastableInterface`.
-- Add more schema types in `Blueprint` as needed.
-- Add more model events as needed.
-
-## License
-MIT
 
 ---
 

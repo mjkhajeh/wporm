@@ -14,6 +14,7 @@ This document describes all public and static methods of the `MJ\WPORM\Model` cl
 - [Utility Methods](#utility-methods)
 - [JSON Where Clauses](#json-where-clauses)
 - [Raw Table Queries with DB::table()](#raw-table-queries-with-dbtable)
+- [Pagination](#pagination)
 
 ---
 
@@ -937,3 +938,39 @@ DB::table('custom_table')->where('status', 'active')->get();
 ```
 
 See [DB.md](./DB.md) for more details.
+
+---
+
+## Pagination
+
+### paginate($perPage = 15, $page = null)
+Returns a paginated result array with total count and page info:
+- `data`: Collection of results for the current page
+- `total`: Total number of records
+- `per_page`: Number of records per page
+- `current_page`: Current page number
+- `last_page`: Last page number
+- `from`: First record number on this page
+- `to`: Last record number on this page
+
+### simplePaginate($perPage = 15, $page = null)
+Returns a paginated result array without total count (more efficient for large tables):
+- `data`: Collection of results for the current page
+- `per_page`: Number of records per page
+- `current_page`: Current page number
+- `next_page`: Next page number (or null if no more pages)
+
+**Example:**
+```php
+$result = User::query()->where('active', true)->paginate(10, 2);
+foreach ($result['data'] as $user) {
+    // ...
+}
+```
+
+```php
+$result = User::query()->where('active', true)->simplePaginate(10, 2);
+foreach ($result['data'] as $user) {
+    // ...
+}
+```

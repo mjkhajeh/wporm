@@ -21,6 +21,10 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
         return $this->items;
     }
 
+    public function slice($offset, $length = null) {
+        return new static(array_slice($this->items, $offset, $length));
+    }
+
     // Countable
     public function count(): int {
         return count($this->items);
