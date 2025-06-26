@@ -577,6 +577,29 @@ if ($user->trashed()) {
 
 > **Note:** All query methods (`all`, `find`, relationships, etc.) respect soft deletes by default. Use `withTrashed()` or `onlyTrashed()` to modify this behavior.
 
+### Customizing the Global Soft Delete Scope
+
+By default, WPORM automatically excludes soft-deleted records from all queries on models with `$softDeletes = true`. This is handled by a global scope that checks for `NULL` in the `deleted_at` column (or your custom column).
+
+If you want to customize or disable this global soft delete scope, you can use the following methods:
+
+- **Disable all global scopes for a query:**
+  ```php
+  $all = User::query(false)->get(); // disables all global scopes, including soft deletes
+  ```
+- **Remove the soft delete global scope at runtime:**
+  ```php
+  User::removeGlobalScope('softDeletes');
+  ```
+- **Add a custom global scope for soft deletes:**
+  ```php
+  User::addGlobalScope('softDeletes', function($query) {
+      $query->whereNull('deleted_at'); // or customize as needed
+  });
+  ```
+
+> Note: The default soft delete global scope is applied automatically if `$softDeletes = true` and no custom scope is set. You can override or remove it as needed for advanced use cases.
+
 ### Force Deleting Relationships
 
 You can force delete a model and its related models in one call using `forceDeleteWith`. This is useful for cascading deletes on relationships (e.g. hasMany, hasOne, belongsToMany) when using soft deletes.
