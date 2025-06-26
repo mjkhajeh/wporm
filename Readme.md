@@ -4,9 +4,12 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 
 ![wporm](https://github.com/user-attachments/assets/f84f6905-4279-4ee3-9e1f-9fb9a3fd2e51)
 
-- [Methods list and documents](https://github.com/mjkhajeh/wporm/blob/main/Methods.md)
-- [Blueprint and column types documents](https://github.com/mjkhajeh/wporm/blob/main/Blueprint.md)
-- [Casts types and define custom casts](https://github.com/mjkhajeh/wporm/blob/main/CastsType.md)
+## Documentation
+- [Methods list and documents](./Methods.md)
+- [Blueprint and column types documents](./Blueprint.md)
+- [Casts types and define custom casts](./CastsType.md)
+- [DB usage and raw queries](./DB.md)
+- [Debugging tips](./Debugging.md)
 
 ## Features
 - **Model-based data access**: Define models for your tables and interact with them using PHP objects.
@@ -43,6 +46,8 @@ require_once __DIR__ . '/ORM/QueryBuilder.php';
 require_once __DIR__ . '/ORM/Blueprint.php';
 require_once __DIR__ . '/ORM/SchemaBuilder.php';
 require_once __DIR__ . '/ORM/ColumnDefinition.php';
+require_once __DIR__ . '/ORM/DB.php';
+require_once __DIR__ . '/ORM/Collection.php';
 ```
 
 ## Defining a Model
@@ -227,6 +232,33 @@ protected $casts = [
 ];
 ```
 
+## Array Conversion and Casting
+
+- Call `->toArray()` on a model or a collection to get an array representation with all casts applied.
+- Built-in types (e.g. 'int', 'bool', 'float', 'json', etc.) are handled natively and will not be instantiated as classes.
+- Custom cast classes must implement `MJ\WPORM\Casts\CastableInterface`.
+
+Example:
+
+```php
+protected $casts = [
+    'user_id'    => 'int',
+    'from'       => Time::class, // custom cast
+    'to'         => Time::class, // custom cast
+    'use_default'=> 'bool',
+    'status'     => 'bool',
+];
+
+$model = Times::find(1);
+$array = $model->toArray();
+
+$collection = Times::query()->get();
+$arrays = $collection->toArray();
+```
+
+- Custom cast classes will be instantiated and their `get()` method called.
+- Built-in types will be cast using native PHP logic.
+
 ## Relationships
 ```php
 // In Product model
@@ -294,6 +326,24 @@ class Parts extends Model {
 // Usage:
 $parts = Parts::partsWithMinQty(5);
 ```
+
+## Raw Table Queries with DB::table()
+
+WPORM now supports Eloquent-style raw table queries using the `DB` class:
+
+```php
+use MJ\WPORM\DB;
+
+// Update posts with IDs 3, 4, 5
+db::table('post')
+    ->whereIn('id', [3, 4, 5])
+    ->update(['title' => 'Updated Title']);
+
+// Select rows from any table
+db::table('custom_table')->where('status', 'active')->get();
+```
+
+See [DB.md](./DB.md) for more details.
 
 ## Complex Where Statements
 WPORM now supports complex nested where/orWhere statements using closures, similar to Eloquent:
@@ -703,50 +753,3 @@ WPORM is inspired by Laravel's Eloquent ORM and adapted for the WordPress ecosys
 ## License Details
 
 This project is licensed under the MIT License. See the LICENSE file or [MIT License](https://opensource.org/licenses/MIT) for details.
-
----
-
-## Raw Table Queries with DB::table()
-
-WPORM now supports Eloquent-style raw table queries using the `DB` class:
-
-```php
-use MJ\WPORM\DB;
-
-// Update posts with IDs 3, 4, 5
-db::table('post')
-    ->whereIn('id', [3, 4, 5])
-    ->update(['title' => 'Updated Title']);
-
-// Select rows from any table
-db::table('custom_table')->where('status', 'active')->get();
-```
-
-See [DB.md](./DB.md) for more details.
-
-## Array Conversion and Casting
-
-- Call `->toArray()` on a model or a collection to get an array representation with all casts applied.
-- Built-in types (e.g. 'int', 'bool', 'float', 'json', etc.) are handled natively and will not be instantiated as classes.
-- Custom cast classes must implement `MJ\WPORM\Casts\CastableInterface`.
-
-Example:
-
-```php
-protected $casts = [
-    'user_id'    => 'int',
-    'from'       => Time::class, // custom cast
-    'to'         => Time::class, // custom cast
-    'use_default'=> 'bool',
-    'status'     => 'bool',
-];
-
-$model = Times::find(1);
-$array = $model->toArray();
-
-$collection = Times::query()->get();
-$arrays = $collection->toArray();
-```
-
-- Custom cast classes will be instantiated and their `get()` method called.
-- Built-in types will be cast using native PHP logic.
