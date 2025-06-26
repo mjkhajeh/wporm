@@ -271,11 +271,13 @@ protected function castSet($key, $value) {
 	}
 
 	public static function find($id) {
-		$instance = static::query()->where('id', $id)->first();
-		if ($instance && method_exists($instance, 'retrieved')) {
-			$instance->retrieved();
+		$instance = new static;
+		$pk = $instance->primaryKey;
+		$result = static::query()->where($pk, $id)->first();
+		if ($result && method_exists($result, 'retrieved')) {
+			$result->retrieved();
 		}
-		return $instance;
+		return $result;
 	}
 
 	// Add a wrapper for triggering retrieved() after get/first
