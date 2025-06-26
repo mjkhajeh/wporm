@@ -658,5 +658,51 @@ public function forceDelete() {
 		unset($this->attributes[$offset]);
 	}
 
-    // The collectionToArray helper is no longer needed because get() now returns a Collection with toArray().
+    /**
+     * Query scope: Include soft-deleted records in results.
+     * Usage: Model::withTrashed()->get()
+     * @param \MJ\WPORM\QueryBuilder|null $query
+     * @return \MJ\WPORM\QueryBuilder
+     */
+    public static function withTrashed($query = null) {
+        $instance = new static;
+        $query = $query ?: static::query();
+        if ($instance->softDeletes) {
+            $query->withTrashed = true;
+        }
+        return $query;
+    }
+
+    /**
+     * Query scope: Only soft-deleted records.
+     * Usage: Model::onlyTrashed()->get()
+     * @param \MJ\WPORM\QueryBuilder|null $query
+     * @return \MJ\WPORM\QueryBuilder
+     */
+    public static function onlyTrashed($query = null) {
+        $instance = new static;
+        $query = $query ?: static::query();
+        if ($instance->softDeletes) {
+            $query->onlyTrashed = true;
+            $query->whereNotNull($instance->deletedAtColumn);
+        }
+        return $query;
+    }
+
+    /**
+     * Query scope: Exclude soft-deleted records (default behavior).
+     * Usage: Model::withoutTrashed()->get()
+     * @param \MJ\WPORM\QueryBuilder|null $query
+     * @return \MJ\WPORM\QueryBuilder
+     */
+    public static function withoutTrashed($query = null) {
+        $instance = new static;
+        $query = $query ?: static::query();
+        if ($instance->softDeletes) {
+            $query->withTrashed = false;
+            $query->onlyTrashed = false;
+            $query->whereNull($instance->deletedAtColumn);
+        }
+        return $query;
+    }
 }
