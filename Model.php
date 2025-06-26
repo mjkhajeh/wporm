@@ -489,6 +489,31 @@ public function forceDelete() {
     return $this->delete();
 }
 
+/**
+     * Force delete the model and all specified relationships.
+     * Usage: $model->forceDeleteWith(['posts', 'comments'])
+     *
+     * @param array $relations Array of relationship method names to force delete
+     * @return bool
+     */
+    public function forceDeleteWith(array $relations = []) {
+        foreach ($relations as $relation) {
+            if (method_exists($this, $relation)) {
+                $related = $this->$relation();
+                if ($related instanceof \MJ\WPORM\Model) {
+                    $related->forceDelete();
+                } elseif ($related instanceof \MJ\WPORM\Collection) {
+                    foreach ($related as $item) {
+                        if ($item instanceof \MJ\WPORM\Model) {
+                            $item->forceDelete();
+                        }
+                    }
+                }
+            }
+        }
+        return $this->forceDelete();
+    }
+
 	/**
 	 * Get the table name for the model (static context).
 	 * @return string

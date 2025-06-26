@@ -1038,6 +1038,21 @@ $user = User::find(1);
 $user->forceDelete();
 ```
 
+### forceDeleteWith(array $relations = [])
+
+Force delete the model and all specified relationships. Useful for cascading deletes on related models when using soft deletes.
+
+**Parameters:**
+- `$relations` (array): Array of relationship method names (strings) to force delete.
+
+**Returns:**
+- `bool` True if the model and all specified relationships were force deleted.
+
+**Example:**
+```php
+$user->forceDeleteWith(['posts', 'comments']);
+```
+
 ### restore()
 **Description:** Restores a soft-deleted model (sets `deleted_at` to null). Also available on QueryBuilder to restore multiple records.
 

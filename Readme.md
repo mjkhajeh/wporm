@@ -577,6 +577,23 @@ if ($user->trashed()) {
 
 > **Note:** All query methods (`all`, `find`, relationships, etc.) respect soft deletes by default. Use `withTrashed()` or `onlyTrashed()` to modify this behavior.
 
+### Force Deleting Relationships
+
+You can force delete a model and its related models in one call using `forceDeleteWith`. This is useful for cascading deletes on relationships (e.g. hasMany, hasOne, belongsToMany) when using soft deletes.
+
+**Usage:**
+
+```php
+// Force delete a post and all its comments and tags
+$post->forceDeleteWith(['comments', 'tags']);
+```
+
+- The argument is an array of relationship method names (as strings).
+- Each related model or collection will be force deleted before the parent model.
+- Works with any relationship that returns a Model or Collection.
+
+> Note: This is only relevant for models using soft deletes.
+
 See [Methods.md](./Methods.md) for a full list of soft delete methods.
 
 ---
