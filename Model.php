@@ -26,6 +26,41 @@ abstract class Model implements \ArrayAccess {
 	protected $softDeletes = false;
 	protected $deletedAtColumn = 'deleted_at';
 
+    /**
+     * Get the deleted_at column as a DateTime instance (if set and not null).
+     * @return \DateTimeInterface|null
+     */
+    public function getDeletedAtAttribute() {
+        $column = $this->deletedAtColumn;
+        $value = $this->attributes[$column] ?? null;
+        if ($value) {
+            try {
+                return new \DateTime($value);
+            } catch (\Exception $e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Set the deleted_at column from a DateTime, timestamp, or string.
+     * @param \DateTimeInterface|int|string|null $value
+     * @return void
+     */
+    public function setDeletedAtAttribute($value) {
+        $column = $this->deletedAtColumn;
+        if ($value instanceof \DateTimeInterface) {
+            $this->attributes[$column] = $value->format('Y-m-d H:i:s');
+        } elseif (is_numeric($value)) {
+            $this->attributes[$column] = date('Y-m-d H:i:s', (int)$value);
+        } elseif (is_string($value)) {
+            $this->attributes[$column] = date('Y-m-d H:i:s', strtotime($value));
+        } elseif ($value === null) {
+            $this->attributes[$column] = null;
+        }
+    }
+
 	// Register a global scope
 	public static function addGlobalScope($identifier, callable $scope) {
 		static::$globalScopes[static::class][$identifier] = $scope;

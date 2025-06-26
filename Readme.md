@@ -577,6 +577,28 @@ if ($user->trashed()) {
 
 > **Note:** All query methods (`all`, `find`, relationships, etc.) respect soft deletes by default. Use `withTrashed()` or `onlyTrashed()` to modify this behavior.
 
+### Date Mutators for $deletedAtColumn
+
+WPORM automatically provides Eloquent-style date mutators for the soft delete column (`$deletedAtColumn`).
+
+- **Get as DateTime:**
+  ```php
+  $deletedAt = $model->deleted_at; // returns DateTime|null if set
+  // or
+  $deletedAt = $model->getDeletedAtAttribute();
+  ```
+- **Set as DateTime, timestamp, or string:**
+  ```php
+  $model->deleted_at = new DateTime();
+  $model->deleted_at = time();
+  $model->deleted_at = '2025-06-26 12:00:00';
+  $model->deleted_at = null; // clears the value
+  // or
+  $model->setDeletedAtAttribute($value);
+  ```
+
+This ensures the `deleted_at` column is always handled as a proper date/time value, just like Eloquent. The mutators work with the default column name or any custom `$deletedAtColumn` you set on your model.
+
 ### Customizing the Global Soft Delete Scope
 
 By default, WPORM automatically excludes soft-deleted records from all queries on models with `$softDeletes = true`. This is handled by a global scope that checks for `NULL` in the `deleted_at` column (or your custom column).
