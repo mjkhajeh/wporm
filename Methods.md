@@ -882,6 +882,25 @@ protected function creating() {
 }
 ```
 
+### softDeleting(), softDeleted(), restoring(), restored()
+**Description:** Event hooks for soft deletes. Override these in your model to add custom logic before/after soft delete and restore.
+
+**Example:**
+```php
+protected function softDeleting() {
+    // Called before soft delete
+}
+protected function softDeleted() {
+    // Called after soft delete
+}
+protected function restoring() {
+    // Called before restore
+}
+protected function restored() {
+    // Called after restore
+}
+```
+
 ---
 
 ## ArrayAccess Methods

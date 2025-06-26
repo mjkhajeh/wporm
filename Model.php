@@ -254,6 +254,34 @@ protected function castSet($key, $value) {
 	 */
 	protected function retrieved() {}
 
+    /**
+     * Called before a model is soft deleted (softDeletes only).
+     * Override in your model to add custom logic.
+     * @return void
+     */
+    protected function softDeleting() {}
+
+    /**
+     * Called after a model is soft deleted (softDeletes only).
+     * Override in your model to add custom logic.
+     * @return void
+     */
+    protected function softDeleted() {}
+
+    /**
+     * Called before a model is restored from soft delete.
+     * Override in your model to add custom logic.
+     * @return void
+     */
+    protected function restoring() {}
+
+    /**
+     * Called after a model is restored from soft delete.
+     * Override in your model to add custom logic.
+     * @return void
+     */
+    protected function restored() {}
+
 	public static function query($applyGlobalScopes = true) {
 		$instance = new static;
 		$query = new \MJ\WPORM\QueryBuilder($instance, $applyGlobalScopes);
@@ -405,14 +433,20 @@ protected function castSet($key, $value) {
 	}
 
 	public function delete() {
-		if ($this->softDeletes) {
-			global $wpdb;
-			$this->attributes[$this->deletedAtColumn] = current_time('mysql');
-			$pk = $this->primaryKey;
-			$wpdb->update($this->getTable(), [$this->deletedAtColumn => $this->attributes[$this->deletedAtColumn]], [$pk => $this->attributes[$pk]]);
-			$this->exists = true;
-			return true;
-		}
+        if ($this->softDeletes) {
+            if (method_exists($this, 'softDeleting')) {
+                $this->softDeleting();
+            }
+            global $wpdb;
+            $this->attributes[$this->deletedAtColumn] = current_time('mysql');
+            $pk = $this->primaryKey;
+            $wpdb->update($this->getTable(), [$this->deletedAtColumn => $this->attributes[$this->deletedAtColumn]], [$pk => $this->attributes[$pk]]);
+            $this->exists = true;
+            if (method_exists($this, 'softDeleted')) {
+                $this->softDeleted();
+            }
+            return true;
+        }
 		if (method_exists($this, 'deleting')) { // Event
 			$this->deleting();
 		}
@@ -428,11 +462,17 @@ protected function castSet($key, $value) {
 
 public function restore() {
     if ($this->softDeletes && $this->trashed()) {
+        if (method_exists($this, 'restoring')) {
+            $this->restoring();
+        }
         global $wpdb;
         $pk = $this->primaryKey;
         $this->attributes[$this->deletedAtColumn] = null;
         $wpdb->update($this->getTable(), [$this->deletedAtColumn => null], [$pk => $this->attributes[$pk]]);
         $this->exists = true;
+        if (method_exists($this, 'restored')) {
+            $this->restored();
+        }
         return true;
     }
     return false;
