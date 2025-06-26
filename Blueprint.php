@@ -204,13 +204,13 @@ class Blueprint
         $this->timestamp('created_at');
         $this->timestamp('updated_at');
     }
-    public function softDeletes()
-    {
-        $this->timestamp('deleted_at')->nullable();
-    }
-    public function softDeletesTz()
-    {
-        $this->timestampTz('deleted_at')->nullable();
+    /**
+     * Add a nullable datetime column for soft deletes (Eloquent-style shortcut).
+     * @param string $column
+     * @return ColumnDefinition
+     */
+    public function softDeletes(string $column = 'deleted_at') {
+        return $this->datetime($column)->nullable();
     }
 
     public function dropColumn(string $column)

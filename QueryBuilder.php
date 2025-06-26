@@ -628,7 +628,37 @@ class QueryBuilder {
         return $this;
     }
 
+    /**
+     * Include soft-deleted records in results.
+     */
+    public $withTrashed = false;
+
+    /**
+     * Only return soft-deleted records.
+     */
+    public $onlyTrashed = false;
+
+    /**
+     * Restore soft-deleted records matching the query.
+     */
+    public function restore() {
+        if (isset($this->model->softDeletes) && $this->model->softDeletes) {
+            $deletedAt = $this->model->deletedAtColumn;
+            return $this->update([$deletedAt => null]);
+        }
+        return false;
+    }
+
     public function get() {
+        // Soft delete logic: filter by deleted_at if needed
+        if (isset($this->model->softDeletes) && $this->model->softDeletes) {
+            $deletedAt = $this->model->deletedAtColumn;
+            if ($this->onlyTrashed) {
+                $this->whereNotNull($deletedAt);
+            } elseif (!$this->withTrashed) {
+                $this->whereNull($deletedAt);
+            }
+        }
         $sql = $this->buildSelectQuery();
         if (!empty($this->bindings)) {
             $sql = $this->wpdb->prepare($sql, ...$this->bindings);

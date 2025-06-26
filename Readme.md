@@ -530,6 +530,55 @@ To remove a specific global scope at runtime:
 Post::removeGlobalScope('published');
 ```
 
+## Soft Deletes
+
+WPORM supports Eloquent-style soft deletes, allowing you to "delete" records without actually removing them from the database. To enable soft deletes on a model, set the `$softDeletes` property to `true`:
+
+```php
+class User extends Model {
+    protected $softDeletes = true;
+    // Optionally customize the deleted_at column:
+    // protected $deletedAtColumn = 'deleted_at';
+}
+```
+
+When enabled, calling `$model->delete()` will set the `deleted_at` column instead of removing the record. By default, all queries will exclude soft-deleted records.
+
+### Querying with Soft Deletes
+- To include soft-deleted records:
+  ```php
+  $users = User::query()->withTrashed()->get();
+  ```
+- To only get soft-deleted records:
+  ```php
+  $trashed = User::query()->onlyTrashed()->get();
+  ```
+- To restore a soft-deleted record:
+  ```php
+  $user = User::find(1);
+  $user->restore();
+  ```
+- To permanently delete (force delete) a record:
+  ```php
+  $user = User::find(1);
+  $user->forceDelete();
+  ```
+- To restore multiple records:
+  ```php
+  User::query()->onlyTrashed()->where('role', 'subscriber')->restore();
+  ```
+
+### Checking if a model is trashed
+```php
+if ($user->trashed()) {
+    // ...
+}
+```
+
+> **Note:** All query methods (`all`, `find`, relationships, etc.) respect soft deletes by default. Use `withTrashed()` or `onlyTrashed()` to modify this behavior.
+
+See [Methods.md](./Methods.md) for a full list of soft delete methods.
+
 ---
 
 # Full Example: Using Every Feature of WPORM

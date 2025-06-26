@@ -15,6 +15,7 @@ This document describes all public and static methods of the `MJ\WPORM\Model` cl
 - [JSON Where Clauses](#json-where-clauses)
 - [Raw Table Queries with DB::table()](#raw-table-queries-with-dbtable)
 - [Pagination](#pagination)
+- [Soft Deletes](#soft-deletes)
 
 ---
 
@@ -973,4 +974,92 @@ $result = User::query()->where('active', true)->simplePaginate(10, 2);
 foreach ($result['data'] as $user) {
     // ...
 }
+```
+
+---
+
+## Soft Deletes
+
+### $softDeletes
+**Description:** Set to `true` on your model to enable soft deletes. When enabled, `delete()` will set the `deleted_at` column instead of removing the record.
+
+**Example:**
+```php
+class User extends Model {
+    protected $softDeletes = true;
+}
+```
+
+### $deletedAtColumn
+**Description:** Optionally customize the column name for soft deletes (default: `deleted_at`).
+
+**Example:**
+```php
+class User extends Model {
+    protected $softDeletes = true;
+    protected $deletedAtColumn = 'removed_at';
+}
+```
+
+### delete()
+**Description:** Soft deletes the model (sets `deleted_at`). If soft deletes are not enabled, performs a hard delete.
+
+**Example:**
+```php
+$user = User::find(1);
+$user->delete();
+```
+
+### forceDelete()
+**Description:** Permanently deletes the model from the database, even if soft deletes are enabled.
+
+**Example:**
+```php
+$user = User::find(1);
+$user->forceDelete();
+```
+
+### restore()
+**Description:** Restores a soft-deleted model (sets `deleted_at` to null). Also available on QueryBuilder to restore multiple records.
+
+**Example:**
+```php
+$user = User::query()->onlyTrashed()->first();
+$user->restore();
+// Or restore multiple:
+User::query()->onlyTrashed()->where('role', 'subscriber')->restore();
+```
+
+### trashed()
+**Description:** Returns `true` if the model is soft deleted.
+
+**Example:**
+```php
+if ($user->trashed()) { /* ... */ }
+```
+
+### withTrashed()
+**Description:** Query builder method to include soft-deleted records in results.
+
+**Example:**
+```php
+$users = User::query()->withTrashed()->get();
+```
+
+### onlyTrashed()
+**Description:** Query builder method to return only soft-deleted records.
+
+**Example:**
+```php
+$trashed = User::query()->onlyTrashed()->get();
+```
+
+---
+
+### Blueprint::softDeletes($column = 'deleted_at')
+**Description:** Adds a nullable DATETIME column for soft deletes (Eloquent-style shortcut). Use this in your schema to enable soft deletes for your model.
+**Example:**
+```php
+$table->softDeletes(); // Adds 'deleted_at' DATETIME NULL
+$table->softDeletes('removed_at'); // Adds 'removed_at' DATETIME NULL
 ```

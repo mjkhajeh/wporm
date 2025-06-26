@@ -543,11 +543,12 @@ $table->id();
 $table->timestamps();
 ```
 
-### softDeletes()
-**Description:** Adds a nullable `deleted_at` TIMESTAMP column for soft deletes.
+### softDeletes($column = 'deleted_at')
+**Description:** Adds a nullable DATETIME column for soft deletes (Eloquent-style shortcut). Use this for enabling soft deletes on your model.
 **Example:**
 ```php
-$table->softDeletes();
+$table->softDeletes(); // Adds 'deleted_at' DATETIME NULL
+$table->softDeletes('removed_at'); // Adds 'removed_at' DATETIME NULL
 ```
 
 ### softDeletesTz()

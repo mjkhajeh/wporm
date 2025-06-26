@@ -23,6 +23,8 @@ abstract class Model implements \ArrayAccess {
 	protected $createdAtColumn = 'created_at';
 	protected $updatedAtColumn = 'updated_at';
     protected $_eagerLoaded = [];
+	protected $softDeletes = false;
+	protected $deletedAtColumn = 'deleted_at';
 
 	// Register a global scope
 	public static function addGlobalScope($identifier, callable $scope) {
@@ -253,11 +255,16 @@ protected function castSet($key, $value) {
 	protected function retrieved() {}
 
 	public static function query($applyGlobalScopes = true) {
-		return new \MJ\WPORM\QueryBuilder(new static, $applyGlobalScopes);
+		$instance = new static;
+		$query = new \MJ\WPORM\QueryBuilder($instance, $applyGlobalScopes);
+		if ($instance->softDeletes && !$query->withTrashed && !$query->onlyTrashed) {
+			$query->whereNull($instance->deletedAtColumn);
+		}
+		return $query;
 	}
 
 	public static function newQuery($applyGlobalScopes = true) {
-		return new \MJ\WPORM\QueryBuilder(new static, $applyGlobalScopes);
+		return static::query($applyGlobalScopes);
 	}
 
 	public static function all() {
@@ -398,6 +405,14 @@ protected function castSet($key, $value) {
 	}
 
 	public function delete() {
+		if ($this->softDeletes) {
+			global $wpdb;
+			$this->attributes[$this->deletedAtColumn] = current_time('mysql');
+			$pk = $this->primaryKey;
+			$wpdb->update($this->getTable(), [$this->deletedAtColumn => $this->attributes[$this->deletedAtColumn]], [$pk => $this->attributes[$pk]]);
+			$this->exists = true;
+			return true;
+		}
 		if (method_exists($this, 'deleting')) { // Event
 			$this->deleting();
 		}
@@ -406,6 +421,33 @@ protected function castSet($key, $value) {
 		$this->exists = false;
 		return true;
 	}
+
+	public function trashed() {
+    return $this->softDeletes && !empty($this->attributes[$this->deletedAtColumn]);
+}
+
+public function restore() {
+    if ($this->softDeletes && $this->trashed()) {
+        global $wpdb;
+        $pk = $this->primaryKey;
+        $this->attributes[$this->deletedAtColumn] = null;
+        $wpdb->update($this->getTable(), [$this->deletedAtColumn => null], [$pk => $this->attributes[$pk]]);
+        $this->exists = true;
+        return true;
+    }
+    return false;
+}
+
+public function forceDelete() {
+    if ($this->softDeletes) {
+        global $wpdb;
+        $pk = $this->primaryKey;
+        $wpdb->delete($this->getTable(), [$pk => $this->attributes[$pk]]);
+        $this->exists = false;
+        return true;
+    }
+    return $this->delete();
+}
 
 	/**
 	 * Get the table name for the model (static context).
