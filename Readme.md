@@ -350,6 +350,29 @@ WPORM supports Eloquent-style relationships. You can define them in your model u
 
 All relationship methods return either a model instance or a `Collection` of models. You can use them just like in Eloquent.
 
+### Relationship Existence Filtering: whereHas, orWhereHas, has
+
+- `whereHas('relation', function($q) { ... })`: Filter models where the relation exists and matches constraints.
+- `orWhereHas('relation', function($q) { ... })`: OR version of whereHas.
+- `has('relation', '>=', 2)`: Filter models with at least (or exactly, or at most) N related records. Operator and count are optional (defaults to ">= 1").
+
+**Examples:**
+```php
+// Users with at least one post
+User::query()->has('posts')->get();
+
+// Users with at least 5 posts
+User::query()->has('posts', '>=', 5)->get();
+
+// Users with exactly 2 posts
+User::query()->has('posts', '=', 2)->get();
+
+// Users with at least one published post
+User::query()->whereHas('posts', function($q) {
+    $q->where('published', 1);
+})->get();
+```
+
 ## Custom Attribute Accessors/Mutators
 ```php
 public function getQtyAttribute() {

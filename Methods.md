@@ -766,6 +766,22 @@ $comments = $user->hasManyThrough(Comment::class, Post::class);
 
 ---
 
+## Relationship Existence Filtering
+
+### whereHas($relation, $constraint = null)
+- Filter models where the given relation exists and matches the constraint closure.
+- Example: `$query->whereHas('posts', function($q) { $q->where('published', 1); })`
+
+### orWhereHas($relation, $constraint = null)
+- OR version of whereHas.
+
+### has($relation, $operator = '>=', $count = 1)
+- Filter models with a number of related records matching the operator and count.
+- Example: `$query->has('posts', '>=', 5)`
+- Operator and count are optional (defaults to ">= 1").
+
+---
+
 ## Utility Methods
 
 ### fill(array $attributes)
