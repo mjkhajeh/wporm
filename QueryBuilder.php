@@ -1292,4 +1292,171 @@ class QueryBuilder {
             'next_page' => $hasMore ? $page + 1 : null
         ];
     }
+
+    /**
+     * Filter by existence of related records (Eloquent-style whereHas).
+     * Usage: ->whereHas('relation', function($q) { ... })
+     */
+    public function whereHas($relation, $constraint = null) {
+        $model = $this->model;
+        if (!method_exists($model, $relation)) {
+            throw new \InvalidArgumentException("Relation '$relation' not defined on model " . get_class($model));
+        }
+        $relatedQuery = $model->$relation();
+        // If the relation returns a QueryBuilder, use it directly
+        if ($relatedQuery instanceof self) {
+            $query = $relatedQuery;
+        } elseif ($relatedQuery instanceof \MJ\WPORM\Model) {
+            $query = $relatedQuery::query();
+        } else {
+            throw new \InvalidArgumentException("Relation '$relation' must return a Model or QueryBuilder");
+        }
+        if ($constraint) {
+            $constraint($query);
+        }
+        // Infer keys for hasOne/hasMany/belongsTo
+        $localKey = property_exists($model, 'primaryKey') ? $model->primaryKey : 'id';
+        $foreignKey = null;
+        // Try to get foreign key from relation method signature
+        $ref = new \ReflectionMethod($model, $relation);
+        $params = $ref->getParameters();
+        if (isset($params[1])) {
+            $foreignKey = $params[1]->getDefaultValue();
+        }
+        // If belongsTo, swap keys
+        if ($relatedQuery instanceof \MJ\WPORM\Model && isset($params[1])) {
+            $foreignKey = $params[1]->getDefaultValue();
+            $ownerKey = $relatedQuery->primaryKey;
+            $column = $model->$foreignKey;
+            $relatedTable = $relatedQuery->getTable();
+            $this->whereExists(function($q) use ($query, $relatedTable, $ownerKey, $foreignKey) {
+                $q->from($relatedTable)
+                  ->whereColumn($relatedTable . '.' . $ownerKey, '=', $this->table . '.' . $foreignKey);
+                foreach ($query->wheres as $w) {
+                    $q->wheres[] = $w;
+                }
+                foreach ($query->bindings as $b) {
+                    $q->bindings[] = $b;
+                }
+            });
+            return $this;
+        }
+        // Default: hasOne/hasMany
+        if ($foreignKey && $localKey) {
+            $relatedTable = $query->table;
+            $this->whereExists(function($q) use ($query, $relatedTable, $foreignKey, $localKey) {
+                $q->from($relatedTable)
+                  ->whereColumn($relatedTable . '.' . $foreignKey, '=', $this->table . '.' . $localKey);
+                foreach ($query->wheres as $w) {
+                    $q->wheres[] = $w;
+                }
+                foreach ($query->bindings as $b) {
+                    $q->bindings[] = $b;
+                }
+            });
+            return $this;
+        }
+        // Fallback: just use subquery
+        $this->whereExists(function($q) use ($query) {
+            foreach ($query->wheres as $w) {
+                $q->wheres[] = $w;
+            }
+            foreach ($query->bindings as $b) {
+                $q->bindings[] = $b;
+            }
+        });
+        return $this;
+    }
+
+    /**
+     * OR version of whereHas (Eloquent-style orWhereHas).
+     */
+    public function orWhereHas($relation, $constraint = null) {
+        $model = $this->model;
+        if (!method_exists($model, $relation)) {
+            throw new \InvalidArgumentException("Relation '$relation' not defined on model " . get_class($model));
+        }
+        $relatedQuery = $model->$relation();
+        if ($relatedQuery instanceof self) {
+            $query = $relatedQuery;
+        } elseif ($relatedQuery instanceof \MJ\WPORM\Model) {
+            $query = $relatedQuery::query();
+        } else {
+            throw new \InvalidArgumentException("Relation '$relation' must return a Model or QueryBuilder");
+        }
+        if ($constraint) {
+            $constraint($query);
+        }
+        $localKey = property_exists($model, 'primaryKey') ? $model->primaryKey : 'id';
+        $foreignKey = null;
+        $ref = new \ReflectionMethod($model, $relation);
+        $params = $ref->getParameters();
+        if (isset($params[1])) {
+            $foreignKey = $params[1]->getDefaultValue();
+        }
+        if ($relatedQuery instanceof \MJ\WPORM\Model && isset($params[1])) {
+            $foreignKey = $params[1]->getDefaultValue();
+            $ownerKey = $relatedQuery->primaryKey;
+            $column = $model->$foreignKey;
+            $relatedTable = $relatedQuery->getTable();
+            $this->orWhereExists(function($q) use ($query, $relatedTable, $ownerKey, $foreignKey) {
+                $q->from($relatedTable)
+                  ->whereColumn($relatedTable . '.' . $ownerKey, '=', $this->table . '.' . $foreignKey);
+                foreach ($query->wheres as $w) {
+                    $q->wheres[] = $w;
+                }
+                foreach ($query->bindings as $b) {
+                    $q->bindings[] = $b;
+                }
+            });
+            return $this;
+        }
+        if ($foreignKey && $localKey) {
+            $relatedTable = $query->table;
+            $this->orWhereExists(function($q) use ($query, $relatedTable, $foreignKey, $localKey) {
+                $q->from($relatedTable)
+                  ->whereColumn($relatedTable . '.' . $foreignKey, '=', $this->table . '.' . $localKey);
+                foreach ($query->wheres as $w) {
+                    $q->wheres[] = $w;
+                }
+                foreach ($query->bindings as $b) {
+                    $q->bindings[] = $b;
+                }
+            });
+            return $this;
+        }
+        $this->orWhereExists(function($q) use ($query) {
+            foreach ($query->wheres as $w) {
+                $q->wheres[] = $w;
+            }
+            foreach ($query->bindings as $b) {
+                $q->bindings[] = $b;
+            }
+        });
+        return $this;
+    }
+
+    /**
+     * Filter by existence of related records (Eloquent-style has).
+     * Usage: ->has('relation', '>=', 2)
+     * Equivalent to whereHas, but allows count/operator.
+     */
+    public function has($relation, $operator = '>=', $count = 1) {
+        // If only relation is given, default to at least 1 related record
+        if (func_num_args() === 1) {
+            $operator = '>=';
+            $count = 1;
+        } elseif (func_num_args() === 2) {
+            $count = $operator;
+            $operator = '>=';
+        }
+        return $this->whereHas($relation, function($q) use ($operator, $count) {
+            // Add HAVING COUNT(*) $operator $count to the subquery
+            if (method_exists($q, 'groupBy')) {
+                $q->groupBy($q->table . '.' . ($q->model->primaryKey ?? 'id'));
+            }
+            if (!isset($q->havings)) $q->havings = [];
+            $q->havings[] = ["COUNT(*) $operator %s", [$count]];
+        });
+    }
 }
