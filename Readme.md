@@ -314,17 +314,41 @@ $arrays = $collection->toArray();
 - Built-in types will be cast using native PHP logic.
 
 ## Relationships
-```php
-// In Product model
-public function parts() {
-    return $this->hasMany(Parts::class, 'product_id');
-}
 
-// In Parts model
-public function product() {
-    return $this->belongsTo(Product::class, 'product_id');
-}
-```
+WPORM supports Eloquent-style relationships. You can define them in your model using the following methods:
+
+- **hasOne**: One-to-one
+  ```php
+  public function profile() {
+      return $this->hasOne(Profile::class, 'user_id');
+  }
+  ```
+- **hasMany**: One-to-many
+  ```php
+  public function posts() {
+      return $this->hasMany(Post::class, 'user_id');
+  }
+  ```
+- **belongsTo**: Inverse one-to-one or many
+  ```php
+  public function user() {
+      return $this->belongsTo(User::class, 'user_id');
+  }
+  ```
+- **belongsToMany**: Many-to-many (with optional pivot table and keys)
+  ```php
+  public function roles() {
+      return $this->belongsToMany(Role::class, 'user_role', 'user_id', 'role_id');
+  }
+  ```
+- **hasManyThrough**: Has-many-through
+  ```php
+  public function comments() {
+      return $this->hasManyThrough(Comment::class, Post::class, 'user_id', 'post_id');
+  }
+  ```
+
+All relationship methods return either a model instance or a `Collection` of models. You can use them just like in Eloquent.
 
 ## Custom Attribute Accessors/Mutators
 ```php

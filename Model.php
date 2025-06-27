@@ -656,6 +656,24 @@ public function forceDelete() {
         return new \MJ\WPORM\Collection($models);
     }
 
+	/**
+     * Define an inverse one-to-one or many relationship (belongsTo).
+     *
+     * @template T of Model
+     * @param class-string<T> $related
+     * @param string|null $foreignKey
+     * @param string|null $ownerKey
+     * @return T|null
+     */
+    public function belongsTo($related, $foreignKey = null, $ownerKey = null) {
+        $instance = new $related;
+        $foreignKey = $foreignKey ?: strtolower(class_basename($related)) . '_id';
+        $ownerKey = $ownerKey ?: $instance->primaryKey;
+        $foreignValue = $this->attributes[$foreignKey] ?? null;
+        if ($foreignValue === null) return null;
+        return $related::query()->where($ownerKey, $foreignValue)->first();
+    }
+
 	public function newFromBuilder(array $attributes) {
 		$instance = new static;
 		foreach ($attributes as $key => $value) {
