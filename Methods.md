@@ -1113,3 +1113,19 @@ $trashed = User::query()->onlyTrashed()->get();
 $table->softDeletes(); // Adds 'deleted_at' DATETIME NULL
 $table->softDeletes('removed_at'); // Adds 'removed_at' DATETIME NULL
 ```
+
+---
+
+## Batch Creation and Saving
+
+### createMany(array $records)
+- Create and save multiple records in a single transaction.
+- Rolls back if any save fails.
+- Returns array of created model instances.
+
+### saveMany(array $models)
+- Save multiple model instances in a single transaction.
+- Rolls back if any save fails.
+- Returns array of saved model instances.
+
+---

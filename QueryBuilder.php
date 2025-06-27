@@ -1234,6 +1234,54 @@ class QueryBuilder {
     }
 
     /**
+     * Create and save multiple records at once (Eloquent-style createMany).
+     * Usage: Model::query()->createMany([['col' => 'val'], ...])
+     * Returns array of created model instances.
+     */
+    public function createMany(array $records) {
+        $created = [];
+        $this->beginTransaction();
+        try {
+            foreach ($records as $attributes) {
+                $modelClass = get_class($this->model);
+                $model = new $modelClass($attributes);
+                if (!$model->save()) {
+                    throw new \Exception('Failed to save model in createMany');
+                }
+                $created[] = $model;
+            }
+            $this->commit();
+        } catch (\Exception $e) {
+            $this->rollBack();
+            throw $e;
+        }
+        return $created;
+    }
+
+    /**
+     * Save multiple model instances at once (Eloquent-style saveMany).
+     * Usage: Model::query()->saveMany([$model1, $model2, ...])
+     * Returns array of saved model instances.
+     */
+    public function saveMany(array $models) {
+        $saved = [];
+        $this->beginTransaction();
+        try {
+            foreach ($models as $model) {
+                if (!$model->save()) {
+                    throw new \Exception('Failed to save model in saveMany');
+                }
+                $saved[] = $model;
+            }
+            $this->commit();
+        } catch (\Exception $e) {
+            $this->rollBack();
+            throw $e;
+        }
+        return $saved;
+    }
+
+    /**
      * Paginate the results (Eloquent-style).
      * Returns an array: [
      *   'data' => Collection,
