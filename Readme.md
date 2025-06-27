@@ -91,6 +91,23 @@ $schema->create('parts', function($table) {
 });
 ```
 
+### Unique Indexes (Eloquent-style)
+
+You can add a unique index to a column using Eloquent-style chaining:
+
+```php
+$table->string('email')->unique();
+$table->integer('user_id')->unique('custom_index_name');
+```
+
+For multi-column unique indexes, use:
+
+```php
+$table->unique(['col1', 'col2']);
+```
+
+This works for all column types and matches Eloquent's API.
+
 ## Basic Usage
 ### Creating a Record
 ```php

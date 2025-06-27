@@ -35,6 +35,7 @@ class Blueprint
     public function addColumn(string $type, string $name): ColumnDefinition
     {
         $col = new ColumnDefinition($name, $type);
+        $col->setBlueprint($this); // Inject reference to Blueprint
         $this->columns[] = $col;
         return $col;
     }
@@ -234,12 +235,16 @@ class Blueprint
         $this->commands[] = "CHANGE $from $to $type";
     }
 
-    public function index($columns, $name = null)
-    {
-        $cols = $this->wrapArray($columns);
-        $this->keys[] = "KEY " . ($name ?? "index_" . md5($cols)) . " ($cols)";
-    }
-
+    /**
+     * Add a unique index for a column (Eloquent-style).
+     *
+     * Usage:
+     *   $table->string('email')->unique();
+     *   $table->integer('user_id')->unique('custom_index_name');
+     *
+     * You can also use the Blueprint method for multi-column unique:
+     *   $table->unique(['col1', 'col2']);
+     */
     public function unique($columns, $name = null)
     {
         $cols = $this->wrapArray($columns);

@@ -10,6 +10,7 @@ class ColumnDefinition
     public bool $autoIncrement = false;
     public bool $primary = false;
     public $default = null;
+    protected $blueprint;
 
     public function __construct(string $name, string $type)
     {
@@ -38,6 +39,26 @@ class ColumnDefinition
     public function primary(bool $value = true)
     {
         $this->primary = $value;
+        return $this;
+    }
+
+    public function setBlueprint($blueprint)
+    {
+        $this->blueprint = $blueprint;
+        return $this;
+    }
+
+    /**
+     * Add a unique index for this column (Eloquent-style).
+     * Usage: $table->string('email')->unique();
+     * @param string|null $name
+     * @return $this
+     */
+    public function unique($name = null)
+    {
+        if ($this->blueprint) {
+            $this->blueprint->unique($this->name, $name);
+        }
         return $this;
     }
 
