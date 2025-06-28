@@ -176,7 +176,12 @@ abstract class Model implements \ArrayAccess {
 			return $this->$method();
 		}
 		if (method_exists($this, $key)) {
-			return $this->$key();
+			$result = $this->$key();
+			// If the relationship method returns a QueryBuilder, resolve it to a Collection
+			if ($result instanceof \MJ\WPORM\QueryBuilder) {
+				return $result->get();
+			}
+			return $result;
 		}
 		if (isset($this->attributes[$key])) {
 			return $this->castGet($key, $this->attributes[$key]);
@@ -582,13 +587,13 @@ public function forceDelete() {
 	 * @param class-string<T> $related
 	 * @param string|null $foreignKey
 	 * @param string|null $localKey
-	 * @return T|null
+	 * @return QueryBuilder<T>
 	 */
 	public function hasOne($related, $foreignKey = null, $localKey = null) {
 		$instance = new $related;
 		$foreignKey = $foreignKey ?: strtolower(class_basename(static::class)) . '_id';
 		$localKey = $localKey ?: $this->primaryKey;
-		return $related::query()->where($foreignKey, $this->$localKey)->first();
+		return $related::query()->where($foreignKey, $this->$localKey);
 	}
 
 	/**
@@ -596,13 +601,13 @@ public function forceDelete() {
      * @param class-string<T> $related
      * @param string|null $foreignKey
      * @param string|null $localKey
-     * @return \MJ\WPORM\Collection<T>
+     * @return QueryBuilder<T>
      */
-    public function hasMany($related, $foreignKey = null, $localKey = null): \MJ\WPORM\Collection {
+    public function hasMany($related, $foreignKey = null, $localKey = null) {
         $instance = new $related;
         $foreignKey = $foreignKey ?: strtolower(class_basename(static::class)) . '_id';
         $localKey = $localKey ?: $this->primaryKey;
-        return $related::query()->where($foreignKey, $this->$localKey)->get();
+        return $related::query()->where($foreignKey, $this->$localKey);
     }
 
     /**
@@ -611,22 +616,20 @@ public function forceDelete() {
      * @param string|null $pivotTable
      * @param string|null $foreignPivotKey
      * @param string|null $relatedPivotKey
-     * @return \MJ\WPORM\Collection<T>
+     * @return QueryBuilder<T>
      */
-    public function belongsToMany($related, $pivotTable = null, $foreignPivotKey = null, $relatedPivotKey = null): \MJ\WPORM\Collection {
+    public function belongsToMany($related, $pivotTable = null, $foreignPivotKey = null, $relatedPivotKey = null) {
         global $wpdb;
         $relatedInstance = new $related;
         $pivotTable = $pivotTable ?: $this->getTable() . '_' . $relatedInstance->getTable();
         $foreignPivotKey = $foreignPivotKey ?: strtolower(class_basename(static::class)) . '_id';
         $relatedPivotKey = $relatedPivotKey ?: strtolower(class_basename($related)) . '_id';
-
-        $query = "SELECT r.* FROM {$wpdb->prefix}{$relatedInstance->getTable()} r
-                  JOIN {$wpdb->prefix}{$pivotTable} p ON r.id = p.{$relatedPivotKey}
-                  WHERE p.{$foreignPivotKey} = %d";
-
-        $results = $wpdb->get_results($wpdb->prepare($query, $this->attributes[$this->primaryKey]), ARRAY_A);
-        $models = array_map(fn($data) => new $related($data), $results);
-        return new \MJ\WPORM\Collection($models);
+        $relatedTable = $relatedInstance->getTable();
+        $primaryKey = $this->primaryKey;
+        $query = $related::query();
+        $query->join($pivotTable, "$relatedTable.id", '=', "$pivotTable.$relatedPivotKey")
+              ->where("$pivotTable.$foreignPivotKey", $this->$primaryKey);
+        return $query;
     }
 
     /**
@@ -637,23 +640,21 @@ public function forceDelete() {
      * @param string|null $firstKey
      * @param string|null $secondKey
      * @param string|null $localKey
-     * @return \MJ\WPORM\Collection<T>
+     * @return QueryBuilder<T>
      */
-    public function hasManyThrough($related, $through, $firstKey = null, $secondKey = null, $localKey = null): \MJ\WPORM\Collection {
+    public function hasManyThrough($related, $through, $firstKey = null, $secondKey = null, $localKey = null) {
         global $wpdb;
         $throughInstance = new $through;
         $relatedInstance = new $related;
         $firstKey = $firstKey ?: strtolower(class_basename($through)) . '_id';
         $secondKey = $secondKey ?: strtolower(class_basename($related)) . '_id';
         $localKey = $localKey ?: $this->primaryKey;
-
-        $query = "SELECT r.* FROM {$wpdb->prefix}{$relatedInstance->getTable()} r
-                  JOIN {$wpdb->prefix}{$throughInstance->getTable()} t ON r.{$secondKey} = t.id
-                  WHERE t.{$firstKey} = %d";
-
-        $results = $wpdb->get_results($wpdb->prepare($query, $this->$localKey), ARRAY_A);
-        $models = array_map(fn($data) => new $related($data), $results);
-        return new \MJ\WPORM\Collection($models);
+        $relatedTable = $relatedInstance->getTable();
+        $throughTable = $throughInstance->getTable();
+        $query = $related::query();
+        $query->join($throughTable, "$relatedTable.$secondKey", '=', "$throughTable.id")
+              ->where("$throughTable.$firstKey", $this->$localKey);
+        return $query;
     }
 
 	/**

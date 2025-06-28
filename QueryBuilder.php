@@ -690,10 +690,24 @@ class QueryBuilder {
     public function first() {
         $this->limit(1);
         $results = $this->get();
+        $model = $results[0] ?? null;
+        // Eager load relations for single model if requested
+        if ($model && !empty($this->with)) {
+            foreach ($this->with as $relation => $constraint) {
+                if (is_int($relation)) {
+                    $relation = $constraint;
+                    $constraint = null;
+                }
+                // Use the same eager loading logic as in get(), but for a single model
+                $models = [$model];
+                $this->eagerLoadRelation($models, $relation, $constraint);
+                $model = $models[0];
+            }
+        }
         if ($this->debug) {
             error_log('[WPORM][first] Results: ' . print_r($results, true));
         }
-        return $results[0] ?? null;
+        return $model;
     }
 
     public function count() {
