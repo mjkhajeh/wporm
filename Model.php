@@ -834,4 +834,13 @@ public function forceDelete() {
         }
         return false;
     }
+
+    /**
+     * Get the fillable attributes for the model (Eloquent-style).
+     * @return array
+     */
+    public function getFillable()
+    {
+        return $this->fillable;
+    }
 }
