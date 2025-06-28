@@ -784,4 +784,14 @@ public function forceDelete() {
         }
         return $query;
     }
+
+    /**
+     * Start a query with eager loading (Eloquent-style static with()).
+     * Usage: Model::with('relation')->get(), Model::with(['rel1', 'rel2'])->first()
+     * @param array|string $relations
+     * @return \MJ\WPORM\QueryBuilder
+     */
+    public static function with($relations) {
+        return static::query()->with($relations);
+    }
 }

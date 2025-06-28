@@ -1536,4 +1536,15 @@ class QueryBuilder {
             $q->havings[] = ["COUNT(*) $operator %s", [$count]];
         });
     }
+
+    /**
+     * Find a model by its primary key (Eloquent-style).
+     * Usage: Model::query()->find($id) or Model::with('rel')->find($id)
+     * @param mixed $id
+     * @return Model|null
+     */
+    public function find($id) {
+        $primaryKey = $this->model->primaryKey ?? 'id';
+        return $this->where($primaryKey, $id)->first();
+    }
 }
