@@ -384,6 +384,22 @@ public function setQtyAttribute($value) {
 }
 ```
 
+## Appended (Computed) Attributes
+
+You can add computed (virtual) attributes to your model's array/JSON output using the `$appends` property, just like in Eloquent.
+
+```php
+protected $appends = ['user'];
+
+public function getUserAttribute() {
+    return get_user_by('id', $this->user_id);
+}
+```
+
+- Appended attributes are included in `toArray()` and JSON output.
+- The value is resolved via a `get{AttributeName}Attribute()` accessor or, if not present, by a public property.
+- Do **not** set appended attributes in `retrieved()`; use accessors instead.
+
 ## Transactions
 ```php
 Parts::query()->beginTransaction();
@@ -957,3 +973,5 @@ WPORM is inspired by Laravel's Eloquent ORM and adapted for the WordPress ecosys
 ## License Details
 
 This project is licensed under the MIT License. See the LICENSE file or [MIT License](https://opensource.org/licenses/MIT) for details.
+
+---
