@@ -25,6 +25,7 @@ abstract class Model implements \ArrayAccess {
     protected $_eagerLoaded = [];
 	protected $softDeletes = false;
 	protected $deletedAtColumn = 'deleted_at';
+	protected $appends = [];
 
     /**
      * Get the deleted_at column as a DateTime instance (if set and not null).
@@ -297,7 +298,7 @@ protected function castSet($key, $value) {
 	 *
 	 * @return void
 	 */
-	protected function retrieved() {}
+	public function retrieved() {}
 
     /**
      * Called before a model is soft deleted (softDeletes only).
@@ -710,6 +711,15 @@ public function forceDelete() {
                 $attributes[$relation] = $data->toArray();
             } else {
                 $attributes[$relation] = $data;
+            }
+        }
+        // Add appended attributes
+        foreach ($this->appends as $appended) {
+            $method = 'get' . ucfirst($appended) . 'Attribute';
+            if (method_exists($this, $method)) {
+                $attributes[$appended] = $this->$method();
+            } elseif (property_exists($this, $appended)) {
+                $attributes[$appended] = $this->$appended;
             }
         }
         return $attributes;

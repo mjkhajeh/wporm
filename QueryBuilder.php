@@ -672,6 +672,9 @@ class QueryBuilder {
         $modelClass = get_class($this->model);
         $models = array_map(function ($row) use ($modelClass) {
             $instance = (new $modelClass)->newFromBuilder($row);
+            if (method_exists($instance, 'retrieved')) {
+                $instance->retrieved();
+            }
             return $instance;
         }, $results);
         // Eager load relations if requested
@@ -704,6 +707,9 @@ class QueryBuilder {
                 // Ensure we return the same instance with _eagerLoaded set
                 $model = $models[0];
             }
+        }
+        if ($model && method_exists($model, 'retrieved')) {
+            $model->retrieved();
         }
         if ($this->debug) {
             error_log('[WPORM][first] Results: ' . print_r($results, true));
