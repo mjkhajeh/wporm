@@ -183,8 +183,13 @@ abstract class Model implements \ArrayAccess {
 			}
 			return $result;
 		}
-		if (isset($this->attributes[$key])) {
-			return $this->castGet($key, $this->attributes[$key]);
+		// Fix: Use array_key_exists to allow empty values (like 0) to be returned
+		if (array_key_exists($key, $this->attributes)) {
+			$value = $this->castGet($key, $this->attributes[$key]);
+			return $value;
+		}
+		if (property_exists($this, $key)) {
+			return $this->$key;
 		}
 		return null;
 	}
@@ -806,5 +811,27 @@ public function forceDelete() {
      */
     public static function with($relations) {
         return static::query()->with($relations);
+    }
+
+    public function __isset($key) {
+        // Eager loaded relations
+        if (isset($this->_eagerLoaded[$key])) {
+            return true;
+        }
+        $method = 'get' . ucfirst($key) . 'Attribute';
+        if (method_exists($this, $method)) {
+            return true;
+        }
+        if (method_exists($this, $key)) {
+            return true;
+        }
+        if (array_key_exists($key, $this->attributes)) {
+            // Allow empty values to be considered set
+            return true;
+        }
+        if (property_exists($this, $key)) {
+            return isset($this->$key);
+        }
+        return false;
     }
 }
