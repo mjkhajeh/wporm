@@ -1129,3 +1129,15 @@ $table->softDeletes('removed_at'); // Adds 'removed_at' DATETIME NULL
 - Returns array of saved model instances.
 
 ---
+
+### distinct()
+Set the query to return only distinct (unique) results, just like Eloquent.
+
+**Usage:**
+```php
+$users = User::query()->distinct()->get();
+```
+- You can also disable it by passing `false`: `$query->distinct(false)`
+- Works with all other query builder methods.
+
+---

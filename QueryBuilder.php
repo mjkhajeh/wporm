@@ -973,6 +973,17 @@ class QueryBuilder {
         return "$field, '$path'";
     }
 
+    /**
+     * Set the query to return distinct results (Eloquent-style).
+     * Usage: ->distinct()
+     */
+    protected $isDistinct = false;
+
+    public function distinct($value = true) {
+        $this->isDistinct = (bool)$value;
+        return $this;
+    }
+
     protected function buildSelectQuery() {
         if (empty($this->wheres)) {
             $where = '';
@@ -992,7 +1003,11 @@ class QueryBuilder {
         }
         // Quote columns in SELECT
         $selects = array_map([$this, 'quoteIdentifier'], $this->selects);
-        $sql = "SELECT " . implode(", ", $selects) . " FROM " . $this->quoteIdentifier($this->table);
+        $sql = "SELECT ";
+        if ($this->isDistinct) {
+            $sql .= "DISTINCT ";
+        }
+        $sql .= implode(", ", $selects) . " FROM " . $this->quoteIdentifier($this->table);
         // Add JOIN clauses
         if (!empty($this->joins)) {
             foreach ($this->joins as $join) {
