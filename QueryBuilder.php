@@ -701,6 +701,7 @@ class QueryBuilder {
                 // Use the same eager loading logic as in get(), but for a single model
                 $models = [$model];
                 $this->eagerLoadRelation($models, $relation, $constraint);
+                // Ensure we return the same instance with _eagerLoaded set
                 $model = $models[0];
             }
         }
@@ -1117,8 +1118,8 @@ class QueryBuilder {
         $model = $models[0];
         if (!method_exists($model, $relation)) return;
         $related = $model->$relation();
-        // hasMany
-        if (is_array($related)) {
+        // Handle QueryBuilder-based relationships (hasMany, belongsToMany, hasManyThrough)
+        if ($related instanceof \MJ\WPORM\QueryBuilder) {
             $foreignKey = null;
             $localKey = $model->primaryKey;
             $ref = new \ReflectionMethod($model, $relation);
@@ -1127,7 +1128,7 @@ class QueryBuilder {
                 $foreignKey = $params[1]->getDefaultValue();
             }
             $ids = array_map(fn($m) => $m->$localKey, $models);
-            $relatedModel = $related ? get_class($related[0]) : null;
+            $relatedModel = $related->model;
             if ($relatedModel && $foreignKey) {
                 $query = $relatedModel::query()->whereIn($foreignKey, $ids);
                 if ($constraint) {

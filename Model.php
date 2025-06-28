@@ -694,6 +694,19 @@ public function forceDelete() {
         foreach ($this->attributes as $key => $value) {
             $attributes[$key] = $this->castGet($key, $value);
         }
+        // Add already eager loaded relations only (avoid infinite loop)
+        foreach ($this->_eagerLoaded as $relation => $data) {
+            if (is_array($data) || $data instanceof \MJ\WPORM\Collection) {
+                $attributes[$relation] = [];
+                foreach ($data as $item) {
+                    $attributes[$relation][] = method_exists($item, 'toArray') ? $item->toArray() : $item;
+                }
+            } elseif (is_object($data) && method_exists($data, 'toArray')) {
+                $attributes[$relation] = $data->toArray();
+            } else {
+                $attributes[$relation] = $data;
+            }
+        }
         return $attributes;
     }
 
