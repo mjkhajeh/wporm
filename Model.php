@@ -235,8 +235,10 @@ abstract class Model implements \ArrayAccess {
         case 'boolean':
             return (bool) $value;
         case 'array':
+            if (empty($value)) return [];
             return is_array($value) ? $value : json_decode($value, true);
         case 'json':
+            if (empty($value)) return [];
             return json_decode($value, true);
         case 'datetime':
             return $value ? new \DateTime($value) : null;
@@ -269,6 +271,7 @@ protected function castSet($key, $value) {
             return (bool) $value;
         case 'array':
         case 'json':
+            if (empty($value)) return '[]';
             return json_encode($value);
         case 'datetime':
             if ($value instanceof \DateTime) {
