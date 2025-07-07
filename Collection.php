@@ -37,7 +37,7 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
     public function offsetExists($offset): bool {
         return isset($this->items[$offset]);
     }
-    public function offsetGet($offset): mixed {
+    public function offsetGet($offset) {
         return isset($this->items[$offset]) ? $this->items[$offset] : null;
     }
     public function offsetSet($offset, $value): void {
