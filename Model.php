@@ -756,6 +756,7 @@ public function forceDelete() {
 		return isset($this->attributes[$offset]);
 	}
 
+    #[\ReturnTypeWillChange]
 	public function offsetGet($offset) {
 		return $this->__get($offset);
 	}
