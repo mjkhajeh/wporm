@@ -640,23 +640,39 @@ class QueryBuilder {
 
     /**
      * Restore soft-deleted records matching the query.
+     * Supports both timestamp and boolean-flag soft deletes via SoftDeletes trait.
      */
     public function restore() {
+        // Support both timestamp and boolean-flag soft deletes
         if (isset($this->model->softDeletes) && $this->model->softDeletes) {
             $deletedAt = $this->model->deletedAtColumn;
+            // If using boolean flag (e.g., deleted = 1/0)
+            if (isset($this->model->softDeleteType) && $this->model->softDeleteType === 'boolean') {
+                return $this->update([$deletedAt => 0]);
+            }
+            // Default: timestamp (e.g., deleted_at)
             return $this->update([$deletedAt => null]);
         }
         return false;
     }
 
     public function get() {
-        // Soft delete logic: filter by deleted_at if needed
+        // Soft delete logic: filter by deleted_at or boolean flag if needed
         if (isset($this->model->softDeletes) && $this->model->softDeletes) {
             $deletedAt = $this->model->deletedAtColumn;
-            if ($this->onlyTrashed) {
-                $this->whereNotNull($deletedAt);
-            } elseif (!$this->withTrashed) {
-                $this->whereNull($deletedAt);
+            $softDeleteType = isset($this->model->softDeleteType) ? $this->model->softDeleteType : 'timestamp';
+            if ($softDeleteType === 'boolean') {
+                if ($this->onlyTrashed) {
+                    $this->where($deletedAt, 1);
+                } elseif (!$this->withTrashed) {
+                    $this->where($deletedAt, 0);
+                }
+            } else {
+                if ($this->onlyTrashed) {
+                    $this->whereNotNull($deletedAt);
+                } elseif (!$this->withTrashed) {
+                    $this->whereNull($deletedAt);
+                }
             }
         }
         $sql = $this->buildSelectQuery();
