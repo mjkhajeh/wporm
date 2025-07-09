@@ -28,6 +28,15 @@ abstract class Model implements \ArrayAccess {
 	protected $appends = [];
 
     /**
+     * The soft delete type for this model ('timestamp' or 'boolean').
+     * 'timestamp' = uses deletedAtColumn (default: deleted_at)
+     * 'boolean' = uses a boolean flag column (e.g., deleted)
+     *
+     * @var string
+     */
+    protected $softDeleteType = 'timestamp';
+
+    /**
      * Get the deleted_at column as a DateTime instance (if set and not null).
      * @return \DateTimeInterface|null
      */

@@ -619,302 +619,73 @@ class User extends Model {
     protected $softDeletes = true;
     // Optionally customize the deleted_at column:
     // protected $deletedAtColumn = 'deleted_at';
+    // Optionally set the soft delete type (see below)
+    // protected $softDeleteType = 'timestamp'; // or 'boolean'
 }
 ```
 
-When enabled, calling `$model->delete()` will set the `deleted_at` column instead of removing the record. By default, all queries will exclude soft-deleted records.
+### Soft Delete Strategies: Timestamp vs Boolean Flag
 
-### Querying with Soft Deletes
-- To include soft-deleted records:
-  ```php
-  $users = User::query()->withTrashed()->get();
-  ```
-- To only get soft-deleted records:
-  ```php
-  $trashed = User::query()->onlyTrashed()->get();
-  ```
-- To restore a soft-deleted record:
-  ```php
-  $user = User::find(1);
-  $user->restore();
-  ```
-- To permanently delete (force delete) a record:
-  ```php
-  $user = User::find(1);
-  $user->forceDelete();
-  ```
-- To restore multiple records:
-  ```php
-  User::query()->onlyTrashed()->where('role', 'subscriber')->restore();
-  ```
+WPORM supports two soft delete strategies:
 
-### Checking if a model is trashed
+1. **Timestamp column (default, Eloquent-style):**
+   - Uses a `deleted_at` (or custom) column to store the deletion datetime.
+   - Set `$softDeletes = true;` and (optionally) `$deletedAtColumn = 'deleted_at';` in your model.
+   - Example:
+     ```php
+     class User extends Model {
+         protected $softDeletes = true;
+         // protected $deletedAtColumn = 'deleted_at'; // optional
+         // protected $softDeleteType = 'timestamp'; // optional, default
+     }
+     ```
+   - In your migration/schema:
+     ```php
+     $table->timestamp('deleted_at')->nullable();
+     ```
+
+2. **Boolean flag column:**
+   - Uses a boolean column (e.g., `deleted`) to indicate soft deletion (`1` = deleted, `0` = not deleted).
+   - Set `$softDeletes = true;`, `$deletedAtColumn = 'deleted'`, and `$softDeleteType = 'boolean';` in your model.
+   - Example:
+     ```php
+     class Product extends Model {
+         protected $softDeletes = true;
+         protected $deletedAtColumn = 'deleted'; // boolean column
+         protected $softDeleteType = 'boolean'; // enable boolean-flag mode
+     }
+     ```
+   - In your migration/schema:
+     ```php
+     $table->boolean('deleted')->default(0);
+     ```
+
+#### How it works
+- **Timestamp mode:**
+  - `delete()` sets `deleted_at` to the current datetime.
+  - `restore()` sets `deleted_at` to `null`.
+  - Queries exclude rows where `deleted_at` is not null (unless `withTrashed()` or `onlyTrashed()` is used).
+- **Boolean mode:**
+  - `delete()` sets `deleted` to `1` (true).
+  - `restore()` sets `deleted` to `0` (false).
+  - Queries exclude rows where `deleted` is true (unless `withTrashed()` or `onlyTrashed()` is used).
+
+#### Example Usage
 ```php
-if ($user->trashed()) {
-    // ...
-}
+// Timestamp soft deletes (default)
+$user = User::find(1);
+$user->delete(); // sets deleted_at
+User::query()->withTrashed()->get(); // includes soft-deleted
+User::query()->onlyTrashed()->get(); // only soft-deleted
+$user->restore(); // sets deleted_at to null
+
+// Boolean flag soft deletes
+$product = Product::find(1);
+$product->delete(); // sets deleted = 1
+Product::query()->withTrashed()->get(); // includes deleted
+Product::query()->onlyTrashed()->get(); // only deleted
+$product->restore(); // sets deleted = 0
 ```
-
-> **Note:** All query methods (`all`, `find`, relationships, etc.) respect soft deletes by default. Use `withTrashed()` or `onlyTrashed()` to modify this behavior.
-
-### Date Mutators for $deletedAtColumn
-
-WPORM automatically provides Eloquent-style date mutators for the soft delete column (`$deletedAtColumn`).
-
-- **Get as DateTime:**
-  ```php
-  $deletedAt = $model->deleted_at; // returns DateTime|null if set
-  // or
-  $deletedAt = $model->getDeletedAtAttribute();
-  ```
-- **Set as DateTime, timestamp, or string:**
-  ```php
-  $model->deleted_at = new DateTime();
-  $model->deleted_at = time();
-  $model->deleted_at = '2025-06-26 12:00:00';
-  $model->deleted_at = null; // clears the value
-  // or
-  $model->setDeletedAtAttribute($value);
-  ```
-
-This ensures the `deleted_at` column is always handled as a proper date/time value, just like Eloquent. The mutators work with the default column name or any custom `$deletedAtColumn` you set on your model.
-
-### Customizing the Global Soft Delete Scope
-
-By default, WPORM automatically excludes soft-deleted records from all queries on models with `$softDeletes = true`. This is handled by a global scope that checks for `NULL` in the `deleted_at` column (or your custom column).
-
-If you want to customize or disable this global soft delete scope, you can use the following methods:
-
-- **Disable all global scopes for a query:**
-  ```php
-  $all = User::query(false)->get(); // disables all global scopes, including soft deletes
-  ```
-- **Remove the soft delete global scope at runtime:**
-  ```php
-  User::removeGlobalScope('softDeletes');
-  ```
-- **Add a custom global scope for soft deletes:**
-  ```php
-  User::addGlobalScope('softDeletes', function($query) {
-      $query->whereNull('deleted_at'); // or customize as needed
-  });
-  ```
-
-> Note: The default soft delete global scope is applied automatically if `$softDeletes = true` and no custom scope is set. You can override or remove it as needed for advanced use cases.
-
-### Force Deleting Relationships
-
-You can force delete a model and its related models in one call using `forceDeleteWith`. This is useful for cascading deletes on relationships (e.g. hasMany, hasOne, belongsToMany) when using soft deletes.
-
-**Usage:**
-
-```php
-// Force delete a post and all its comments and tags
-$post->forceDeleteWith(['comments', 'tags']);
-```
-
-- The argument is an array of relationship method names (as strings).
-- Each related model or collection will be force deleted before the parent model.
-- Works with any relationship that returns a Model or Collection.
-
-> Note: This is only relevant for models using soft deletes.
-
-See [Methods.md](./Methods.md) for a full list of soft delete methods.
-
----
-
-# Full Example: Using Every Feature of WPORM
-
-```php
-use MJ\WPORM\Model;
-use MJ\WPORM\Blueprint;
-use MJ\WPORM\SchemaBuilder;
-
-global $wpdb;
-
-// 1. Define Models
-class User extends Model {
-    protected $table = 'users';
-    protected $fillable = ['id', 'name', 'email', 'country', 'age', 'verified', 'subscribed', 'meta'];
-    protected $casts = [
-        'age' => 'int',
-        'verified' => 'bool',
-        'subscribed' => 'bool',
-        'meta' => 'json',
-    ];
-    public function up(Blueprint $table) {
-        $table->id();
-        $table->string('name');
-        $table->string('email');
-        $table->string('country', 2);
-        $table->integer('age');
-        $table->boolean('verified');
-        $table->boolean('subscribed');
-        $table->json('meta');
-        $table->timestamps();
-        $this->schema = $table->toSql();
-    }
-    // Accessor
-    public function getNameAttribute() {
-        return strtoupper($this->attributes['name']);
-    }
-    // Mutator
-    public function setNameAttribute($value) {
-        $this->attributes['name'] = ucfirst($value);
-    }
-    // Relationship
-    public function posts() {
-        return $this->hasMany(Post::class, 'user_id');
-    }
-}
-
-class Post extends Model {
-    protected $table = 'posts';
-    protected $fillable = ['id', 'user_id', 'title', 'content', 'meta'];
-    protected $casts = [
-        'meta' => 'json',
-    ];
-    public function up(Blueprint $table) {
-        $table->id();
-        $table->unsignedBigInteger('user_id');
-        $table->string('title');
-        $table->text('content');
-        $table->json('meta');
-        $table->timestamps();
-        $table->foreign('user_id', 'users');
-        $this->schema = $table->toSql();
-    }
-    public function user() {
-        return $this->belongsTo(User::class, 'user_id');
-    }
-}
-
-// 2. Schema Management
-$schema = new SchemaBuilder($wpdb);
-$schema->create('users', function($table) {
-    $table->id();
-    $table->string('name');
-    $table->string('email');
-    $table->string('country', 2);
-    $table->integer('age');
-    $table->boolean('verified');
-    $table->boolean('subscribed');
-    $table->json('meta');
-    $table->timestamps();
-});
-$schema->create('posts', function($table) {
-    $table->id();
-    $table->unsignedBigInteger('user_id');
-    $table->string('title');
-    $table->text('content');
-    $table->json('meta');
-    $table->timestamps();
-    $table->foreign('user_id', 'users');
-});
-
-// 3. Creating Records
-$user = new User([
-    'name' => 'alice',
-    'email' => 'alice@example.com',
-    'country' => 'US',
-    'age' => 30,
-    'verified' => true,
-    'subscribed' => false,
-    'meta' => ['newsletter' => true]
-]);
-$user->save();
-
-$post = new Post([
-    'user_id' => $user->id,
-    'title' => 'Hello World',
-    'content' => 'This is a post.',
-    'meta' => ['tags' => ['intro', 'welcome']]
-]);
-$post->save();
-
-// 4. Querying Records
-$allUsers = User::all();
-$found = User::find($user->id);
-$adults = User::query()->where('age', '>=', 18)->get();
-$firstUser = User::query()->where('country', 'US')->first();
-
-// 5. Updating Records
-$found->subscribed = true;
-$found->save();
-
-// 6. Deleting Records
-$post->delete();
-
-// 7. Attribute Casting
-$casted = $found->meta; // array
-
-// 8. Relationships
-$userPosts = $user->posts(); // hasMany
-$postUser = $post->user();  // belongsTo
-
-// 9. Custom Accessors/Mutators
-$name = $user->name; // Accessor (uppercased)
-$user->name = 'bob'; // Mutator (ucfirst)
-$user->save();
-
-// 10. Transactions
-User::query()->beginTransaction();
-try {
-    $user2 = new User([
-        'name' => 'eve',
-        'email' => 'eve@example.com',
-        'country' => 'CA',
-        'age' => 22,
-        'verified' => false,
-        'subscribed' => true,
-        'meta' => []
-    ]);
-    $user2->save();
-    User::query()->commit();
-} catch (Exception $e) {
-    User::query()->rollBack();
-}
-
-// 11. Global Scopes
-User::addGlobalScope('active', function($query) {
-    $query->where('verified', true);
-});
-$activeUsers = User::all();
-User::removeGlobalScope('active');
-
-// 12. Complex Where Statements
-$complex = User::query()
-    ->where(function ($q) {
-        $q->where('country', 'US')
-          ->where(function ($q2) {
-              $q2->where('age', '>=', 18)
-                  ->orWhere('verified', true);
-          });
-    })
-    ->orWhere(function ($q) {
-        $q->where('country', 'CA')
-          ->where('subscribed', true);
-    })
-    ->get();
-
-// 13. Custom Queries
-$custom = User::query()
-    ->select(['country', 'COUNT(*) as total'])
-    ->groupBy('country')
-    ->get();
-
-// 14. $wpdb Direct SQL
-$table = (new User)->getTable();
-$results = $wpdb->get_results(
-    $wpdb->prepare(
-        "SELECT * FROM $table WHERE (country = %s AND (age >= %d OR verified = %d)) OR (country = %s AND subscribed = %d)",
-        'US', 18, 1, 'CA', 1
-    ),
-    ARRAY_A
-);
-```
-
-This example demonstrates every major feature of WPORM: model definition, schema, CRUD, casting, relationships, accessors/mutators, transactions, global scopes, complex queries, custom queries, and direct SQL.
 
 ## Troubleshooting & Tips
 
