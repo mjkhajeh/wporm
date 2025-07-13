@@ -687,6 +687,37 @@ Product::query()->onlyTrashed()->get(); // only deleted
 $product->restore(); // sets deleted = 0
 ```
 
+
+## Conditional Queries: when()
+
+WPORM supports Eloquent-style conditional queries using the `when()` method. This allows you to add query constraints only if a given condition is true, making your code more readable and dynamic.
+
+**Usage:**
+```php
+// Add a where clause only if $isActive is true
+$users = User::query()
+    ->when($isActive, function ($query) {
+        $query->where('active', true);
+    })
+    ->get();
+
+// You can also provide a default callback for the false case
+$users = User::query()
+    ->when($country, function ($query, $country) {
+        $query->where('country', $country);
+    }, function ($query) {
+        $query->where('country', 'US'); // fallback
+    })
+    ->get();
+```
+
+- The first argument is the condition value.
+- The second argument is a callback executed if the condition is truthy.
+- The optional third argument is a callback executed if the condition is falsy.
+
+This method is available on both the query builder and as a static method on models.
+
+
 ## Troubleshooting & Tips
 
 - **Table Prefixing:** Always use `$table = (new ModelName)->getTable();` to get the correct, prefixed table name for custom SQL. Do not manually prepend `$wpdb->prefix`.

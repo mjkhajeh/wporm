@@ -1021,6 +1021,24 @@ class QueryBuilder {
         return $this;
     }
 
+    /**
+     * Conditionally add query constraints (Eloquent-style when()).
+     * Usage: $query->when($condition, function($q) { ... }, function($q) { ... });
+     *
+     * @param mixed $value Condition value
+     * @param callable $callback Callback if condition is truthy
+     * @param callable|null $default Callback if condition is falsy
+     * @return $this
+     */
+    public function when($value, callable $callback, callable $default = null) {
+        if ($value) {
+            $callback($this, $value);
+        } elseif ($default) {
+            $default($this, $value);
+        }
+        return $this;
+    }
+
     protected function buildSelectQuery() {
         if (empty($this->wheres)) {
             $where = '';

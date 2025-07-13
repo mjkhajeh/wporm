@@ -866,4 +866,23 @@ public function forceDelete() {
     {
         return $this->fillable;
     }
+
+    /**
+     * Conditionally add query constraints (Eloquent-style when()).
+     * Usage: Model::query()->when($condition, function($q) { ... });
+     *
+     * @param mixed $value Condition value
+     * @param callable $callback Callback if condition is truthy
+     * @param callable|null $default Callback if condition is falsy
+     * @return QueryBuilder
+     */
+    public static function when($value, callable $callback, callable $default = null) {
+        $query = static::query();
+        if ($value) {
+            $callback($query, $value);
+        } elseif ($default) {
+            $default($query, $value);
+        }
+        return $query;
+    }
 }
