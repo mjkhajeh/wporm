@@ -14,7 +14,7 @@ class ColumnDefinition
 
     public function __construct(string $name, string $type)
     {
-        $this->name = $name;
+        $this->name = $this->quoteIdentifier( $name );
         $this->type = $type;
     }
 
@@ -76,5 +76,20 @@ class ColumnDefinition
         }
 
         return $sql;
+    }
+
+    // Helper to quote identifiers (table/column names) with backticks
+    protected function quoteIdentifier($name) {
+        // If already quoted or is a function call, return as is
+        if ($name === '*' || strpos($name, '`') !== false || preg_match('/\w+\s*\(/', $name)) {
+            return $name;
+        }
+        // Support dot notation (table.column)
+        if (strpos($name, '.') !== false) {
+            return implode('.', array_map(function($part) {
+                return '`' . str_replace('`', '', $part) . '`';
+            }, explode('.', $name)));
+        }
+        return '`' . str_replace('`', '', $name) . '`';
     }
 }
