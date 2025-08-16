@@ -571,6 +571,16 @@ class QueryBuilder {
     }
 
     /**
+     * Add a raw ORDER BY clause. Bindings (if any) will be appended to the query bindings
+     * and the raw SQL will be used as-is in the ORDER BY clause.
+     * Usage: ->orderByRaw('FIELD(status, ?, ?)', ['active','pending'])
+     */
+    public function orderByRaw($sql, array $bindings = []) {
+        $this->orders[] = ['raw' => $sql, 'bindings' => $bindings];
+        return $this;
+    }
+
+    /**
      * Order by latest (descending, default column 'created_at')
      */
     public function latest($column = 'created_at') {
@@ -1109,16 +1119,28 @@ class QueryBuilder {
             $sql .= " HAVING " . implode(' AND ', $havingParts);
         }
         if (!empty($this->orders)) {
-            $orders = array_map(function($order) {
+            $orderParts = [];
+            foreach ($this->orders as $order) {
+                // Support raw order entries with bindings
+                if (is_array($order) && isset($order['raw'])) {
+                    $orderParts[] = $order['raw'];
+                    if (!empty($order['bindings'])) {
+                        foreach ($order['bindings'] as $b) {
+                            $this->bindings[] = $b;
+                        }
+                    }
+                    continue;
+                }
                 // Split by space to get column and direction
                 if (preg_match('/^([a-zA-Z0-9_\.]+)\s+(asc|desc)$/i', $order, $m)) {
-                    return $this->quoteIdentifier($m[1]) . ' ' . strtoupper($m[2]);
+                    $orderParts[] = $this->quoteIdentifier($m[1]) . ' ' . strtoupper($m[2]);
                 } elseif (preg_match('/^([a-zA-Z0-9_\.]+)$/', $order, $m)) {
-                    return $this->quoteIdentifier($m[1]);
+                    $orderParts[] = $this->quoteIdentifier($m[1]);
+                } else {
+                    $orderParts[] = $order;
                 }
-                return $order;
-            }, $this->orders);
-            $sql .= " ORDER BY " . implode(", ", $orders);
+            }
+            $sql .= " ORDER BY " . implode(", ", $orderParts);
         }
         if (isset($this->limit)) {
             $sql .= " LIMIT {$this->limit}";

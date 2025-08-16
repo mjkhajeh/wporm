@@ -126,6 +126,14 @@ $part = Parts::find(1);
 // Where clause
 $parts = Parts::query()->where('qty', '>', 5)->orderBy('qty', 'desc')->limit(10)->get(); // Limit to 10 results
 
+// Raw ORDER BY example
+$parts = Parts::query()->where('qty', '>', 5)
+    ->orderByRaw('FIELD(name, ?, ?)', ['Widget', 'Gadget'])
+    ->limit(10)
+    ->get();
+
+// This allows custom SQL ordering, e.g. sorting by a specific value list. Bindings are safely passed to $wpdb->prepare.
+
 // First result
 $first = Parts::query()->where('product_id', 2)->first();
 ```

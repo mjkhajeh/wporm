@@ -309,6 +309,14 @@ $users = User::query()->oldest('id')->get();
 $users = User::query()->inRandomOrder()->get();
 ```
 
+### orderByRaw($sql, array $bindings = [])
+**Description:** Add a raw SQL ORDER BY clause with optional bindings. Useful for custom sorting or SQL functions.
+
+**Example:**
+```php
+$products = Product::query()->orderByRaw('FIELD(name, ?, ?)', ['Widget', 'Gadget'])->get();
+```
+
 ### reorder()
 **Description:** Remove all previous order by clauses from the query.
 
