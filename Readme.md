@@ -189,6 +189,34 @@ $user = User::updateOrCreate(
 This is useful for upsert operations, such as syncing data or ensuring a record exists with certain values.
 
 ### Creating or Getting Records: firstOrCreate and firstOrNew
+### Inserting Records: insertOrIgnore
+
+WPORM provides an `insertOrIgnore` method, similar to Laravel Eloquent, for inserting one or multiple records and ignoring duplicate key errors (such as unique constraint violations).
+
+**Usage:**
+
+```php
+// Insert a single user, ignore if email already exists
+$success = User::insertOrIgnore([
+    'email' => 'user@example.com',
+    'name' => 'Jane Doe',
+    'country' => 'US'
+]);
+
+// Insert multiple users, ignore duplicates
+$data = [
+    ['email' => 'user1@example.com', 'name' => 'User One'],
+    ['email' => 'user2@example.com', 'name' => 'User Two'],
+    ['email' => 'user1@example.com', 'name' => 'User One Duplicate'], // duplicate email
+];
+$success = User::insertOrIgnore($data);
+```
+
+- Returns `true` if the insert(s) succeeded or were ignored due to duplicate keys.
+- Returns `false` on other errors.
+- Uses MySQL's `INSERT IGNORE` for safe upsert-like behavior.
+
+This is useful for bulk imports or situations where you want to avoid errors on duplicate records.
 
 WPORM also provides `firstOrCreate` and `firstOrNew` methods, similar to Laravel Eloquent, for convenient record retrieval or creation.
 

@@ -430,6 +430,42 @@ protected function castSet($key, $value) {
 		return $instance;
 	}
 
+    /**
+     * Insert a record, ignoring duplicate key errors (Eloquent-style).
+     * Usage: Model::insertOrIgnore(['col' => 'val', ...])
+     * Returns true if insert succeeded or was ignored, false on other errors.
+     */
+    public static function insertOrIgnore(array $attributes)
+    {
+        $instance = new static;
+        $table = $instance->getTable();
+        // If $attributes is a list of records (array of arrays)
+        if (isset($attributes[0]) && is_array($attributes[0])) {
+            $columns = array_keys($attributes[0]);
+            $rows = $attributes;
+        } else {
+            $columns = array_keys($attributes);
+            $rows = [$attributes];
+        }
+        $placeholdersRow = '(' . implode(', ', array_fill(0, count($columns), '%s')) . ')';
+        $allPlaceholders = implode(', ', array_fill(0, count($rows), $placeholdersRow));
+        $allValues = [];
+        foreach ($rows as $row) {
+            foreach ($columns as $col) {
+                $allValues[] = $row[$col] ?? null;
+            }
+        }
+        $sql = sprintf(
+            'INSERT IGNORE INTO %s (%s) VALUES %s',
+            $table,
+            implode(', ', $columns),
+            $allPlaceholders
+        );
+        global $wpdb;
+        $result = $wpdb->query($wpdb->prepare($sql, ...$allValues));
+        return $result !== false;
+    }
+
 	/**
 	 * firstOrNew: Return the first record matching attributes or instantiate a new one (not saved).
 	 *

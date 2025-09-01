@@ -706,6 +706,26 @@ $user = User::firstOrCreate(['email' => 'foo@bar.com'], ['name' => 'Foo']);
 $user = User::firstOrNew(['email' => 'foo@bar.com'], ['name' => 'Foo']);
 ```
 
+### insertOrIgnore(array $attributes)
+**Description:** Insert one or multiple records, ignoring duplicate key errors (e.g., unique constraint violations). Returns true if insert(s) succeeded or were ignored, false on other errors.
+
+**Examples:**
+```php
+// Single record
+$success = User::insertOrIgnore([
+    'email' => 'foo@bar.com',
+    'name' => 'Foo'
+]);
+
+// Multiple records
+$data = [
+    ['email' => 'user1@example.com', 'name' => 'User One'],
+    ['email' => 'user2@example.com', 'name' => 'User Two'],
+    ['email' => 'user1@example.com', 'name' => 'User One Duplicate'], // duplicate email
+];
+$success = User::insertOrIgnore($data);
+```
+
 ---
 
 ## Persistence Methods
