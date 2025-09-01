@@ -673,7 +673,6 @@ public function forceDelete() {
      * @return QueryBuilder<T>
      */
     public function belongsToMany($related, $pivotTable = null, $foreignPivotKey = null, $relatedPivotKey = null) {
-        global $wpdb;
         $relatedInstance = new $related;
         $pivotTable = $pivotTable ?: $this->getTable() . '_' . $relatedInstance->getTable();
         $foreignPivotKey = $foreignPivotKey ?: strtolower(class_basename(static::class)) . '_id';
