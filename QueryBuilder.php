@@ -109,7 +109,7 @@ class QueryBuilder {
         if ($value instanceof \DateTime) {
             $value = $value->format('Y-m-d H:i:s');
         }
-        $this->wheres[] = \MJ\WPORM\quoteIdentifier($column) . " $operator %s";
+        $this->wheres[] = Helpers::quoteIdentifier($column) . " $operator %s";
         $this->bindings[] = $value;
         return $this;
     }
@@ -130,7 +130,7 @@ class QueryBuilder {
             $value = $operator;
             $operator = '=';
         }
-        $this->wheres[] = 'OR ' . \MJ\WPORM\quoteIdentifier($column) . " $operator %s";
+        $this->wheres[] = 'OR ' . Helpers::quoteIdentifier($column) . " $operator %s";
         $this->bindings[] = $value;
         return $this;
     }
@@ -540,7 +540,7 @@ class QueryBuilder {
             $second = $operator;
             $operator = '=';
         }
-    $this->wheres[] = \MJ\WPORM\quoteIdentifier($first) . " $operator " . \MJ\WPORM\quoteIdentifier($second);
+    $this->wheres[] = Helpers::quoteIdentifier($first) . " $operator " . Helpers::quoteIdentifier($second);
         return $this;
     }
     public function orWhereColumn($first, $operator, $second = null) {
@@ -548,12 +548,12 @@ class QueryBuilder {
             $second = $operator;
             $operator = '=';
         }
-    $this->wheres[] = "OR " . \MJ\WPORM\quoteIdentifier($first) . " $operator " . \MJ\WPORM\quoteIdentifier($second);
+    $this->wheres[] = "OR " . Helpers::quoteIdentifier($first) . " $operator " . Helpers::quoteIdentifier($second);
         return $this;
     }
 
     public function orderBy($column, $direction = 'asc') {
-    $this->orders[] = \MJ\WPORM\quoteIdentifier($column) . ' ' . $direction;
+    $this->orders[] = Helpers::quoteIdentifier($column) . ' ' . $direction;
         return $this;
     }
 
@@ -847,7 +847,7 @@ class QueryBuilder {
             $this->joins[] = [
                 'type' => $type,
                 'table' => $table,
-                'clause' => \MJ\WPORM\quoteIdentifier($first) . " $operator " . \MJ\WPORM\quoteIdentifier($second),
+                'clause' => Helpers::quoteIdentifier($first) . " $operator " . Helpers::quoteIdentifier($second),
                 'bindings' => [],
             ];
         } else {
@@ -897,7 +897,7 @@ class QueryBuilder {
             $columns = func_get_args();
         }
         foreach ($columns as $col) {
-            $this->groups[] = \MJ\WPORM\quoteIdentifier($col);
+            $this->groups[] = Helpers::quoteIdentifier($col);
         }
         return $this;
     }
@@ -1054,23 +1054,23 @@ class QueryBuilder {
             }
         }
         // Quote columns in SELECT
-    $selects = array_map('\MJ\WPORM\quoteIdentifier', $this->selects);
+    $selects = array_map('\MJ\WPORM\Helpers::quoteIdentifier', $this->selects);
         $sql = "SELECT ";
         if ($this->isDistinct) {
             $sql .= "DISTINCT ";
         }
-    $sql .= implode(", ", $selects) . " FROM " . \MJ\WPORM\quoteIdentifier($this->table);
+    $sql .= implode(", ", $selects) . " FROM " . Helpers::quoteIdentifier($this->table);
         // Add JOIN clauses
         if (!empty($this->joins)) {
             foreach ($this->joins as $join) {
                 $type = $join['type'];
-                $table = \MJ\WPORM\quoteIdentifier($join['table']);
+                $table = Helpers::quoteIdentifier($join['table']);
                 if ($type === 'CROSS') {
                     $sql .= " CROSS JOIN $table";
                 } elseif ($join['clause']) {
                     // Try to quote identifiers in ON clause
                     $clause = preg_replace_callback('/([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)/', function($m) {
-                        return \MJ\WPORM\quoteIdentifier($m[1]);
+                        return Helpers::quoteIdentifier($m[1]);
                     }, $join['clause']);
                     $sql .= " $type JOIN $table ON {$clause}";
                 } else {
@@ -1081,13 +1081,13 @@ class QueryBuilder {
         if (!empty($where)) {
             // Quote identifiers in WHERE
             $where = preg_replace_callback('/([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)/', function($m) {
-                return \MJ\WPORM\quoteIdentifier($m[1]);
+                return Helpers::quoteIdentifier($m[1]);
             }, $where);
             $sql .= " WHERE $where";
         }
         // GROUP BY
         if (!empty($this->groups)) {
-            $groups = array_map('\MJ\WPORM\quoteIdentifier', $this->groups);
+            $groups = array_map('\MJ\WPORM\Helpers::quoteIdentifier', $this->groups);
             $sql .= " GROUP BY " . implode(", ", $groups);
         }
         // HAVING
@@ -1096,7 +1096,7 @@ class QueryBuilder {
             foreach ($this->havings as [$expr, $vals]) {
                 // Quote identifiers in HAVING
                 $expr = preg_replace_callback('/([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)/', function($m) {
-                    return \MJ\WPORM\quoteIdentifier($m[1]);
+                    return Helpers::quoteIdentifier($m[1]);
                 }, $expr);
                 $havingParts[] = $expr;
                 foreach ($vals as $v) {
@@ -1120,9 +1120,9 @@ class QueryBuilder {
                 }
                 // Split by space to get column and direction
                 if (preg_match('/^([a-zA-Z0-9_\.]+)\s+(asc|desc)$/i', $order, $m)) {
-                    $orderParts[] = \MJ\WPORM\quoteIdentifier($m[1]) . ' ' . strtoupper($m[2]);
+                    $orderParts[] = Helpers::quoteIdentifier($m[1]) . ' ' . strtoupper($m[2]);
                 } elseif (preg_match('/^([a-zA-Z0-9_\.]+)$/', $order, $m)) {
-                    $orderParts[] = \MJ\WPORM\quoteIdentifier($m[1]);
+                    $orderParts[] = Helpers::quoteIdentifier($m[1]);
                 } else {
                     $orderParts[] = $order;
                 }
@@ -1139,11 +1139,11 @@ class QueryBuilder {
     }
 
     protected function buildCountQuery() {
-    $sql = "SELECT COUNT(*) FROM " . \MJ\WPORM\quoteIdentifier($this->table);
+    $sql = "SELECT COUNT(*) FROM " . Helpers::quoteIdentifier($this->table);
         if (!empty($this->wheres)) {
             $where = implode(" AND ", $this->wheres);
             $where = preg_replace_callback('/([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)/', function($m) {
-                return \MJ\WPORM\quoteIdentifier($m[1]);
+                return Helpers::quoteIdentifier($m[1]);
             }, $where);
             $sql .= " WHERE $where";
         }
@@ -1151,11 +1151,11 @@ class QueryBuilder {
     }
 
     protected function buildDeleteQuery() {
-    $sql = "DELETE FROM " . \MJ\WPORM\quoteIdentifier($this->table);
+    $sql = "DELETE FROM " . Helpers::quoteIdentifier($this->table);
         if (!empty($this->wheres)) {
             $where = implode(" AND ", $this->wheres);
             $where = preg_replace_callback('/([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)/', function($m) {
-                return \MJ\WPORM\quoteIdentifier($m[1]);
+                return Helpers::quoteIdentifier($m[1]);
             }, $where);
             $sql .= " WHERE $where";
         }
@@ -1276,7 +1276,7 @@ class QueryBuilder {
         $set = [];
         $bindings = [];
         foreach ($data as $col => $val) {
-            $set[] = \MJ\WPORM\quoteIdentifier($col) . ' = %s';
+            $set[] = Helpers::quoteIdentifier($col) . ' = %s';
             $bindings[] = $val;
         }
         // Use wpdb prefix for table name
@@ -1284,7 +1284,7 @@ class QueryBuilder {
         if (isset($this->wpdb->prefix) && strpos($tableName, $this->wpdb->prefix) !== 0) {
             $tableName = $this->wpdb->prefix . ltrim($tableName, '_');
         }
-    $sql = 'UPDATE ' . \MJ\WPORM\quoteIdentifier($tableName) . ' SET ' . implode(', ', $set);
+    $sql = 'UPDATE ' . Helpers::quoteIdentifier($tableName) . ' SET ' . implode(', ', $set);
         if (!empty($this->wheres)) {
             $where = '';
             foreach ($this->wheres as $i => $clause) {
@@ -1300,7 +1300,7 @@ class QueryBuilder {
             }
             // Quote identifiers in WHERE
             $where = preg_replace_callback('/([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)/', function($m) {
-                return \MJ\WPORM\quoteIdentifier($m[1]);
+                return Helpers::quoteIdentifier($m[1]);
             }, $where);
             $sql .= ' WHERE ' . $where;
         }

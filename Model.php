@@ -181,7 +181,7 @@ abstract class Model implements \ArrayAccess {
         if (isset($this->_eagerLoaded[$key])) {
             return $this->_eagerLoaded[$key];
         }
-		$method = 'get' . ucfirst($key) . 'Attribute';
+		$method = 'get' . Helpers::convert_to_pascal_case($key) . 'Attribute';
 		if (method_exists($this, $method)) {
 			return $this->$method();
 		}
@@ -205,7 +205,7 @@ abstract class Model implements \ArrayAccess {
 	}
 
 	public function __set($key, $value) {
-		$method = 'set' . ucfirst($key) . 'Attribute';
+		$method = 'set' . Helpers::convert_to_pascal_case($key) . 'Attribute';
 		if (method_exists($this, $method)) {
 			return $this->$method($value);
 		}
@@ -632,7 +632,7 @@ public function forceDelete() {
 		if (isset($this->table)) {
 			return $wpdb->prefix . $this->table;
 		}
-		return $wpdb->prefix . strtolower(class_basename(static::class));
+		return $wpdb->prefix . strtolower(Helpers::class_basename(static::class));
 	}
 
 	// Relationships
@@ -645,7 +645,7 @@ public function forceDelete() {
 	 */
 	public function hasOne($related, $foreignKey = null, $localKey = null) {
 		$instance = new $related;
-		$foreignKey = $foreignKey ?: strtolower(class_basename(static::class)) . '_id';
+		$foreignKey = $foreignKey ?: strtolower(Helpers::class_basename(static::class)) . '_id';
 		$localKey = $localKey ?: $this->primaryKey;
 		return $related::query()->where($foreignKey, $this->$localKey);
 	}
@@ -659,7 +659,7 @@ public function forceDelete() {
      */
     public function hasMany($related, $foreignKey = null, $localKey = null) {
         $instance = new $related;
-        $foreignKey = $foreignKey ?: strtolower(class_basename(static::class)) . '_id';
+        $foreignKey = $foreignKey ?: strtolower(Helpers::class_basename(static::class)) . '_id';
         $localKey = $localKey ?: $this->primaryKey;
         return $related::query()->where($foreignKey, $this->$localKey);
     }
@@ -675,8 +675,8 @@ public function forceDelete() {
     public function belongsToMany($related, $pivotTable = null, $foreignPivotKey = null, $relatedPivotKey = null) {
         $relatedInstance = new $related;
         $pivotTable = $pivotTable ?: $this->getTable() . '_' . $relatedInstance->getTable();
-        $foreignPivotKey = $foreignPivotKey ?: strtolower(class_basename(static::class)) . '_id';
-        $relatedPivotKey = $relatedPivotKey ?: strtolower(class_basename($related)) . '_id';
+        $foreignPivotKey = $foreignPivotKey ?: strtolower(Helpers::class_basename(static::class)) . '_id';
+        $relatedPivotKey = $relatedPivotKey ?: strtolower(Helpers::class_basename($related)) . '_id';
         $relatedTable = $relatedInstance->getTable();
         $primaryKey = $this->primaryKey;
         $query = $related::query();
@@ -699,8 +699,8 @@ public function forceDelete() {
         global $wpdb;
         $throughInstance = new $through;
         $relatedInstance = new $related;
-        $firstKey = $firstKey ?: strtolower(class_basename($through)) . '_id';
-        $secondKey = $secondKey ?: strtolower(class_basename($related)) . '_id';
+        $firstKey = $firstKey ?: strtolower(Helpers::class_basename($through)) . '_id';
+        $secondKey = $secondKey ?: strtolower(Helpers::class_basename($related)) . '_id';
         $localKey = $localKey ?: $this->primaryKey;
         $relatedTable = $relatedInstance->getTable();
         $throughTable = $throughInstance->getTable();
@@ -721,7 +721,7 @@ public function forceDelete() {
      */
     public function belongsTo($related, $foreignKey = null, $ownerKey = null) {
         $instance = new $related;
-        $foreignKey = $foreignKey ?: strtolower(class_basename($related)) . '_id';
+        $foreignKey = $foreignKey ?: strtolower(Helpers::class_basename($related)) . '_id';
         $ownerKey = $ownerKey ?: $instance->primaryKey;
         $foreignValue = $this->attributes[$foreignKey] ?? null;
         if ($foreignValue === null) return null;
@@ -762,7 +762,7 @@ public function forceDelete() {
         }
         // Add appended attributes
         foreach ($this->appends as $appended) {
-            $method = 'get' . ucfirst($appended) . 'Attribute';
+            $method = 'get' . Helpers::convert_to_pascal_case($appended) . 'Attribute';
             if (method_exists($this, $method)) {
                 $attributes[$appended] = $this->$method();
             } elseif (property_exists($this, $appended)) {
@@ -876,7 +876,7 @@ public function forceDelete() {
         if (isset($this->_eagerLoaded[$key])) {
             return true;
         }
-        $method = 'get' . ucfirst($key) . 'Attribute';
+        $method = 'get' . Helpers::convert_to_pascal_case($key) . 'Attribute';
         if (method_exists($this, $method)) {
             return true;
         }
