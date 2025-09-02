@@ -11,6 +11,21 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
         $this->items = $items;
     }
 
+    /**
+     * Get the items after a given value (first occurrence).
+     *
+     * @param mixed $value
+     * @return static
+     */
+    public function after($value, $strict = true)
+    {
+        $index = array_search($value, $this->items, $strict);
+        if ($index === false) {
+            return new static([]);
+        }
+        return new static(array_slice($this->items, $index + 1));
+    }
+
     public function toArray() {
         return array_map(function($item) {
             return method_exists($item, 'toArray') ? $item->toArray() : (array)$item;
@@ -19,6 +34,15 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
 
     public function all() {
         return $this->items;
+    }
+
+    /**
+     * Reverse the order of the items in the collection.
+     *
+     * @return static
+     */
+    public function reverse() {
+        return new static(array_reverse($this->items));
     }
 
     public function slice($offset, $length = null) {
