@@ -251,6 +251,39 @@ class Blueprint
         $this->keys[] = "UNIQUE KEY " . ($name ?? "unique_" . md5($cols)) . " ($cols)";
     }
 
+    /**
+     * Add a regular index (KEY) for a column or columns.
+     * Usage: $table->index('user_id'); or $table->index(['type', 'created_at']);
+     */
+    public function index($columns, $name = null)
+    {
+        $cols = $this->wrapArray($columns);
+        $this->keys[] = "KEY " . ($name ?? "index_" . md5($cols)) . " ($cols)";
+        return $this;
+    }
+
+    /**
+     * Add a fulltext index for a column or columns.
+     * Usage: $table->fullText('meta');
+     */
+    public function fullText($columns, $name = null)
+    {
+        $cols = $this->wrapArray($columns);
+        $this->keys[] = "FULLTEXT KEY " . ($name ?? "fulltext_" . md5($cols)) . " ($cols)";
+        return $this;
+    }
+
+    /**
+     * Add a spatial index for a column or columns.
+     * Usage: $table->spatialIndex('location');
+     */
+    public function spatialIndex($columns, $name = null)
+    {
+        $cols = $this->wrapArray($columns);
+        $this->keys[] = "SPATIAL KEY " . ($name ?? "spatial_" . md5($cols)) . " ($cols)";
+        return $this;
+    }
+
     public function foreign(string $column, string $refTable, string $refColumn = 'id', string $onDelete = 'CASCADE', string $onUpdate = 'CASCADE')
     {
         $this->foreigns[] = "FOREIGN KEY ($column) REFERENCES $refTable($refColumn) ON DELETE $onDelete ON UPDATE $onUpdate";
