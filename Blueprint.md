@@ -560,4 +560,38 @@ $table->softDeletesTz();
 
 ---
 
+## Indexing Methods
+
+### index($columns, $name = null)
+**Description:** Adds a regular index (KEY) for one or more columns.
+**Example:**
+```php
+$table->index('user_id');
+$table->index(['type', 'created_at']);
+```
+
+### fullText($columns, $name = null)
+**Description:** Adds a FULLTEXT index for one or more columns (MySQL only).
+**Example:**
+```php
+$table->fullText('meta');
+$table->fullText(['title', 'body']);
+```
+
+### spatialIndex($columns, $name = null)
+**Description:** Adds a SPATIAL index for one or more columns (MySQL only).
+**Example:**
+```php
+$table->spatialIndex('location');
+```
+
+### language($columns, $language, $name = null)
+**Description:** Adds a language-specific index (MySQL 8+; limited dbDelta support).
+**Example:**
+```php
+$table->language('title', 'english');
+```
+
+---
+
 For more advanced usage, see the main `Readme.md` and `Methods.md`.
