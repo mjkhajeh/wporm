@@ -676,6 +676,7 @@ class QueryBuilder {
         if (!empty($this->bindings)) {
             $sql = $this->wpdb->prepare($sql, ...$this->bindings);
         }
+        // If bindings are empty, do not call prepare
         if ($this->debug) {
             error_log('[WPORM][get] SQL: ' . $sql);
             error_log('[WPORM][get] Bindings: ' . print_r($this->bindings, true));
@@ -736,7 +737,11 @@ class QueryBuilder {
             error_log('[WPORM][count] SQL: ' . $sql);
             error_log('[WPORM][count] Bindings: ' . print_r($this->bindings, true));
         }
-        return (int) $this->wpdb->get_var($this->wpdb->prepare($sql, ...$this->bindings));
+        if (!empty($this->bindings)) {
+            return (int) $this->wpdb->get_var($this->wpdb->prepare($sql, ...$this->bindings));
+        } else {
+            return (int) $this->wpdb->get_var($sql);
+        }
     }
 
     public function delete() {
@@ -745,7 +750,11 @@ class QueryBuilder {
             error_log('[WPORM][delete] SQL: ' . $sql);
             error_log('[WPORM][delete] Bindings: ' . print_r($this->bindings, true));
         }
-        return $this->wpdb->query($this->wpdb->prepare($sql, ...$this->bindings));
+        if (!empty($this->bindings)) {
+            return $this->wpdb->query($this->wpdb->prepare($sql, ...$this->bindings));
+        } else {
+            return $this->wpdb->query($sql);
+        }
     }
 
     public function beginTransaction() {
@@ -1309,7 +1318,11 @@ class QueryBuilder {
             error_log('[WPORM][update] SQL: ' . $sql);
             error_log('[WPORM][update] Bindings: ' . print_r($allBindings, true));
         }
-        return $this->wpdb->query($this->wpdb->prepare($sql, ...$allBindings));
+        if (!empty($allBindings)) {
+            return $this->wpdb->query($this->wpdb->prepare($sql, ...$allBindings));
+        } else {
+            return $this->wpdb->query($sql);
+        }
     }
 
     /**
