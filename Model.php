@@ -343,9 +343,6 @@ protected function castSet($key, $value) {
 	public static function query($applyGlobalScopes = true) {
 		$instance = new static;
 		$query = new \MJ\WPORM\QueryBuilder($instance, $applyGlobalScopes);
-		if ($instance->softDeletes && !$query->withTrashed && !$query->onlyTrashed) {
-			$query->whereNull($instance->deletedAtColumn);
-		}
 		return $query;
 	}
 
