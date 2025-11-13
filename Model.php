@@ -254,6 +254,9 @@ abstract class Model implements \ArrayAccess {
         case 'timestamp':
             return $value ? (new \DateTime())->setTimestamp((int)$value) : null;
         default:
+             if( is_array( $cast ) ) {
+                $cast = $cast[0];
+            }
             if (class_exists($cast) && !in_array($cast, ['int','integer','float','double','bool','boolean','array','json','datetime','timestamp'])) {
                 $castInstance = new $cast();
                 if ($castInstance instanceof \MJ\WPORM\Casts\CastableInterface) {
@@ -294,6 +297,9 @@ protected function castSet($key, $value) {
         case 'timestamp':
             return $value instanceof \DateTime ? $value->getTimestamp() : (is_numeric($value) ? (int)$value : strtotime($value));
         default:
+             if( is_array( $cast ) ) {
+                $cast = $cast[0];
+            }
             if (class_exists($cast) && !in_array($cast, ['int','integer','float','double','bool','boolean','array','json','datetime','timestamp'])) {
                 $castInstance = new $cast();
                 if ($castInstance instanceof \MJ\WPORM\Casts\CastableInterface) {
