@@ -965,8 +965,6 @@ class QueryBuilder {
      */
     public function withoutGlobalScopes() {
         $this->applyGlobalScopes = false;
-        $this->wheres = [];
-        $this->bindings = [];
         return $this;
     }
 
@@ -1199,6 +1197,24 @@ class QueryBuilder {
         $model = $models[0];
         if (!method_exists($model, $relation)) return;
         $related = $model->$relation();
+        // Support per-relation options passed via with():
+        // e.g. ['topics' => ['disableGlobalScopes' => true, 'constraint' => function($q){...}]]
+        $disableGlobalScopes = false;
+        if (is_array($constraint)) {
+            if (isset($constraint['disableGlobalScopes'])) {
+                $disableGlobalScopes = (bool)$constraint['disableGlobalScopes'];
+            }
+            if (isset($constraint['constraint']) && is_callable($constraint['constraint'])) {
+                $constraint = $constraint['constraint'];
+            } else {
+                // If array contains a single callable element (shorthand), use it
+                foreach ($constraint as $c) {
+                    if (is_callable($c)) { $constraint = $c; break; }
+                }
+                // If no callable found, set to null
+                if (!is_callable($constraint)) $constraint = null;
+            }
+        }
         // Handle QueryBuilder-based relationships (hasMany, belongsToMany, hasManyThrough)
         if ($related instanceof \MJ\WPORM\QueryBuilder) {
             $foreignKey = null;
@@ -1211,7 +1227,7 @@ class QueryBuilder {
             $ids = array_map(fn($m) => $m->$localKey, $models);
             $relatedModel = $related->model;
             if ($relatedModel && $foreignKey) {
-                $query = $relatedModel::query()->whereIn($foreignKey, $ids);
+                $query = $relatedModel::query(!$disableGlobalScopes)->whereIn($foreignKey, $ids);
                 if ($constraint) {
                     $constraint($query);
                 }
@@ -1221,7 +1237,11 @@ class QueryBuilder {
                     $grouped[$rel->$foreignKey][] = $rel;
                 }
                 foreach ($models as $m) {
-                    $m->_eagerLoaded[$relation] = $grouped[$m->$localKey] ?? [];
+                    if (method_exists($m, 'setEagerLoaded')) {
+                        $m->setEagerLoaded($relation, $grouped[$m->$localKey] ?? []);
+                    } else {
+                        $m->_eagerLoaded[$relation] = $grouped[$m->$localKey] ?? [];
+                    }
                 }
             }
         }
@@ -1236,7 +1256,7 @@ class QueryBuilder {
             }
             $ids = array_map(fn($m) => $m->$foreignKey, $models);
             $relatedModel = get_class($related);
-            $query = $relatedModel::query()->whereIn($ownerKey, $ids);
+            $query = $relatedModel::query(!$disableGlobalScopes)->whereIn($ownerKey, $ids);
             if ($constraint) {
                 $constraint($query);
             }
@@ -1246,7 +1266,11 @@ class QueryBuilder {
                 $map[$rel->$ownerKey] = $rel;
             }
             foreach ($models as $m) {
-                $m->_eagerLoaded[$relation] = $map[$m->$foreignKey] ?? null;
+                if (method_exists($m, 'setEagerLoaded')) {
+                    $m->setEagerLoaded($relation, $map[$m->$foreignKey] ?? null);
+                } else {
+                    $m->_eagerLoaded[$relation] = $map[$m->$foreignKey] ?? null;
+                }
             }
         }
     }

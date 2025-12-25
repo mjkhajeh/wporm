@@ -646,6 +646,43 @@ To remove a specific global scope at runtime:
 Post::removeGlobalScope('published');
 ```
 
+### Per-relation global-scope control (eager loads)
+
+You can disable global scopes for a specific relation when using `with()` to eager-load relations. Pass an array for the relation with the optional key `disableGlobalScopes` set to `true` and an optional `constraint` callable. This affects only the related query used to load that relation.
+
+Examples:
+
+```php
+// Disable global scopes for the 'topics' relation only
+$department = Departments::query(false)
+    ->with(['topics' => ['disableGlobalScopes' => true]])
+    ->orderBy('id', 'desc')
+    ->first();
+
+print_r($department->topics);
+```
+
+```php
+// Disable global scopes and also apply a constraint to the related query
+$dept = Departments::query()
+    ->with([ 
+        'topics' => [
+            'disableGlobalScopes' => true,
+            'constraint' => function($q) { $q->where('active', true); }
+        ]
+    ])
+    ->first();
+```
+
+You can still use the shorthand closure form for simple constraints (unchanged):
+
+```php
+$dept = Departments::query()->with(['topics' => function($q) {
+    $q->where('active', true);
+}])->first();
+```
+
+
 ## Soft Deletes
 
 WPORM supports Eloquent-style soft deletes, allowing you to "delete" records without actually removing them from the database. To enable soft deletes on a model, set the `$softDeletes` property to `true`:

@@ -23,6 +23,25 @@ abstract class Model implements \ArrayAccess {
 	protected $createdAtColumn = 'created_at';
 	protected $updatedAtColumn = 'updated_at';
     protected $_eagerLoaded = [];
+
+    /**
+     * Set a single eager loaded relation value.
+     * @param string $relation
+     * @param mixed $value
+     */
+    public function setEagerLoaded(string $relation, $value) {
+        $this->_eagerLoaded[$relation] = $value;
+    }
+
+    /**
+     * Merge multiple eager loaded relations.
+     * @param array $map
+     */
+    public function setEagerLoadedMany(array $map) {
+        foreach ($map as $k => $v) {
+            $this->_eagerLoaded[$k] = $v;
+        }
+    }
 	protected $softDeletes = false;
 	protected $deletedAtColumn = 'deleted_at';
 	protected $appends = [];
