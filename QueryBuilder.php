@@ -1007,18 +1007,8 @@ class QueryBuilder {
         $sql = $this->toSql();
         $bindings = $this->getBindings();
         if (empty($bindings)) return $sql;
-        // Replace %s placeholders with quoted bindings
-        foreach ($bindings as $binding) {
-            if (is_null($binding)) {
-                $replace = 'NULL';
-            } elseif (is_numeric($binding)) {
-                $replace = $binding;
-            } else {
-                $replace = "'" . addslashes($binding) . "'";
-            }
-            $sql = preg_replace('/%s/', $replace, $sql, 1);
-        }
-        return $sql;
+        // Use wpdb->prepare to safely interpolate bindings for debugging
+        return $this->wpdb->prepare($sql, ...$bindings);
     }
 
     // Helper to convert 'col->foo->bar' to JSON_EXTRACT(col, '$.foo.bar')
