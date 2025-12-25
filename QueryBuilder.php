@@ -1221,12 +1221,33 @@ class QueryBuilder {
             $localKey = $model->primaryKey;
             $ref = new \ReflectionMethod($model, $relation);
             $params = $ref->getParameters();
-            if (isset($params[1])) {
-                $foreignKey = $params[1]->getDefaultValue();
+            if (isset($params[0])) {
+                $foreignKey = $params[0]->getDefaultValue();
             }
             $ids = array_map(fn($m) => $m->$localKey, $models);
             $relatedModel = $related->model;
-            if ($relatedModel && $foreignKey) {
+            if ($relatedModel) {
+                // If reflection didn't yield a foreign key, try to infer it from the relation's where clauses
+                if (!$foreignKey) {
+                    $foreignKey = null;
+                    foreach ($related->wheres as $w) {
+                        $cl = preg_replace('/^OR\s+/i', '', $w);
+                        $cl = str_replace('`', '', $cl);
+                        if (preg_match('/([a-zA-Z0-9_\.]+)\s*(?:=|!=|<|>|NOT|IN)\b/i', $cl, $mcol)) {
+                            $col = $mcol[1];
+                            if (strpos($col, '.') !== false) {
+                                $parts = explode('.', $col);
+                                $col = end($parts);
+                            }
+                            $foreignKey = $col;
+                            break;
+                        }
+                    }
+                    // Fallback: compute default similar to Model::hasMany()
+                    if (!$foreignKey) {
+                        $foreignKey = strtolower(\MJ\WPORM\Helpers::class_basename(get_class($model))) . '_id';
+                    }
+                }
                 $query = $relatedModel::query(!$disableGlobalScopes)->whereIn($foreignKey, $ids);
                 if ($constraint) {
                     $constraint($query);
@@ -1251,11 +1272,15 @@ class QueryBuilder {
             $ownerKey = $related->primaryKey;
             $ref = new \ReflectionMethod($model, $relation);
             $params = $ref->getParameters();
-            if (isset($params[1])) {
-                $foreignKey = $params[1]->getDefaultValue();
+            if (isset($params[0])) {
+                $foreignKey = $params[0]->getDefaultValue();
+            }
+            $relatedModel = get_class($related);
+            // If reflection didn't yield the foreign key name, compute default (like Model::belongsTo)
+            if (!$foreignKey) {
+                $foreignKey = strtolower(\MJ\WPORM\Helpers::class_basename(get_class($related))) . '_id';
             }
             $ids = array_map(fn($m) => $m->$foreignKey, $models);
-            $relatedModel = get_class($related);
             $query = $relatedModel::query(!$disableGlobalScopes)->whereIn($ownerKey, $ids);
             if ($constraint) {
                 $constraint($query);
@@ -1507,12 +1532,12 @@ class QueryBuilder {
         // Try to get foreign key from relation method signature
         $ref = new \ReflectionMethod($model, $relation);
         $params = $ref->getParameters();
-        if (isset($params[1])) {
-            $foreignKey = $params[1]->getDefaultValue();
+        if (isset($params[0])) {
+            $foreignKey = $params[0]->getDefaultValue();
         }
         // If belongsTo, swap keys
-        if ($relatedQuery instanceof \MJ\WPORM\Model && isset($params[1])) {
-            $foreignKey = $params[1]->getDefaultValue();
+        if ($relatedQuery instanceof \MJ\WPORM\Model && isset($params[0])) {
+            $foreignKey = $params[0]->getDefaultValue();
             $ownerKey = $relatedQuery->primaryKey;
             $column = $model->$foreignKey;
             $relatedTable = $relatedQuery->getTable();
@@ -1578,11 +1603,11 @@ class QueryBuilder {
         $foreignKey = null;
         $ref = new \ReflectionMethod($model, $relation);
         $params = $ref->getParameters();
-        if (isset($params[1])) {
-            $foreignKey = $params[1]->getDefaultValue();
+        if (isset($params[0])) {
+            $foreignKey = $params[0]->getDefaultValue();
         }
-        if ($relatedQuery instanceof \MJ\WPORM\Model && isset($params[1])) {
-            $foreignKey = $params[1]->getDefaultValue();
+        if ($relatedQuery instanceof \MJ\WPORM\Model && isset($params[0])) {
+            $foreignKey = $params[0]->getDefaultValue();
             $ownerKey = $relatedQuery->primaryKey;
             $column = $model->$foreignKey;
             $relatedTable = $relatedQuery->getTable();
