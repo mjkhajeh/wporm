@@ -757,6 +757,19 @@ class QueryBuilder {
         }
     }
 
+    /**
+     * Truncate the model's table.
+     * Usage: Model::query()->truncate();
+     * This executes a TRUNCATE TABLE statement for the current model table.
+     */
+    public function truncate() {
+        $sql = "TRUNCATE TABLE {$this->table}";
+        if ($this->debug) {
+            error_log('[WPORM][truncate] SQL: ' . $sql);
+        }
+        return $this->wpdb->query($sql);
+    }
+
     public function beginTransaction() {
         $this->wpdb->query('START TRANSACTION');
     }

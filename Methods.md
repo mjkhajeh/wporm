@@ -748,6 +748,15 @@ $user = User::find(1);
 $user->delete();
 ```
 
+### truncate()
+**Description:** Truncate the model's table. Executes a `TRUNCATE TABLE` statement for the model's underlying table and removes all records quickly. Use with caution.
+
+**Example:**
+```php
+// Truncate all records for the model's table
+User::query()->truncate();
+```
+
 ---
 
 ## Relationship Methods

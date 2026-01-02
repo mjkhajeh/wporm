@@ -276,6 +276,14 @@ $part = Parts::find(1);
 $part->delete();
 ```
 
+### Truncating a Table
+You can quickly remove all rows from a model's table using `truncate()` on the model query builder:
+
+```php
+// Remove all records from the table
+Parts::query()->truncate();
+```
+
 ## Pagination
 
 WPORM supports Eloquent-style pagination with the following methods on the query builder:
