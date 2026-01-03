@@ -76,13 +76,27 @@ class QueryBuilder {
             return $this;
         }
         if (is_callable($column)) {
-            // Nested group
+            // Nested group: build SQL preserving explicit OR prefixes
             $nested = new self($this->model);
             $column($nested);
             $group = $nested->wheres;
             $bindings = $nested->bindings;
             if (!empty($group)) {
-                $this->wheres[] = '(' . implode(' AND ', $group) . ')';
+                $groupSql = '';
+                foreach ($group as $i => $g) {
+                    if ($i === 0) {
+                        // If the first element begins with an OR, strip it
+                        $groupSql .= preg_replace('/^\s*OR\s+/i', '', $g);
+                    } else {
+                        if (preg_match('/^\s*OR\s+/i', $g)) {
+                            // Preserve OR by appending as-is (with a space)
+                            $groupSql .= ' ' . preg_replace('/^\s*/', '', $g);
+                        } else {
+                            $groupSql .= ' AND ' . $g;
+                        }
+                    }
+                }
+                $this->wheres[] = '(' . $groupSql . ')';
                 $this->bindings = array_merge($this->bindings, $bindings);
             }
             return $this;
@@ -121,7 +135,19 @@ class QueryBuilder {
             $group = $nested->wheres;
             $bindings = $nested->bindings;
             if (!empty($group)) {
-                $this->wheres[] = 'OR (' . implode(' AND ', $group) . ')';
+                $groupSql = '';
+                foreach ($group as $i => $g) {
+                    if ($i === 0) {
+                        $groupSql .= preg_replace('/^\s*OR\s+/i', '', $g);
+                    } else {
+                        if (preg_match('/^\s*OR\s+/i', $g)) {
+                            $groupSql .= ' ' . preg_replace('/^\s*/', '', $g);
+                        } else {
+                            $groupSql .= ' AND ' . $g;
+                        }
+                    }
+                }
+                $this->wheres[] = 'OR (' . $groupSql . ')';
                 $this->bindings = array_merge($this->bindings, $bindings);
             }
             return $this;
