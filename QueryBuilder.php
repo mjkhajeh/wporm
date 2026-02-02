@@ -1251,7 +1251,8 @@ class QueryBuilder {
             $ref = new \ReflectionMethod($model, $relation);
             $params = $ref->getParameters();
             if (isset($params[0])) {
-                $foreignKey = $params[0]->getDefaultValue();
+                $name = $params[0]->getName();
+                $$name = $params[0]->getDefaultValue();
             }
             $ids = array_map(fn($m) => $m->$localKey, $models);
             $relatedModel = $related->model;
