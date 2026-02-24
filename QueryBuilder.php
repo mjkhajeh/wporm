@@ -1086,7 +1086,7 @@ class QueryBuilder {
      * @param callable|null $default Callback if condition is falsy
      * @return $this
      */
-    public function when($value, callable $callback, callable $default = null) {
+    public function when($value, callable $callback, ?callable $default = null) {
         if ($value) {
             $callback($this, $value);
         } elseif ($default) {

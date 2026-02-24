@@ -937,7 +937,7 @@ public function forceDelete() {
      * @param callable|null $default Callback if condition is falsy
      * @return QueryBuilder
      */
-    public static function when($value, callable $callback, callable $default = null) {
+    public static function when($value, callable $callback, ?callable $default = null) {
         $query = static::query();
         if ($value) {
             $callback($query, $value);
