@@ -473,6 +473,15 @@ protected function castSet($key, $value) {
             $columns = array_keys($attributes);
             $rows = [$attributes];
         }
+        if ($instance->timestamps) {
+			$now = current_time('mysql');
+            $columns[] = $instance->createdAtColumn;
+            $columns[] = $instance->updatedAtColumn;
+            foreach( $rows as $row_index => $row ) {
+                $rows[$row_index][$instance->createdAtColumn] = $now;
+                $rows[$row_index][$instance->updatedAtColumn] = $now;
+            }
+		}
         $placeholdersRow = '(' . implode(', ', array_fill(0, count($columns), '%s')) . ')';
         $allPlaceholders = implode(', ', array_fill(0, count($rows), $placeholdersRow));
         $allValues = [];
