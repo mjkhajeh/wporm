@@ -475,11 +475,19 @@ protected function castSet($key, $value) {
         }
         if ($instance->timestamps) {
 			$now = current_time('mysql');
-            $columns[] = $instance->createdAtColumn;
-            $columns[] = $instance->updatedAtColumn;
+            if( !in_array( $instance->createdAtColumn, $columns ) ) {
+                $columns[] = $instance->createdAtColumn;
+            }
+            if( !in_array( $instance->updatedAtColumn, $columns ) ) {
+                $columns[] = $instance->updatedAtColumn;
+            }
             foreach( $rows as $row_index => $row ) {
-                $rows[$row_index][$instance->createdAtColumn] = $now;
-                $rows[$row_index][$instance->updatedAtColumn] = $now;
+                if( !isset( $rows[$row_index][$instance->createdAtColumn] ) ) {
+                    $rows[$row_index][$instance->createdAtColumn] = $now;
+                }
+                if( !isset( $rows[$row_index][$instance->updatedAtColumn] ) ) {
+                    $rows[$row_index][$instance->updatedAtColumn] = $now;
+                }
             }
 		}
         $placeholdersRow = '(' . implode(', ', array_fill(0, count($columns), '%s')) . ')';
