@@ -1095,23 +1095,35 @@ class QueryBuilder {
         return $this;
     }
 
-    protected function buildSelectQuery() {
+    /**
+     * Build the WHERE clause string from $this->wheres, correctly handling OR prefixes.
+     * Returns the clause WITHOUT the leading "WHERE" keyword, or empty string if no conditions.
+     * Also quotes dot-notation identifiers (table.column).
+     */
+    protected function buildWhereClause() {
         if (empty($this->wheres)) {
-            $where = '';
-        } else {
-            $where = '';
-            foreach ($this->wheres as $i => $clause) {
-                if ($i === 0) {
-                    $where .= $clause;
+            return '';
+        }
+        $where = '';
+        foreach ($this->wheres as $i => $clause) {
+            if ($i === 0) {
+                $where .= $clause;
+            } else {
+                if (strpos(trim($clause), 'OR ') === 0) {
+                    $where .= ' ' . $clause;
                 } else {
-                    if (strpos(trim($clause), 'OR ') === 0) {
-                        $where .= ' ' . $clause;
-                    } else {
-                        $where .= ' AND ' . $clause;
-                    }
+                    $where .= ' AND ' . $clause;
                 }
             }
         }
+        $where = preg_replace_callback('/([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)/', function($m) {
+            return Helpers::quoteIdentifier($m[1]);
+        }, $where);
+        return $where;
+    }
+
+    protected function buildSelectQuery() {
+        $where = $this->buildWhereClause();
         // Quote columns in SELECT
     $selects = array_map('\MJ\WPORM\Helpers::quoteIdentifier', $this->selects);
         $sql = "SELECT ";
@@ -1138,10 +1150,6 @@ class QueryBuilder {
             }
         }
         if (!empty($where)) {
-            // Quote identifiers in WHERE
-            $where = preg_replace_callback('/([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)/', function($m) {
-                return Helpers::quoteIdentifier($m[1]);
-            }, $where);
             $sql .= " WHERE $where";
         }
         // GROUP BY
@@ -1199,11 +1207,8 @@ class QueryBuilder {
 
     protected function buildCountQuery() {
     $sql = "SELECT COUNT(*) FROM " . Helpers::quoteIdentifier($this->table);
-        if (!empty($this->wheres)) {
-            $where = implode(" AND ", $this->wheres);
-            $where = preg_replace_callback('/([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)/', function($m) {
-                return Helpers::quoteIdentifier($m[1]);
-            }, $where);
+        $where = $this->buildWhereClause();
+        if (!empty($where)) {
             $sql .= " WHERE $where";
         }
         return $sql;
@@ -1211,11 +1216,8 @@ class QueryBuilder {
 
     protected function buildDeleteQuery() {
     $sql = "DELETE FROM " . Helpers::quoteIdentifier($this->table);
-        if (!empty($this->wheres)) {
-            $where = implode(" AND ", $this->wheres);
-            $where = preg_replace_callback('/([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)/', function($m) {
-                return Helpers::quoteIdentifier($m[1]);
-            }, $where);
+        $where = $this->buildWhereClause();
+        if (!empty($where)) {
             $sql .= " WHERE $where";
         }
         return $sql;
@@ -1396,23 +1398,8 @@ class QueryBuilder {
             $tableName = $this->wpdb->prefix . ltrim($tableName, '_');
         }
     $sql = 'UPDATE ' . Helpers::quoteIdentifier($tableName) . ' SET ' . implode(', ', $set);
-        if (!empty($this->wheres)) {
-            $where = '';
-            foreach ($this->wheres as $i => $clause) {
-                if ($i === 0) {
-                    $where .= $clause;
-                } else {
-                    if (strpos(trim($clause), 'OR ') === 0) {
-                        $where .= ' ' . $clause;
-                    } else {
-                        $where .= ' AND ' . $clause;
-                    }
-                }
-            }
-            // Quote identifiers in WHERE
-            $where = preg_replace_callback('/([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)/', function($m) {
-                return Helpers::quoteIdentifier($m[1]);
-            }, $where);
+        $where = $this->buildWhereClause();
+        if (!empty($where)) {
             $sql .= ' WHERE ' . $where;
         }
         $allBindings = array_merge($bindings, $this->bindings);
