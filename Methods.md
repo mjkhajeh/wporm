@@ -728,6 +728,50 @@ $success = User::insertOrIgnore($data);
 
 ---
 
+### upsert(array $values, array|string $uniqueBy, array|null $update = null)
+**Description:** Insert or update multiple records in a single query (Eloquent-style). Uses MySQL `INSERT ... ON DUPLICATE KEY UPDATE` syntax. If a record with the same unique key(s) already exists, the specified columns are updated; otherwise, a new record is inserted.
+
+**Parameters:**
+- `$values` — Array of records to upsert (each record is an associative array).
+- `$uniqueBy` — Column(s) that uniquely identify records (e.g., `['email']` or `'email'`).
+- `$update` — (Optional) Columns to update when a duplicate is found. If `null`, all columns except `$uniqueBy` are updated.
+
+**Returns:** Number of affected rows or `false` on failure.
+
+**Examples:**
+```php
+// Upsert with explicit update columns
+User::upsert([
+    ['email' => 'alice@test.com', 'name' => 'Alice', 'votes' => 1],
+    ['email' => 'bob@test.com', 'name' => 'Bob', 'votes' => 2],
+], ['email'], ['name', 'votes']);
+
+// Upsert all columns except unique key (auto-detected)
+User::upsert([
+    ['email' => 'alice@test.com', 'name' => 'Alice Updated', 'votes' => 10],
+], 'email');
+
+// Single record upsert
+User::upsert(
+    ['email' => 'alice@test.com', 'name' => 'Alice', 'votes' => 5],
+    ['email'],
+    ['votes']
+);
+
+// Using DB::table() (raw table query)
+DB::table('users')->upsert([
+    ['email' => 'alice@test.com', 'name' => 'Alice', 'votes' => 1],
+    ['email' => 'bob@test.com', 'name' => 'Bob', 'votes' => 2],
+], ['email'], ['name', 'votes']);
+```
+
+**Notes:**
+- If timestamps are enabled on the model, `created_at` and `updated_at` are handled automatically.
+- The `$uniqueBy` columns must have a unique or primary key constraint in the database for the ON DUPLICATE KEY behavior to work.
+- If `$update` is empty (no columns to update), falls back to `INSERT IGNORE` behavior.
+
+---
+
 ## Persistence Methods
 
 ### save()

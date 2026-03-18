@@ -509,6 +509,108 @@ protected function castSet($key, $value) {
         return $result !== false;
     }
 
+    /**
+     * Insert or update multiple records in a single query (Eloquent-style upsert).
+     *
+     * Uses MySQL INSERT ... ON DUPLICATE KEY UPDATE syntax.
+     *
+     * @param array $values Array of records to upsert (each record is an associative array).
+     * @param array|string $uniqueBy Column(s) that uniquely identify records (used for ON DUPLICATE KEY).
+     * @param array|null $update Columns to update on duplicate. If null, all columns except $uniqueBy are updated.
+     * @return int|false Number of affected rows or false on failure.
+     *
+     * Usage:
+     *   Model::upsert([
+     *       ['email' => 'a@test.com', 'name' => 'Alice', 'votes' => 1],
+     *       ['email' => 'b@test.com', 'name' => 'Bob', 'votes' => 2],
+     *   ], ['email'], ['name', 'votes']);
+     */
+    public static function upsert(array $values, $uniqueBy, $update = null)
+    {
+        $instance = new static;
+        $table = $instance->getTable();
+
+        if (empty($values)) {
+            return 0;
+        }
+
+        // Normalize to array of arrays
+        if (!isset($values[0]) || !is_array($values[0])) {
+            $values = [$values];
+        }
+
+        $uniqueBy = (array) $uniqueBy;
+
+        // Determine columns from first record
+        $columns = array_keys($values[0]);
+
+        // Add timestamps if enabled
+        if ($instance->timestamps) {
+            $now = current_time('mysql');
+            if (!in_array($instance->createdAtColumn, $columns)) {
+                $columns[] = $instance->createdAtColumn;
+            }
+            if (!in_array($instance->updatedAtColumn, $columns)) {
+                $columns[] = $instance->updatedAtColumn;
+            }
+            foreach ($values as $index => $row) {
+                if (!isset($values[$index][$instance->createdAtColumn])) {
+                    $values[$index][$instance->createdAtColumn] = $now;
+                }
+                if (!isset($values[$index][$instance->updatedAtColumn])) {
+                    $values[$index][$instance->updatedAtColumn] = $now;
+                }
+            }
+        }
+
+        // If update columns not specified, update all columns except the unique key columns
+        if ($update === null) {
+            $update = array_values(array_diff($columns, $uniqueBy));
+        }
+
+        if (empty($update)) {
+            // Nothing to update on duplicate — fall back to INSERT IGNORE behavior
+            return static::insertOrIgnore($values);
+        }
+
+        // Build placeholders
+        $placeholdersRow = '(' . implode(', ', array_fill(0, count($columns), '%s')) . ')';
+        $allPlaceholders = implode(', ', array_fill(0, count($values), $placeholdersRow));
+
+        $allValues = [];
+        foreach ($values as $row) {
+            foreach ($columns as $col) {
+                $allValues[] = $row[$col] ?? null;
+            }
+        }
+
+        // Build ON DUPLICATE KEY UPDATE clause
+        $updateParts = [];
+        foreach ($update as $col) {
+            $quoted = Helpers::quoteIdentifier($col);
+            $updateParts[] = $quoted . ' = VALUES(' . $quoted . ')';
+        }
+
+        // Always update the updated_at timestamp on duplicate if timestamps are enabled
+        if ($instance->timestamps && !in_array($instance->updatedAtColumn, $update)) {
+            $quoted = Helpers::quoteIdentifier($instance->updatedAtColumn);
+            $updateParts[] = $quoted . ' = VALUES(' . $quoted . ')';
+        }
+
+        $quotedColumns = array_map([Helpers::class, 'quoteIdentifier'], $columns);
+
+        $sql = sprintf(
+            'INSERT INTO %s (%s) VALUES %s ON DUPLICATE KEY UPDATE %s',
+            $table,
+            implode(', ', $quotedColumns),
+            $allPlaceholders,
+            implode(', ', $updateParts)
+        );
+
+        global $wpdb;
+        return $wpdb->query($wpdb->prepare($sql, ...$allValues));
+    }
+
 	/**
 	 * firstOrNew: Return the first record matching attributes or instantiate a new one (not saved).
 	 *

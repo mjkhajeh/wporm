@@ -218,6 +218,53 @@ $success = User::insertOrIgnore($data);
 
 This is useful for bulk imports or situations where you want to avoid errors on duplicate records.
 
+### Bulk Upsert: upsert
+
+WPORM provides an Eloquent-style `upsert` method for inserting or updating multiple records in a single query. It uses MySQL's `INSERT ... ON DUPLICATE KEY UPDATE` syntax for maximum efficiency.
+
+**Signature:**
+```php
+Model::upsert(array $values, array|string $uniqueBy, array|null $update = null)
+```
+
+**Parameters:**
+- `$values` — An array of records (each an associative array) to insert or update.
+- `$uniqueBy` — The column(s) that uniquely identify a record (must have a unique or primary key constraint in the database).
+- `$update` — (Optional) The columns to update when a duplicate is found. If omitted or `null`, all columns except `$uniqueBy` are updated automatically.
+
+**Examples:**
+```php
+// Upsert multiple records — insert new ones, update existing by email
+User::upsert([
+    ['email' => 'alice@test.com', 'name' => 'Alice', 'votes' => 1],
+    ['email' => 'bob@test.com', 'name' => 'Bob', 'votes' => 2],
+], ['email'], ['name', 'votes']);
+
+// Auto-detect update columns (updates all columns except the unique key)
+User::upsert([
+    ['email' => 'alice@test.com', 'name' => 'Alice Updated', 'votes' => 10],
+], 'email');
+
+// Single record upsert
+User::upsert(
+    ['email' => 'alice@test.com', 'name' => 'Alice', 'votes' => 5],
+    ['email'],
+    ['votes']
+);
+
+// Also available via DB::table() for raw table queries
+use MJ\WPORM\DB;
+
+DB::table('users')->upsert([
+    ['email' => 'alice@test.com', 'name' => 'Alice', 'votes' => 1],
+    ['email' => 'bob@test.com', 'name' => 'Bob', 'votes' => 2],
+], ['email'], ['name', 'votes']);
+```
+
+- If timestamps are enabled on the model, `created_at` and `updated_at` are handled automatically.
+- Returns the number of affected rows, or `false` on failure.
+- If no update columns are specified and none can be inferred, falls back to `INSERT IGNORE` behavior.
+
 WPORM also provides `firstOrCreate` and `firstOrNew` methods, similar to Laravel Eloquent, for convenient record retrieval or creation.
 
 **firstOrCreate Usage:**

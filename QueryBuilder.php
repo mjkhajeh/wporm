@@ -1428,6 +1428,125 @@ class QueryBuilder {
     }
 
     /**
+     * Insert or update multiple records in a single query (Eloquent-style upsert).
+     *
+     * Uses MySQL INSERT ... ON DUPLICATE KEY UPDATE syntax.
+     *
+     * @param array $values Array of records to upsert (each record is an associative array).
+     * @param array|string $uniqueBy Column(s) that uniquely identify records (used for ON DUPLICATE KEY).
+     * @param array|null $update Columns to update on duplicate. If null, all columns except $uniqueBy are updated.
+     * @return int|false Number of affected rows or false on failure.
+     *
+     * Usage:
+     *   DB::table('users')->upsert([
+     *       ['email' => 'a@test.com', 'name' => 'Alice', 'votes' => 1],
+     *       ['email' => 'b@test.com', 'name' => 'Bob', 'votes' => 2],
+     *   ], ['email'], ['name', 'votes']);
+     */
+    public function upsert(array $values, $uniqueBy, $update = null)
+    {
+        if (empty($values)) {
+            return 0;
+        }
+
+        // Normalize to array of arrays
+        if (!isset($values[0]) || !is_array($values[0])) {
+            $values = [$values];
+        }
+
+        $uniqueBy = (array) $uniqueBy;
+
+        // Determine columns from first record
+        $columns = array_keys($values[0]);
+
+        // Add timestamps if the model supports them
+        $hasTimestamps = property_exists($this->model, 'timestamps') && $this->model->timestamps;
+        $createdAtColumn = $this->model->createdAtColumn ?? 'created_at';
+        $updatedAtColumn = $this->model->updatedAtColumn ?? 'updated_at';
+
+        if ($hasTimestamps) {
+            $now = current_time('mysql');
+            if (!in_array($createdAtColumn, $columns)) {
+                $columns[] = $createdAtColumn;
+            }
+            if (!in_array($updatedAtColumn, $columns)) {
+                $columns[] = $updatedAtColumn;
+            }
+            foreach ($values as $index => $row) {
+                if (!isset($values[$index][$createdAtColumn])) {
+                    $values[$index][$createdAtColumn] = $now;
+                }
+                if (!isset($values[$index][$updatedAtColumn])) {
+                    $values[$index][$updatedAtColumn] = $now;
+                }
+            }
+        }
+
+        // If update columns not specified, update all columns except the unique key columns
+        if ($update === null) {
+            $update = array_values(array_diff($columns, $uniqueBy));
+        }
+
+        // Resolve table name with prefix
+        $tableName = method_exists($this->model, 'getTable') ? $this->model->getTable() : $this->table;
+
+        if (empty($update)) {
+            // Nothing to update on duplicate — use INSERT IGNORE
+            $placeholdersRow = '(' . implode(', ', array_fill(0, count($columns), '%s')) . ')';
+            $allPlaceholders = implode(', ', array_fill(0, count($values), $placeholdersRow));
+            $allValues = [];
+            foreach ($values as $row) {
+                foreach ($columns as $col) {
+                    $allValues[] = $row[$col] ?? null;
+                }
+            }
+            $sql = sprintf('INSERT IGNORE INTO %s (%s) VALUES %s', $tableName, implode(', ', array_map([Helpers::class, 'quoteIdentifier'], $columns)), $allPlaceholders);
+            return $this->wpdb->query($this->wpdb->prepare($sql, ...$allValues));
+        }
+
+        // Build placeholders
+        $placeholdersRow = '(' . implode(', ', array_fill(0, count($columns), '%s')) . ')';
+        $allPlaceholders = implode(', ', array_fill(0, count($values), $placeholdersRow));
+
+        $allValues = [];
+        foreach ($values as $row) {
+            foreach ($columns as $col) {
+                $allValues[] = $row[$col] ?? null;
+            }
+        }
+
+        // Build ON DUPLICATE KEY UPDATE clause
+        $updateParts = [];
+        foreach ($update as $col) {
+            $quoted = Helpers::quoteIdentifier($col);
+            $updateParts[] = $quoted . ' = VALUES(' . $quoted . ')';
+        }
+
+        // Always update the updated_at timestamp on duplicate if timestamps are enabled
+        if ($hasTimestamps && !in_array($updatedAtColumn, $update)) {
+            $quoted = Helpers::quoteIdentifier($updatedAtColumn);
+            $updateParts[] = $quoted . ' = VALUES(' . $quoted . ')';
+        }
+
+        $quotedColumns = array_map([Helpers::class, 'quoteIdentifier'], $columns);
+
+        $sql = sprintf(
+            'INSERT INTO %s (%s) VALUES %s ON DUPLICATE KEY UPDATE %s',
+            $tableName,
+            implode(', ', $quotedColumns),
+            $allPlaceholders,
+            implode(', ', $updateParts)
+        );
+
+        if ($this->debug) {
+            error_log('[WPORM][upsert] SQL: ' . $sql);
+            error_log('[WPORM][upsert] Bindings: ' . print_r($allValues, true));
+        }
+
+        return $this->wpdb->query($this->wpdb->prepare($sql, ...$allValues));
+    }
+
+    /**
      * Create and save multiple records at once (Eloquent-style createMany).
      * Usage: Model::query()->createMany([['col' => 'val'], ...])
      * Returns array of created model instances.
