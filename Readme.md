@@ -404,6 +404,75 @@ $arrays = $collection->toArray();
 - Custom cast classes will be instantiated and their `get()` method called.
 - Built-in types will be cast using native PHP logic.
 
+## Collections
+
+All multi-result queries (`get()`, `all()`, etc.) return a `Collection` instance. Collections provide a fluent, Eloquent-style API for working with arrays of models.
+
+### Available Methods
+
+| Method | Returns | Description |
+|---|---|---|
+| `all()` | `array` | Get the underlying array of items |
+| `first()` | `mixed` | Get the first item |
+| `last()` | `mixed` | Get the last item |
+| `count()` | `int` | Number of items |
+| `isEmpty()` | `bool` | Whether the collection is empty |
+| `toArray()` | `array` | Convert all items to arrays |
+| `filter(callable)` | `Collection` | Return a new filtered collection |
+| `map(callable)` | `Collection` | Return a new collection with transformed items |
+| `transform(callable)` | `$this` | Transform items **in-place** (mutating) |
+| `pluck($key, $indexKey)` | `array` | Extract a single column from each item |
+| `contains($value)` | `bool` | Check if a value exists (strict) |
+| `slice($offset, $length)` | `Collection` | Slice the collection |
+| `reverse()` | `Collection` | Reverse item order |
+| `after($value)` | `Collection` | Items after the first occurrence of a value |
+
+### map() vs transform()
+
+`map()` returns a **new** collection, leaving the original unchanged. `transform()` modifies the collection **in-place** and returns `$this` for chaining — just like Eloquent.
+
+```php
+$users = User::query()->where('active', true)->get();
+
+// map() — returns a new collection, original is unchanged
+$names = $users->map(function ($user) {
+    return $user->name;
+});
+
+// transform() — mutates the collection in-place
+$users->transform(function ($user) {
+    $user->name = strtoupper($user->name);
+    return $user;
+});
+```
+
+### Other Examples
+
+```php
+$users = User::query()->where('role', 'admin')->get();
+
+// Filter
+$active = $users->filter(function ($user) {
+    return $user->active;
+});
+
+// Pluck emails
+$emails = $users->pluck('email');
+
+// Pluck emails keyed by id
+$emailMap = $users->pluck('email', 'id');
+
+// Slice and reverse
+$lastFive = $users->slice(-5)->reverse();
+
+// Check existence
+if ($users->isEmpty()) {
+    // No results
+}
+```
+
+Collections also implement `ArrayAccess`, `Countable`, and `IteratorAggregate`, so you can use them in `foreach` loops, access items by index (`$users[0]`), and pass them to `count()`.
+
 ## Relationships
 
 WPORM supports Eloquent-style relationships. You can define them in your model using the following methods:

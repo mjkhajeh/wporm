@@ -134,6 +134,19 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
     }
 
     /**
+     * Transform each item in the collection using a callback (mutates in-place).
+     * Unlike map(), which returns a new collection, transform() modifies the current collection.
+     *
+     * @param callable $callback
+     * @return $this
+     */
+    public function transform(callable $callback) {
+        $this->items = array_map($callback, $this->items);
+
+        return $this;
+    }
+
+    /**
      * Determine if the collection contains a given value (strict).
      */
     public function contains($value) {
