@@ -137,6 +137,10 @@ abstract class Model implements \ArrayAccess {
 			);
 			$this->fill($attributes);
 			if ($row) {
+				if (array_key_exists($this->primaryKey, $row)) {
+					$this->attributes[$this->primaryKey] = $row[$this->primaryKey];
+					$this->{$this->primaryKey} = $row[$this->primaryKey];
+				}
 				$this->original = $row;
 				$this->exists = true;
 			}
@@ -195,13 +199,31 @@ abstract class Model implements \ArrayAccess {
 
 	public function fill(array $attributes) {
 		foreach ($attributes as $key => $value) {
-			if (
-				(empty($this->fillable) || in_array($key, $this->fillable))
-			) {
+			if ($this->isFillableAttribute($key)) {
 				$this->__set($key, $value);
 			}
 		}
 		return $this;
+	}
+
+	protected function isFillableAttribute($key) {
+		if (in_array($key, $this->fillable, true)) {
+			return true;
+		}
+
+		if ($this->isGuardedAttribute($key)) {
+			return false;
+		}
+
+		return empty($this->fillable);
+	}
+
+	protected function isGuardedAttribute($key) {
+		if (empty($this->guarded)) {
+			return false;
+		}
+
+		return in_array('*', $this->guarded, true) || in_array($key, $this->guarded, true);
 	}
 
 	public function __get($key) {
@@ -233,15 +255,15 @@ abstract class Model implements \ArrayAccess {
 	}
 
 	public function __set($key, $value) {
+		if (!$this->isFillableAttribute($key)) {
+			return;
+		}
+
 		$method = 'set' . Helpers::convert_to_pascal_case($key) . 'Attribute';
 		if (method_exists($this, $method)) {
 			return $this->$method($value);
 		}
-		if (
-			(empty($this->fillable) || in_array($key, $this->fillable))
-		) {
-			$this->attributes[$key] = $this->castSet($key, $value);
-		}
+		$this->attributes[$key] = $this->castSet($key, $value);
 	}
 
 	public function __call($method, $parameters) {
