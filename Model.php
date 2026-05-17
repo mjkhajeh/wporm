@@ -169,11 +169,6 @@ abstract class Model implements \ArrayAccess {
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
 		$table = $this->getTable();
-
-        static $cached_tables = [];
-        if( in_array( $table, $cached_tables ) ) return;
-        $cached_tables[] = $table;
-        
 		if( $wpdb->get_var( "SHOW TABLES LIKE '{$table}'" ) !== $table ) {
 			$charsetCollate = $wpdb->get_charset_collate();
 	
