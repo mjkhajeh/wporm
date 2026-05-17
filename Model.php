@@ -172,6 +172,7 @@ abstract class Model implements \ArrayAccess {
 
         static $cached_tables = [];
         if( in_array( $table, $cached_tables ) ) return;
+        $cached_tables[] = $table;
         
 		if( $wpdb->get_var( "SHOW TABLES LIKE '{$table}'" ) !== $table ) {
 			$charsetCollate = $wpdb->get_charset_collate();
@@ -184,8 +185,6 @@ abstract class Model implements \ArrayAccess {
             if( !empty( $wpdb->last_error ) ) {
                 error_log($wpdb->last_error);
             }
-
-            $cached_tables[] = $table;
 		}
 	}
 
