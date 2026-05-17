@@ -165,6 +165,10 @@ abstract class Model implements \ArrayAccess {
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
 		$table = $this->getTable();
+
+        static $cached_tables = [];
+        if( in_array( $table, $cached_tables ) ) return;
+        
 		if( $wpdb->get_var( "SHOW TABLES LIKE '{$table}'" ) !== $table ) {
 			$charsetCollate = $wpdb->get_charset_collate();
 	
@@ -173,6 +177,11 @@ abstract class Model implements \ArrayAccess {
 ) $charsetCollate;";
 	
 			dbDelta($sql);
+            if( !empty( $wpdb->last_error ) ) {
+                error_log($wpdb->last_error);
+            }
+
+            $cached_tables[] = $table;
 		}
 	}
 
@@ -474,22 +483,22 @@ protected function castSet($key, $value) {
             $rows = [$attributes];
         }
         if ($instance->timestamps) {
-			$now = current_time('mysql');
-            if( !in_array( $instance->createdAtColumn, $columns ) ) {
+            $now = current_time('mysql');
+            if (!in_array($instance->createdAtColumn, $columns)) {
                 $columns[] = $instance->createdAtColumn;
             }
-            if( !in_array( $instance->updatedAtColumn, $columns ) ) {
+            if (!in_array($instance->updatedAtColumn, $columns)) {
                 $columns[] = $instance->updatedAtColumn;
             }
             foreach( $rows as $row_index => $row ) {
                 if( !isset( $rows[$row_index][$instance->createdAtColumn] ) ) {
                     $rows[$row_index][$instance->createdAtColumn] = $now;
                 }
-                if( !isset( $rows[$row_index][$instance->updatedAtColumn] ) ) {
+                if (!isset($rows[$row_index][$instance->updatedAtColumn])) {
                     $rows[$row_index][$instance->updatedAtColumn] = $now;
                 }
             }
-		}
+        }
         $placeholdersRow = '(' . implode(', ', array_fill(0, count($columns), '%s')) . ')';
         $allPlaceholders = implode(', ', array_fill(0, count($rows), $placeholdersRow));
         $allValues = [];
@@ -498,12 +507,11 @@ protected function castSet($key, $value) {
                 $allValues[] = $row[$col] ?? null;
             }
         }
-        $sql = sprintf(
-            'INSERT IGNORE INTO %s (%s) VALUES %s',
-            $table,
-            implode(', ', $columns),
-            $allPlaceholders
-        );
+
+        $quotedColumns = array_map([Helpers::class, 'quoteIdentifier'], $columns);
+
+        $sql = 'INSERT IGNORE INTO ' . $table . ' (' . implode(', ', $quotedColumns) . ') VALUES ' . $allPlaceholders;
+
         global $wpdb;
         $result = $wpdb->query($wpdb->prepare($sql, ...$allValues));
         return $result !== false;
