@@ -1,0 +1,112 @@
+gapcode resume 019d01af-876a-7652-81ab-5cbe253ac54d
+
+ ## 🔴 Critical Bugs (Fix First)
+
+  1. buildCountQuery destroys OR clauses — Uses implode(" AND ", $this->wheres), which converts OR conditions into AND. Queries like ->where('a', 1)->orWhere('b', 2)->count() return wrong
+     results.
+  2. buildDeleteQuery has the same OR bug — Same implode(" AND ") pattern.
+  3. Double soft-delete filtering — get() appends soft-delete WHERE clauses every time it's called. Calling get() twice (or paginate(), which calls count() then get()) produces duplicate
+     deleted_at IS NULL conditions and potentially misaligned bindings.
+  4. HAVING bindings pollute on repeat calls — buildSelectQuery() re-appends HAVING bindings to $this->bindings each call. Using toSql() before get() (or calling get() twice) corrupts
+     bindings.
+  5. __construct fires a DB query when PK is present — new Model(['id' => 5]) silently runs SELECT *. This is an expensive side-effect that makes batch construction slow and behavior
+     surprising.
+  6. Boolean soft-delete delete() writes a timestamp — Model::delete() always sets deletedAtColumn to current_time('mysql') even when $softDeleteType = 'boolean'. Should set 1/true instead.
+  7. where() uses is_callable() instead of instanceof \Closure — Column names matching PHP function names (trim, count, date) are misinterpreted as nested closure groups.
+
+  ———
+
+  ## 🟠 Moderate Issues
+
+  9. whereIn/whereNotIn/whereLike/whereBetween/date methods don't quote column identifiers — where() uses Helpers::quoteIdentifier() but these variants use raw column names, risking breakage
+     with reserved-word column names.
+  10. update() has fragile double-prefix logic — Calls getTable() (already prefixed), then conditionally prepends prefix again. Other methods use $this->table directly.
+  11. belongsTo eagerly resolves — Unlike hasOne/hasMany which return a QueryBuilder, belongsTo() immediately executes the query and returns a model. No lazy loading or query chaining
+     possible.
+  12. DB::table() anonymous model is incomplete — Missing timestamps, softDeletes, fillable, createdAtColumn, updatedAtColumn properties, which causes errors when QueryBuilder methods try to
+     access them.
+  13. insert() sets PK as shadow property — $this->$pk = $wpdb->insert_id bypasses __set(), creating a property that can diverge from $attributes.
+  14. Dual schema systems — Both raw $schema string and up(Blueprint) exist. Constructor calls both, but only $schema actually creates the table. Confusing and error-prone.
+
+  ———
+
+  ## 🟡 Missing Eloquent Features (By Priority)
+
+  ### High Value — Used Frequently
+
+  | # | Feature | Eloquent Equivalent | Impact |
+  |---|---------|-------------------|--------|
+  | 15 | increment() / decrement() | User::where(...)->increment('votes') | Very common for counters |
+  | 16 | sum() / avg() / min() / max() | Order::where('status','paid')->sum('total') | Essential aggregates |
+  | 17 | value() | User::where('id',1)->value('email') | Single column, single row |
+  | 18 | pluck() | User::pluck('email', 'id') | Column extraction |
+  | 19 | exists() / doesntExist() | User::where('email',$e)->exists() | Boolean existence check |
+  | 20 | selectRaw() / whereRaw() / havingRaw() | Raw SQL expressions | Only orderByRaw() exists |
+  | 21 | chunk() / each() | Process large datasets in batches | Memory management |
+  | 22 | toJson() on Model | $user->toJson() | Serialization |
+  | 23 | $hidden property | Hide attributes from toArray()/toJson() | API security (passwords etc.) |
+  | 24 | findOrFail() / firstOrFail() | Throw exception on not found | Cleaner error handling |
+  | 25 | create() static method | User::create([...]) | One-line insert + return model |
+
+  ### Medium Value — Common Patterns
+
+  | # | Feature | Notes |
+  |---|---------|-------|
+  | 26 | Polymorphic relationships (morphOne/morphMany/morphTo) | Comments on posts, pages, etc. |
+  | 27 | subquery support in select() / where() / from() | Subselects, derived tables |
+  | 28 | union() / unionAll() | Combining query results |
+  | 29 | fromSub() / from() | Query from subquery or change table |
+  | 30 | tap() / pipe() on QueryBuilder | Functional chaining |
+  | 31 | withCount() | User::withCount('posts')->get() — adds posts_count |
+  | 32 | withSum() / withAvg() / withMin() / withMax() | Aggregate sub-selects |
+  | 33 | Observer / Event dispatcher system | Beyond hardcoded method hooks |
+  | 34 | $dispatchesEvents property | Map events to classes |
+  | 35 | replicate() | Clone a model without PK |
+  | 36 | fresh() / refresh() | Re-fetch model from DB |
+  | 37 | wasRecentlyCreated property | Know if model was just inserted |
+  | 38 | Lazy collections / cursor() | Generator-based for huge datasets |
+
+  ### Lower Value — Nice to Have
+
+  | # | Feature | Notes |
+  |---|---------|-------|
+  | 39 | Collection enrichment | Missing: each, reduce, flatMap, sortBy, groupBy, keyBy, unique, values, keys, sum, avg, min, max, chunk, diff, intersect, merge, push, pull, put, toJson,
+  implode, when, unless, firstWhere, mapToGroups |
+  | 40 | Query scopes as classes | ScopeInterface instead of just scope*() methods |
+  | 41 | Prunable / MassPrunable traits | Auto-cleanup old records |
+  | 42 | $touches property | Auto-update parent timestamps |
+  | 43 | Pivot model customization | withPivot(), withTimestamps(), custom pivot class |
+  | 44 | hasOneThrough | Single record through intermediate |
+  | 45 | hasOneOfMany | Latest/oldest/specific related record |
+  | 46 | Database transactions with DB::transaction(closure) | Cleaner than begin/commit/rollBack |
+  | 47 | Query logging / DB::listen() | Debug & profiling |
+  | 48 | CURRENT_TIMESTAMP default handling in ColumnDefinition | Currently wraps it in quotes as a string |
+  | 49 | SchemaBuilder::create() wrapping | Currently doesn't wrap column SQL in CREATE TABLE ... () |
+
+  ———
+
+  ## 🔵 Code Quality Improvements
+
+  | # | Issue | Recommendation |
+  |---|-------|---------------|
+  | 50 | OR-handling logic is duplicated across buildSelectQuery, buildCountQuery, buildDeleteQuery, update(), restore() | Extract a buildWhereClause() helper |
+  | 51 | Table name resolution differs per method ($this->table vs getTable() vs manual prefix) | Standardize to one approach |
+  | 52 | Helpers::convert_to_pascal_case is over-engineered | Simplify to str_replace(' ', '', ucwords(str_replace(['_', '-'], ' ', $input))) |
+  | 53 | No interfaces / contracts | Add ModelInterface, QueryBuilderInterface for testability |
+  | 54 | No type hints on method params/returns | PHP 7.4+ type declarations would improve DX and catch bugs |
+  | 57 | No Stringable support on Collection | Can't echo a collection |
+
+  1. Fix the 8 critical bugs — These cause wrong query results and data corruption
+  2. Add $guarded enforcement + $hidden — Security essentials
+  3. Add increment/decrement/sum/avg/min/max/value/pluck/exists — Highest-use missing features
+  4. Extract buildWhereClause() helper — Fixes OR bugs everywhere at once
+  5. Add selectRaw/whereRaw/havingRaw — Completes the raw SQL story
+  6. Add create()/findOrFail()/toJson()/$hidden — Common Eloquent patterns
+  7. Enrich Collection — Bring it closer to Eloquent's rich collection API
+
+Other works need to be done:
+  - Extracted the correct OR-aware WHERE logic into a single reusable method
+  - Iterates $this->wheres, preserving OR prefixes and defaulting to AND
+  - Quotes dot-notation identifiers (table.column) automatically
+  - buildDeleteQuery() — same bug fix — identical broken pattern replaced
+  - update() — replaced 14 lines of duplicated OR-handling logic
