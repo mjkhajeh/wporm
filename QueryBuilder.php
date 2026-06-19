@@ -1430,12 +1430,7 @@ class QueryBuilder {
             $set[] = Helpers::quoteIdentifier($col) . ' = %s';
             $bindings[] = $val;
         }
-        // Use wpdb prefix for table name
-        $tableName = method_exists($this->model, 'getTable') ? $this->model->getTable() : $this->table;
-        if (isset($this->wpdb->prefix) && strpos($tableName, $this->wpdb->prefix) !== 0) {
-            $tableName = $this->wpdb->prefix . ltrim($tableName, '_');
-        }
-    $sql = 'UPDATE ' . Helpers::quoteIdentifier($tableName) . ' SET ' . implode(', ', $set);
+        $sql = 'UPDATE ' . Helpers::quoteIdentifier($this->table) . ' SET ' . implode(', ', $set);
         $where = $this->buildWhereClause();
         if (!empty($where)) {
             $sql .= ' WHERE ' . $where;
