@@ -8,7 +8,7 @@ gapcode resume 019d01af-876a-7652-81ab-5cbe253ac54d
   ✅ 1. HAVING bindings pollute on repeat calls — buildSelectQuery() re-appends HAVING bindings to $this->bindings each call. Using toSql() before get() (or calling get() twice) corrupts bindings.
   ✅ 2. __construct fires a DB query when PK is present — new Model(['id' => 5]) silently runs SELECT *. This is an expensive side-effect that makes batch construction slow and behavior surprising.
   ✅ 1. Boolean soft-delete delete() writes a timestamp — Model::delete() always sets deletedAtColumn to current_time('mysql') even when $softDeleteType = 'boolean'. Should set 1/true instead.
-  2. where() uses is_callable() instead of instanceof \Closure — Column names matching PHP function names (trim, count, date) are misinterpreted as nested closure groups.
+  ✅ 2. where() uses is_callable() instead of instanceof \Closure — Column names matching PHP function names (trim, count, date) are misinterpreted as nested closure groups.
 
   ———
 

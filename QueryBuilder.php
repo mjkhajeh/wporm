@@ -75,7 +75,7 @@ class QueryBuilder {
             }
             return $this;
         }
-        if (is_callable($column)) {
+        if ($column instanceof \Closure) {
             // Nested group: build SQL preserving explicit OR prefixes
             $nested = new self($this->model);
             $column($nested);
@@ -129,7 +129,7 @@ class QueryBuilder {
     }
 
     public function orWhere($column, $operator = null, $value = null) {
-        if (is_callable($column)) {
+        if ($column instanceof \Closure) {
             $nested = new self($this->model);
             $column($nested);
             $group = $nested->wheres;
@@ -904,7 +904,7 @@ class QueryBuilder {
      * Usage: ->join('table', 'table.col', '=', 'other.col')
      */
     public function join($table, $first = null, $operator = null, $second = null, $type = 'INNER') {
-        if (is_callable($first)) {
+        if ($first instanceof \Closure) {
             // Support closure for advanced join conditions
             $join = new static($this->model);
             $first($join);
