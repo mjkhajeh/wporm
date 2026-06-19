@@ -5,25 +5,21 @@ gapcode resume 019d01af-876a-7652-81ab-5cbe253ac54d
   ✅ 1. buildCountQuery destroys OR clauses — Uses implode(" AND ", $this->wheres), which converts OR conditions into AND. Queries like ->where('a', 1)->orWhere('b', 2)->count() return wrong results.
   ✅ 2. buildDeleteQuery has the same OR bug — Same implode(" AND ") pattern.
   ✅ 3. Double soft-delete filtering — get() appends soft-delete WHERE clauses every time it's called. Calling get() twice (or paginate(), which calls count() then get()) produces duplicate deleted_at IS NULL conditions and potentially misaligned bindings.
-  1. HAVING bindings pollute on repeat calls — buildSelectQuery() re-appends HAVING bindings to $this->bindings each call. Using toSql() before get() (or calling get() twice) corrupts bindings.
-  2. __construct fires a DB query when PK is present — new Model(['id' => 5]) silently runs SELECT *. This is an expensive side-effect that makes batch construction slow and behavior
-     surprising.
-  3. Boolean soft-delete delete() writes a timestamp — Model::delete() always sets deletedAtColumn to current_time('mysql') even when $softDeleteType = 'boolean'. Should set 1/true instead.
-  4. where() uses is_callable() instead of instanceof \Closure — Column names matching PHP function names (trim, count, date) are misinterpreted as nested closure groups.
+  ✅ 1. HAVING bindings pollute on repeat calls — buildSelectQuery() re-appends HAVING bindings to $this->bindings each call. Using toSql() before get() (or calling get() twice) corrupts bindings.
+  ✅ 2. __construct fires a DB query when PK is present — new Model(['id' => 5]) silently runs SELECT *. This is an expensive side-effect that makes batch construction slow and behavior surprising.
+  ✅ 1. Boolean soft-delete delete() writes a timestamp — Model::delete() always sets deletedAtColumn to current_time('mysql') even when $softDeleteType = 'boolean'. Should set 1/true instead.
+  2. where() uses is_callable() instead of instanceof \Closure — Column names matching PHP function names (trim, count, date) are misinterpreted as nested closure groups.
 
   ———
 
   ## 🟠 Moderate Issues
 
-  9. whereIn/whereNotIn/whereLike/whereBetween/date methods don't quote column identifiers — where() uses Helpers::quoteIdentifier() but these variants use raw column names, risking breakage
-     with reserved-word column names.
-  10. update() has fragile double-prefix logic — Calls getTable() (already prefixed), then conditionally prepends prefix again. Other methods use $this->table directly.
-  11. belongsTo eagerly resolves — Unlike hasOne/hasMany which return a QueryBuilder, belongsTo() immediately executes the query and returns a model. No lazy loading or query chaining
-     possible.
-  12. DB::table() anonymous model is incomplete — Missing timestamps, softDeletes, fillable, createdAtColumn, updatedAtColumn properties, which causes errors when QueryBuilder methods try to
-     access them.
-  13. insert() sets PK as shadow property — $this->$pk = $wpdb->insert_id bypasses __set(), creating a property that can diverge from $attributes.
-  14. Dual schema systems — Both raw $schema string and up(Blueprint) exist. Constructor calls both, but only $schema actually creates the table. Confusing and error-prone.
+  9. whereIn/whereNotIn/whereLike/whereBetween/date methods don't quote column identifiers — where() uses Helpers::quoteIdentifier() but these variants use raw column names, risking breakage with reserved-word column names.
+  1.  update() has fragile double-prefix logic — Calls getTable() (already prefixed), then conditionally prepends prefix again. Other methods use $this->table directly.
+  2.  belongsTo eagerly resolves — Unlike hasOne/hasMany which return a QueryBuilder, belongsTo() immediately executes the query and returns a model. No lazy loading or query chaining possible.
+  3.  DB::table() anonymous model is incomplete — Missing timestamps, softDeletes, fillable, createdAtColumn, updatedAtColumn properties, which causes errors when QueryBuilder methods try to access them.
+  4.  insert() sets PK as shadow property — $this->$pk = $wpdb->insert_id bypasses __set(), creating a property that can diverge from $attributes.
+  5.  Dual schema systems — Both raw $schema string and up(Blueprint) exist. Constructor calls both, but only $schema actually creates the table. Confusing and error-prone.
 
   ———
 
