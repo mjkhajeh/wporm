@@ -579,7 +579,7 @@ class QueryBuilder {
     }
 
     public function orderBy($column, $direction = 'asc') {
-    $this->orders[] = Helpers::quoteIdentifier($column) . ' ' . $direction;
+      $this->orders[] = Helpers::quoteIdentifier($column) . ' ' . $direction;
         return $this;
     }
 
