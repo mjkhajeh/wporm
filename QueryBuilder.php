@@ -720,13 +720,14 @@ class QueryBuilder {
     public function get() {
         $this->applySoftDeleteScope();
         $sql = $this->buildSelectQuery();
-        if (!empty($this->bindings)) {
-            $sql = $this->wpdb->prepare($sql, ...$this->bindings);
+        $bindings = $this->getBindings();
+        if (!empty($bindings)) {
+            $sql = $this->wpdb->prepare($sql, ...$bindings);
         }
         // If bindings are empty, do not call prepare
         if ($this->debug) {
             error_log('[WPORM][get] SQL: ' . $sql);
-            error_log('[WPORM][get] Bindings: ' . print_r($this->bindings, true));
+            error_log('[WPORM][get] Bindings: ' . print_r($bindings, true));
         }
         $results = $this->wpdb->get_results($sql, ARRAY_A);
         if (!$results) return new \MJ\WPORM\Collection([]);
@@ -1040,7 +1041,30 @@ class QueryBuilder {
      * Return the current bindings array (for debugging).
      */
     public function getBindings() {
-        return $this->bindings;
+        return array_merge($this->bindings, $this->getSelectExtraBindings());
+    }
+
+    /**
+     * Return bindings used by SELECT-only clauses that are stored outside the main WHERE bindings.
+     */
+    protected function getSelectExtraBindings() {
+        $bindings = [];
+
+        foreach ($this->havings as [$expr, $values]) {
+            foreach ($values as $value) {
+                $bindings[] = $value;
+            }
+        }
+
+        foreach ($this->orders as $order) {
+            if (is_array($order) && isset($order['raw']) && !empty($order['bindings'])) {
+                foreach ($order['bindings'] as $value) {
+                    $bindings[] = $value;
+                }
+            }
+        }
+
+        return $bindings;
     }
 
     /**
@@ -1188,9 +1212,6 @@ class QueryBuilder {
                     return Helpers::quoteIdentifier($m[1]);
                 }, $expr);
                 $havingParts[] = $expr;
-                foreach ($vals as $v) {
-                    $this->bindings[] = $v;
-                }
             }
             $sql .= " HAVING " . implode(' AND ', $havingParts);
         }
@@ -1200,11 +1221,6 @@ class QueryBuilder {
                 // Support raw order entries with bindings
                 if (is_array($order) && isset($order['raw'])) {
                     $orderParts[] = $order['raw'];
-                    if (!empty($order['bindings'])) {
-                        foreach ($order['bindings'] as $b) {
-                            $this->bindings[] = $b;
-                        }
-                    }
                     continue;
                 }
                 // Split by space to get column and direction

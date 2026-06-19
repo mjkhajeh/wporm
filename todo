@@ -2,17 +2,14 @@ gapcode resume 019d01af-876a-7652-81ab-5cbe253ac54d
 
  ## 🔴 Critical Bugs (Fix First)
 
-  ✅ 1. buildCountQuery destroys OR clauses — Uses implode(" AND ", $this->wheres), which converts OR conditions into AND. Queries like ->where('a', 1)->orWhere('b', 2)->count() return wrong
-     results.
+  ✅ 1. buildCountQuery destroys OR clauses — Uses implode(" AND ", $this->wheres), which converts OR conditions into AND. Queries like ->where('a', 1)->orWhere('b', 2)->count() return wrong results.
   ✅ 2. buildDeleteQuery has the same OR bug — Same implode(" AND ") pattern.
-  3. Double soft-delete filtering — get() appends soft-delete WHERE clauses every time it's called. Calling get() twice (or paginate(), which calls count() then get()) produces duplicate
-     deleted_at IS NULL conditions and potentially misaligned bindings.
-  4. HAVING bindings pollute on repeat calls — buildSelectQuery() re-appends HAVING bindings to $this->bindings each call. Using toSql() before get() (or calling get() twice) corrupts
-     bindings.
-  5. __construct fires a DB query when PK is present — new Model(['id' => 5]) silently runs SELECT *. This is an expensive side-effect that makes batch construction slow and behavior
+  ✅ 3. Double soft-delete filtering — get() appends soft-delete WHERE clauses every time it's called. Calling get() twice (or paginate(), which calls count() then get()) produces duplicate deleted_at IS NULL conditions and potentially misaligned bindings.
+  1. HAVING bindings pollute on repeat calls — buildSelectQuery() re-appends HAVING bindings to $this->bindings each call. Using toSql() before get() (or calling get() twice) corrupts bindings.
+  2. __construct fires a DB query when PK is present — new Model(['id' => 5]) silently runs SELECT *. This is an expensive side-effect that makes batch construction slow and behavior
      surprising.
-  6. Boolean soft-delete delete() writes a timestamp — Model::delete() always sets deletedAtColumn to current_time('mysql') even when $softDeleteType = 'boolean'. Should set 1/true instead.
-  7. where() uses is_callable() instead of instanceof \Closure — Column names matching PHP function names (trim, count, date) are misinterpreted as nested closure groups.
+  3. Boolean soft-delete delete() writes a timestamp — Model::delete() always sets deletedAtColumn to current_time('mysql') even when $softDeleteType = 'boolean'. Should set 1/true instead.
+  4. where() uses is_callable() instead of instanceof \Closure — Column names matching PHP function names (trim, count, date) are misinterpreted as nested closure groups.
 
   ———
 
