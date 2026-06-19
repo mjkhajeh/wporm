@@ -14,7 +14,14 @@ class DB {
             public $table;
             public $primaryKey = 'id';
             public $casts = [];
-            public function __construct() {}
+            public $timestamps = false;
+            public $softDeletes = false;
+            public $softDeleteType = 'timestamp';
+            public $deletedAtColumn = 'deleted_at';
+            public $fillable = [];
+            public $createdAtColumn = 'created_at';
+            public $updatedAtColumn = 'updated_at';
+
             public function getTable() { return $this->table; }
         };
         $model->table = $table;
