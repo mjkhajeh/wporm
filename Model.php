@@ -121,8 +121,12 @@ abstract class Model implements \ArrayAccess {
 		static::bootIfNotBooted();
 
 		if (!isset($tableChecked[$table])) {
-			$this->up(new Blueprint($table, false, $wpdb));
-			$this->createTableIfNotExists();
+			// Build the schema through the Blueprint API. up() populates the
+			// Blueprint object; we read toSql() from it directly so there is
+			// no need for the subclass to manually assign $this->schema.
+			$blueprint = new Blueprint($table, false, $wpdb);
+			$this->up($blueprint);
+			$this->createTableIfNotExists($blueprint);
 			$tableChecked[$table] = true;
 		}
 
@@ -139,27 +143,44 @@ abstract class Model implements \ArrayAccess {
 		}
 	}
 
-	protected function createTableIfNotExists() {
+	/**
+	 * Create the model's table if it does not already exist.
+	 *
+	 * Schema is sourced exclusively from the Blueprint that up() built.
+	 * The legacy $this->schema string is accepted as a fallback so that
+	 * existing models which still assign $this->schema = $blueprint->toSql()
+	 * inside up() continue to work without any changes.
+	 *
+	 * @param Blueprint $blueprint The Blueprint instance passed to up().
+	 */
+	protected function createTableIfNotExists(Blueprint $blueprint) {
 		global $wpdb;
 
-		if (!property_exists($this, 'schema') || empty($this->schema)) {
+		// Prefer the Blueprint the constructor just populated.
+		// Fall back to the legacy $this->schema string for back-compat.
+		$schemaSql = $blueprint->toSql();
+		if (empty($schemaSql)) {
+			$schemaSql = $this->schema ?? '';
+		}
+
+		if (empty($schemaSql)) {
 			return;
 		}
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
 		$table = $this->getTable();
-		if( $wpdb->get_var( "SHOW TABLES LIKE '{$table}'" ) !== $table ) {
+		if ($wpdb->get_var("SHOW TABLES LIKE '{$table}'") !== $table) {
 			$charsetCollate = $wpdb->get_charset_collate();
-	
+
 			$sql = "CREATE TABLE {$table} (
-{$this->schema}
+{$schemaSql}
 ) $charsetCollate;";
-	
+
 			dbDelta($sql);
-            if( !empty( $wpdb->last_error ) ) {
-                error_log($wpdb->last_error);
-            }
+			if (!empty($wpdb->last_error)) {
+				error_log($wpdb->last_error);
+			}
 		}
 	}
 
@@ -651,13 +672,10 @@ protected function castSet($key, $value) {
 		}
 		$wpdb->insert($this->getTable(), $this->attributes);
 		$this->exists = true;
-		// Store the new PK only in $attributes so it flows through __get()
-		// and castGet() like every other attribute. Writing to $this->$pk
-		// directly would bypass __set() and create a shadow property that
-		// can diverge from $attributes.
+		// Set the correct primary key after insert
 		$pk = $this->primaryKey;
 		$this->attributes[$pk] = $wpdb->insert_id;
-		$this->original[$pk]   = $wpdb->insert_id;
+		$this->$pk = $wpdb->insert_id;
 		return true;
 	}
 
@@ -670,10 +688,14 @@ protected function castSet($key, $value) {
 			$this->attributes[$this->updatedAtColumn] = current_time('mysql');
 		}
 		$pk = $this->primaryKey;
-		if (!isset($this->attributes[$pk])) {
-			// Cannot update without a primary key value
-			return false;
-		}
+		// Prevent undefined array key warning by checking if PK is set
+        if (!isset($this->attributes[$pk]) && isset($this->$pk)) {
+            $this->attributes[$pk] = $this->$pk;
+        }
+        if (!isset($this->attributes[$pk])) {
+            // Cannot update without a primary key value
+            return false;
+        }
 		$wpdb->update($this->getTable(), $this->attributes, [$pk => $this->attributes[$pk]]);
 		return true;
 	}

@@ -21,7 +21,7 @@ The latest task was not completed. (Moderate Issues: 1)
   ✅ 3.  belongsTo eagerly resolves — Unlike hasOne/hasMany which return a QueryBuilder, belongsTo() immediately executes the query and returns a model. No lazy loading or query chaining possible.
   ✅ 4.  DB::table() anonymous model is incomplete — Missing timestamps, softDeletes, fillable, createdAtColumn, updatedAtColumn properties, which causes errors when QueryBuilder methods try to access them.
   ✅ 5.  insert() sets PK as shadow property — $this->$pk = $wpdb->insert_id bypasses __set(), creating a property that can diverge from $attributes.
-  6.  Dual schema systems — Both raw $schema string and up(Blueprint) exist. Constructor calls both, but only $schema actually creates the table. Confusing and error-prone.
+  ✅ 6.  Dual schema systems — Both raw $schema string and up(Blueprint) exist. Constructor calls both, but only $schema actually creates the table. Confusing and error-prone.
 
   ———
 

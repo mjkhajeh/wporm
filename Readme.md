@@ -68,10 +68,11 @@ class Parts extends Model {
         $blueprint->integer('product_id');
         $blueprint->integer('qty');
         $blueprint->index('product_id');
-        $this->schema = $blueprint->toSql();
     }
 }
 ```
+
+> **Note:** Just build your columns on the `$blueprint` passed into `up()` — WPORM reads the schema directly from it via `$blueprint->toSql()`. You do **not** need to (and should not) manually assign `$this->schema` anymore; `up(Blueprint $blueprint)` is now the single source of truth for table schema.
 
 > **Note:** When using `$table` in custom SQL queries, do **not** manually add the WordPress prefix (e.g., `$wpdb->prefix`). The ORM automatically handles table prefixing. Use `$table = (new User)->getTable();` as shown in the next, which returns the fully-prefixed table name.
 
@@ -495,6 +496,7 @@ WPORM supports Eloquent-style relationships. You can define them in your model u
       return $this->belongsTo(User::class, 'user_id');
   }
   ```
+  > `belongsTo()` returns a `QueryBuilder` (just like `hasOne`/`hasMany`), so it is lazy and chainable: `$comment->belongsTo(User::class, 'user_id')->where('active', 1)->first()`. Accessing it as a property (`$comment->user`) automatically resolves it to a single model via `first()`.
 - **belongsToMany**: Many-to-many (with optional pivot table and keys)
   ```php
   public function roles() {
@@ -508,7 +510,7 @@ WPORM supports Eloquent-style relationships. You can define them in your model u
   }
   ```
 
-All relationship methods return either a model instance or a `Collection` of models. You can use them just like in Eloquent.
+All relationship methods (`hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`) return a lazy, chainable `QueryBuilder` when called directly — e.g. `$user->posts()->where('published', 1)->get()`. When accessed as a property instead (e.g. `$user->posts`, `$comment->user`), WPORM automatically resolves the query for you: `hasOne`/`belongsTo`-style relations resolve to a single model (or `null`), and `hasMany`/`belongsToMany`/`hasManyThrough`-style relations resolve to a `Collection`.
 
 ### Relationship Existence Filtering: whereHas, orWhereHas, has
 
@@ -651,6 +653,8 @@ $parts = Parts::query()
     ->get();
 ```
 > Note: For very advanced SQL, you can always use `$wpdb` directly.
+>
+> Note: `where()`/`orWhere()` detect nested groups via `instanceof \Closure`, so column names that happen to match PHP function names (e.g. `trim`, `count`, `date`) are treated as plain column names, not as closures — `->where('count', 5)` works exactly as expected.
 > 
 You can also use `$wpdb` directly for complex SQL logic:
 
@@ -703,7 +707,6 @@ class Article extends Model {
         $table->text('content');
         $table->timestamp('created_on');
         $table->timestamp('changed_on');
-        $this->schema = $table->toSql();
     }
 }
 ```
@@ -726,7 +729,6 @@ class LogEntry extends Model {
     public function up(Blueprint $table) {
         $table->id();
         $table->string('message');
-        $this->schema = $table->toSql();
     }
 }
 ```
@@ -919,7 +921,9 @@ This method is available on both the query builder and as a static method on mod
 
 - **Table Prefixing:** Always use `$table = (new ModelName)->getTable();` to get the correct, prefixed table name for custom SQL. Do not manually prepend `$wpdb->prefix`.
 - **Model Booting:** If you add static boot methods or global scopes, ensure you call them before querying if not using the model's constructor.
-- **Schema Changes:** If you change your model's `up()` schema, you may need to drop and recreate the table or use the `SchemaBuilder`'s `table()` method for migrations.
+- **Schema Changes:** Your model's `up(Blueprint $blueprint)` method is the single source of truth for the table schema — WPORM reads it via `$blueprint->toSql()` automatically, so you no longer need to assign `$this->schema` yourself. If you change `up()`, you may need to drop and recreate the table or use the `SchemaBuilder`'s `table()` method for migrations.
+- **Reusing a Query Builder:** It's safe to call `toSql()`, `count()`, `get()`, etc. multiple times (or in combination, as `paginate()` does internally) on the same query instance — soft-delete constraints and HAVING bindings are only applied once per instance and won't duplicate or misalign bindings on repeat calls.
+- **Constructing Models:** `new Model(['id' => 5])` (or any attributes) only fills the model's attributes in memory — it does **not** query the database. Use `Model::find($id)` to load an existing record.
 - **Events:** You can add `creating`, `updating`, and `deleting` methods to your models for event hooks.
 - **Extending Casts:** Implement `MJ\WPORM\Casts\CastableInterface` for custom attribute casting logic.
 - **Testing:** Always test your queries and schema changes on a staging environment before deploying to production.
@@ -931,14 +935,6 @@ Contributions, bug reports, and feature requests are welcome! Please open an iss
 ## Credits
 
 WPORM is inspired by Laravel's Eloquent ORM and adapted for the WordPress ecosystem.
-
----
-
-## Version
-
-- **Current Version:** 1.0.0
-- **Changelog:**
-  - Initial release with full Eloquent-style ORM features for WordPress.
 
 ## Security Note
 
@@ -956,7 +952,7 @@ WPORM is inspired by Laravel's Eloquent ORM and adapted for the WordPress ecosys
 ## FAQ
 
 **Q: Why is my table not created?**
-- A: Ensure your model's `up()` method is correct and that you call the schema builder. Check for errors in your SQL or schema definition.
+- A: Ensure your model's `up(Blueprint $blueprint)` method correctly builds the columns on the `$blueprint` argument (WPORM reads the schema from it automatically). Check for errors in your column definitions, and check `$wpdb->last_error` for SQL errors.
 
 **Q: How do I debug a failed query?**
 - A: Use `$wpdb->last_query` and `$wpdb->last_error` after running a query to inspect the last executed SQL and any errors.
