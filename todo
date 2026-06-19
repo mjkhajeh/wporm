@@ -39,7 +39,7 @@ The latest task was not completed. (Moderate Issues: 1)
   | 20 | selectRaw() / whereRaw() / havingRaw() | Raw SQL expressions | Only orderByRaw() exists |
   | 21 | chunk() / each() | Process large datasets in batches | Memory management |
   | 22 | toJson() on Model | $user->toJson() | Serialization |
-  | 23 | $hidden property | Hide attributes from toArray()/toJson() | API security (passwords etc.) |
+  | ✅ 23 | $hidden property | Hide attributes from toArray()/toJson() | API security (passwords etc.) |
   | 24 | findOrFail() / firstOrFail() | Throw exception on not found | Cleaner error handling |
   | 25 | create() static method | User::create([...]) | One-line insert + return model |
 
@@ -92,7 +92,7 @@ The latest task was not completed. (Moderate Issues: 1)
   | 57 | No Stringable support on Collection | Can't echo a collection |
 
   1. Fix the 8 critical bugs — These cause wrong query results and data corruption
-  2. Add $guarded enforcement + $hidden — Security essentials
+  ✅ 2. Add $guarded enforcement + $hidden — Security essentials
   3. Add increment/decrement/sum/avg/min/max/value/pluck/exists — Highest-use missing features
   4. Extract buildWhereClause() helper — Fixes OR bugs everywhere at once
   5. Add selectRaw/whereRaw/havingRaw — Completes the raw SQL story
@@ -105,3 +105,12 @@ Other works need to be done:
   - Quotes dot-notation identifiers (table.column) automatically
   - buildDeleteQuery() — same bug fix — identical broken pattern replaced
   - update() — replaced 14 lines of duplicated OR-handling logic
+  - $guarded enforcement confirmed: fill()/__set()/offsetSet() (and therefore
+    updateOrCreate/firstOrCreate/firstOrNew/new Model([...])) all route through
+    isFillableAttribute()/isGuardedAttribute(), so mass assignment already
+    respects $guarded. newFromBuilder() intentionally bypasses it since it
+    hydrates trusted data straight from the database.
+  - Added $hidden (and $visible) support to Model: new $hidden/$visible
+    properties, toArray()/toJson() now filter through applyVisibility(),
+    plus getHidden()/setHidden()/getVisible()/setVisible()/makeHidden()/
+    makeVisible() helpers (Eloquent-style). Collection::toJson() added too.

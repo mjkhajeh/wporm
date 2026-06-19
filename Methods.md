@@ -12,6 +12,8 @@ This document describes all public and static methods of the `MJ\WPORM\Model` cl
 - [Persistence Methods](#persistence-methods)
 - [Relationship Methods](#relationship-methods)
 - [Utility Methods](#utility-methods)
+- [Mass Assignment Protection](#mass-assignment-protection)
+- [Hidden & Visible Attributes](#hidden--visible-attributes)
 - [JSON Where Clauses](#json-where-clauses)
 - [Raw Table Queries with DB::table()](#raw-table-queries-with-dbtable)
 - [Pagination](#pagination)
@@ -881,11 +883,23 @@ $user->fill(['name' => 'Baz']);
 - Converts a model or collection to an array, applying all casts.
 - Built-in types (int, bool, float, json, etc.) are handled natively.
 - Custom cast classes must implement `MJ\WPORM\Casts\CastableInterface`.
+- Respects `$hidden`/`$visible` (and any runtime `makeHidden()`/`makeVisible()` overrides) — see [Hidden & Visible Attributes](#hidden--visible-attributes) below.
 
 **Example:**
 ```php
 $array = $user->toArray();
 ```
+
+### toJson($options = 0)
+**Description:** Convert the model to a JSON string. Internally calls `toArray()`, so it respects `$hidden`/`$visible` the same way. `$options` is passed straight through to `json_encode()` (e.g. `JSON_PRETTY_PRINT`).
+
+**Example:**
+```php
+$json = $user->toJson();
+$pretty = $user->toJson(JSON_PRETTY_PRINT);
+```
+
+> `Collection` also has a `toJson()` method that JSON-encodes the result of `Collection::toArray()`, so hidden attributes stay hidden for lists of models too.
 
 ### getOriginal($key = null)
 **Description:** Get the original value(s) of the model's attributes.
@@ -910,6 +924,124 @@ if ($user->isDirty('name')) { /* ... */ }
 ```php
 $changes = $user->getChanges();
 ```
+
+---
+
+## Mass Assignment Protection
+
+WPORM guards against unintended mass assignment, just like Eloquent, via `$fillable` and `$guarded` on the model. These are enforced by `isFillableAttribute()` for **every** mass-assignment path: `fill()`, `__set()` (and therefore array access like `$user['name'] = ...`), `new Model([...])`, `updateOrCreate()`, `firstOrCreate()`, and `firstOrNew()`.
+
+### $fillable
+**Description:** A whitelist of attribute names that may be mass-assigned. If `$fillable` is non-empty, only the listed keys can be set via `fill()`/constructor/`__set()`; everything else is silently ignored.
+
+**Example:**
+```php
+class User extends Model {
+    protected $fillable = ['name', 'email'];
+}
+
+$user = new User(['name' => 'Jane', 'email' => 'jane@example.com', 'is_admin' => true]);
+$user->is_admin; // null — 'is_admin' was not in $fillable, so it was never set
+```
+
+### $guarded
+**Description:** A blacklist of attribute names that may **not** be mass-assigned (default: `['id']`). Use `['*']` to block all mass assignment (in which case attributes must be set individually, e.g. `$user->name = 'Jane';`). `$guarded` is only consulted when `$fillable` is empty.
+
+**Example:**
+```php
+class User extends Model {
+    protected $guarded = ['id', 'is_admin']; // everything else is mass-assignable
+}
+
+$user = new User(['name' => 'Jane', 'is_admin' => true]);
+$user->is_admin; // null — 'is_admin' is guarded
+
+// Block all mass assignment:
+class StrictUser extends Model {
+    protected $guarded = ['*'];
+}
+$user = new StrictUser(['name' => 'Jane']); // 'name' is silently ignored
+$user->name = 'Jane'; // works fine — direct property assignment still bypasses $guarded by design only for explicit single-attribute sets
+```
+
+**Notes:**
+- `newFromBuilder()` — used internally to hydrate models from query results — intentionally bypasses `$fillable`/`$guarded`, since it's populating attributes from trusted data already in the database, not from user input.
+- For protecting attributes from being **read** out in API responses (rather than written via mass assignment), see `$hidden`/`$visible` below.
+
+---
+
+## Hidden & Visible Attributes
+
+WPORM supports Eloquent-style `$hidden` and `$visible` properties on models to control which attributes appear in `toArray()` / `toJson()` output. This is the standard way to keep sensitive columns (passwords, tokens, API secrets, etc.) out of API responses and logs.
+
+### $hidden
+**Description:** An array of attribute names to exclude from `toArray()`/`toJson()` output. Hidden attributes are still fully readable/writable on the model (`$user->password` still works) — they're only stripped from the serialized array/JSON representation.
+
+**Example:**
+```php
+class User extends Model {
+    protected $fillable = ['name', 'email', 'password'];
+    protected $hidden = ['password', 'remember_token'];
+}
+
+$user = User::find(1);
+$user->toArray(); // 'password' and 'remember_token' are NOT present
+```
+
+### $visible
+**Description:** An allow-list of attribute names to include in `toArray()`/`toJson()` output. When `$visible` is non-empty, only those keys (and any of them not also listed in `$hidden`) are kept; everything else is dropped. If both `$visible` and `$hidden` are set, `$visible` is applied first, then `$hidden` removes from what remains.
+
+**Example:**
+```php
+class User extends Model {
+    protected $visible = ['id', 'name', 'email'];
+}
+
+$user = User::find(1);
+$user->toArray(); // only id, name, email are present, everything else is dropped
+```
+
+### getHidden() / setHidden(array $hidden)
+**Description:** Get or replace the model's `$hidden` list at runtime.
+
+**Example:**
+```php
+$user->setHidden(['password']);
+$hiddenKeys = $user->getHidden();
+```
+
+### getVisible() / setVisible(array $visible)
+**Description:** Get or replace the model's `$visible` allow-list at runtime.
+
+**Example:**
+```php
+$user->setVisible(['id', 'name']);
+$visibleKeys = $user->getVisible();
+```
+
+### makeHidden($attributes)
+**Description:** Hide one or more additional attributes on this instance only, without modifying the model's `$hidden` property. Accepts a string, multiple string arguments, or an array. Returns `$this` for chaining.
+
+**Example:**
+```php
+$user = User::find(1);
+$user->makeHidden('email')->toArray(); // 'email' is now hidden too, just for this instance
+$user->makeHidden(['email', 'phone']);
+```
+
+### makeVisible($attributes)
+**Description:** Reveal one or more attributes on this instance only, even if they're listed in `$hidden`. Accepts a string, multiple string arguments, or an array. Returns `$this` for chaining.
+
+**Example:**
+```php
+$user = User::find(1); // $hidden = ['password']
+$user->makeVisible('password')->toArray(); // 'password' is included this time
+```
+
+**Notes:**
+- `$hidden`/`$visible` apply uniformly to plain attributes, eager-loaded relations, and `$appends`-computed attributes, since filtering happens on the fully-assembled array right before it's returned from `toArray()`.
+- `makeHidden()`/`makeVisible()` are per-instance and non-persistent — they don't change the class-level `$hidden`/`$visible` defaults, only the current object.
+- This complements (not replaces) `$fillable`/`$guarded`: `$fillable`/`$guarded` control what can be **written** via mass assignment (`fill()`, `__set()`, `updateOrCreate()`, etc.), while `$hidden`/`$visible` control what's **read** out via `toArray()`/`toJson()`. Use both together for sensitive columns — guard them from mass assignment AND hide them from serialized output.
 
 ---
 

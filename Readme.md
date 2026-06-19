@@ -405,6 +405,74 @@ $arrays = $collection->toArray();
 - Custom cast classes will be instantiated and their `get()` method called.
 - Built-in types will be cast using native PHP logic.
 
+## Mass Assignment Protection: $fillable and $guarded
+
+WPORM protects against unintended mass assignment, just like Eloquent. Use `$fillable` to whitelist attributes that can be set via `fill()`, the constructor, `__set()` (including array access like `$model['name'] = ...`), `updateOrCreate()`, `firstOrCreate()`, or `firstOrNew()`. Use `$guarded` (default: `['id']`) to blacklist attributes instead — anything **not** in `$guarded` is mass-assignable. `$guarded` is only checked when `$fillable` is empty.
+
+```php
+class User extends Model {
+    protected $fillable = ['name', 'email'];
+}
+
+$user = new User(['name' => 'Jane', 'is_admin' => true]);
+$user->is_admin; // null — not in $fillable, so it was never set
+
+// Or, blacklist style:
+class Post extends Model {
+    protected $guarded = ['id', 'is_published']; // everything else is mass-assignable
+}
+
+// Block all mass assignment:
+class StrictModel extends Model {
+    protected $guarded = ['*'];
+}
+```
+
+> Note: Hydrating a model from a database row (e.g. via `find()`, `get()`, `all()`) always populates every column, regardless of `$fillable`/`$guarded` — these protections only apply to mass assignment of *user-supplied* data.
+
+## Hidden & Visible Attributes: $hidden and $visible
+
+To keep sensitive columns (passwords, tokens, API secrets, etc.) out of `toArray()`/`toJson()` output — and therefore out of API responses or logs — set `$hidden` on your model, Eloquent-style:
+
+```php
+class User extends Model {
+    protected $fillable = ['name', 'email', 'password'];
+    protected $hidden = ['password', 'remember_token'];
+}
+
+$user = User::find(1);
+$user->toArray(); // 'password' and 'remember_token' are excluded
+$user->toJson();  // same — toJson() is just json_encode(toArray())
+```
+
+Hidden attributes are still fully accessible on the model object itself (`$user->password` works fine) — they're only stripped when the model is converted to an array or JSON.
+
+You can also use `$visible` as an allow-list instead — only the listed keys will appear in the output:
+
+```php
+class User extends Model {
+    protected $visible = ['id', 'name', 'email'];
+}
+```
+
+For one-off overrides on a single instance, use `makeHidden()` / `makeVisible()` (both return `$this` for chaining):
+
+```php
+$user = User::find(1); // $hidden = ['password']
+
+$user->makeVisible('password')->toArray(); // reveal it just this once
+$user->makeHidden('email')->toArray();     // hide an extra field just this once
+```
+
+`Collection::toArray()` / `Collection::toJson()` call each model's own `toArray()`, so `$hidden`/`$visible` are respected automatically for lists of models too:
+
+```php
+$users = User::query()->get();
+$users->toArray(); // every user in the list has 'password' excluded
+```
+
+`$fillable`/`$guarded` and `$hidden`/`$visible` solve two different problems and are meant to be used together for sensitive columns: `$fillable`/`$guarded` control what can be **written** via mass assignment, while `$hidden`/`$visible` control what's **read** back out via serialization.
+
 ## Collections
 
 All multi-result queries (`get()`, `all()`, etc.) return a `Collection` instance. Collections provide a fluent, Eloquent-style API for working with arrays of models.
@@ -419,6 +487,7 @@ All multi-result queries (`get()`, `all()`, etc.) return a `Collection` instance
 | `count()` | `int` | Number of items |
 | `isEmpty()` | `bool` | Whether the collection is empty |
 | `toArray()` | `array` | Convert all items to arrays |
+| `toJson($options = 0)` | `string` | JSON-encode the collection (via `toArray()`) |
 | `filter(callable)` | `Collection` | Return a new filtered collection |
 | `map(callable)` | `Collection` | Return a new collection with transformed items |
 | `transform(callable)` | `$this` | Transform items **in-place** (mutating) |

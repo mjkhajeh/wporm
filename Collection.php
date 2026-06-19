@@ -32,6 +32,16 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
         }, $this->items);
     }
 
+    /**
+     * Convert the collection to its JSON representation.
+     * Respects each model's $hidden/$visible via toArray().
+     * @param int $options json_encode() options
+     * @return string
+     */
+    public function toJson($options = 0) {
+        return json_encode($this->toArray(), $options);
+    }
+
     public function all() {
         return $this->items;
     }

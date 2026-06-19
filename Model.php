@@ -47,6 +47,36 @@ abstract class Model implements \ArrayAccess {
 	protected $appends = [];
 
     /**
+     * Attributes that should be hidden from toArray()/toJson() output
+     * (e.g. passwords, tokens, secrets). Eloquent-style $hidden.
+     *
+     * @var array
+     */
+    protected $hidden = [];
+
+    /**
+     * If non-empty, ONLY these attributes (plus appended ones not excluded)
+     * are included in toArray()/toJson() output. Eloquent-style $visible.
+     * When both $visible and $hidden are set, $visible is applied first,
+     * then $hidden subtracts from that set.
+     *
+     * @var array
+     */
+    protected $visible = [];
+
+    /**
+     * Runtime-only hidden attributes added via makeHidden(), merged with $hidden.
+     * @var array
+     */
+    protected $runtimeHidden = [];
+
+    /**
+     * Runtime-only visible attributes added via makeVisible(), subtracted from hidden.
+     * @var array
+     */
+    protected $runtimeVisible = [];
+
+    /**
      * The soft delete type for this model ('timestamp' or 'boolean').
      * 'timestamp' = uses deletedAtColumn (default: deleted_at)
      * 'boolean' = uses a boolean flag column (e.g., deleted)
@@ -954,7 +984,110 @@ public function forceDelete() {
                 $attributes[$appended] = $this->$appended;
             }
         }
+        return $this->applyVisibility($attributes);
+    }
+
+    /**
+     * Apply $visible/$hidden (and runtime overrides) filtering to an attribute array.
+     * Mirrors Eloquent: $visible (if set) is applied first as an allow-list, then
+     * $hidden subtracts from whatever remains. Runtime overrides from makeHidden()/
+     * makeVisible() are layered on top of the model-defined lists.
+     *
+     * @param array $attributes
+     * @return array
+     */
+    protected function applyVisibility(array $attributes) {
+        $visible = !empty($this->visible) ? array_flip($this->visible) : null;
+        if ($visible !== null) {
+            $attributes = array_intersect_key($attributes, $visible);
+        }
+
+        $hidden = array_unique(array_merge($this->hidden, $this->runtimeHidden));
+        $hidden = array_diff($hidden, $this->runtimeVisible);
+
+        if (!empty($hidden)) {
+            foreach ($hidden as $key) {
+                unset($attributes[$key]);
+            }
+        }
+
         return $attributes;
+    }
+
+    /**
+     * Get the attributes that are hidden from array/JSON output.
+     * @return array
+     */
+    public function getHidden() {
+        return $this->hidden;
+    }
+
+    /**
+     * Set the hidden attributes for the model (replaces the current list).
+     * @param array $hidden
+     * @return $this
+     */
+    public function setHidden(array $hidden) {
+        $this->hidden = $hidden;
+        return $this;
+    }
+
+    /**
+     * Get the attributes that are explicitly visible (allow-list) for array/JSON output.
+     * @return array
+     */
+    public function getVisible() {
+        return $this->visible;
+    }
+
+    /**
+     * Set the visible attributes for the model (replaces the current list).
+     * @param array $visible
+     * @return $this
+     */
+    public function setVisible(array $visible) {
+        $this->visible = $visible;
+        return $this;
+    }
+
+    /**
+     * Hide the given attribute(s) from array/JSON output for this instance,
+     * on top of whatever is already in $hidden (Eloquent-style makeHidden()).
+     * Usage: $user->makeHidden('password')->toArray();
+     *
+     * @param array|string $attributes
+     * @return $this
+     */
+    public function makeHidden($attributes) {
+        $attributes = is_array($attributes) ? $attributes : func_get_args();
+        $this->runtimeHidden = array_unique(array_merge($this->runtimeHidden, $attributes));
+        // If a previously-runtime-visible attribute is now explicitly hidden again, un-reveal it.
+        $this->runtimeVisible = array_diff($this->runtimeVisible, $attributes);
+        return $this;
+    }
+
+    /**
+     * Reveal the given attribute(s) in array/JSON output for this instance,
+     * even if they're present in $hidden (Eloquent-style makeVisible()).
+     * Usage: $user->makeVisible('password')->toArray();
+     *
+     * @param array|string $attributes
+     * @return $this
+     */
+    public function makeVisible($attributes) {
+        $attributes = is_array($attributes) ? $attributes : func_get_args();
+        $this->runtimeVisible = array_unique(array_merge($this->runtimeVisible, $attributes));
+        $this->runtimeHidden = array_diff($this->runtimeHidden, $attributes);
+        return $this;
+    }
+
+    /**
+     * Convert the model to its JSON representation, respecting $hidden/$visible.
+     * @param int $options json_encode() options
+     * @return string
+     */
+    public function toJson($options = 0) {
+        return json_encode($this->toArray(), $options);
     }
 
 	public function getOriginal($key = null) {
