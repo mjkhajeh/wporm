@@ -60,11 +60,15 @@ $query = User::applyGlobalScopes(new QueryBuilder(new User));
 ## Constructor
 
 ### __construct(array $attributes = [])
-**Description:** Create a new model instance. If primary key is present in attributes, fetches from DB.
+**Description:** Create a new model instance and fill it with the given attributes. This never queries the database — even if the primary key is present in `$attributes` — it only sets attributes in memory. Use `Model::find($id)` to load an existing record from the database. (The constructor does ensure the model's table exists, building it from `up(Blueprint $blueprint)` on first use per table.)
 
 **Example:**
 ```php
+// Does NOT query the database — just an in-memory instance with id pre-filled
 $user = new User(['id' => 1]);
+
+// To actually load the record from the database, use find():
+$user = User::find(1);
 ```
 
 ---
@@ -822,7 +826,7 @@ $posts = $user->hasMany(Post::class);
 ```
 
 ### belongsTo($related, $foreignKey = null, $ownerKey = null)
-**Description:** Define an inverse one-to-one or many relationship.
+**Description:** Define an inverse one-to-one or many relationship. Like `hasOne`/`hasMany`, this returns a lazy, chainable `QueryBuilder` rather than eagerly executing the query — call `->first()` (or further chain `->where(...)` etc.) to resolve it.
 
 **Example:**
 ```php
@@ -1044,7 +1048,7 @@ unset($user['name']);
 
 ## Raw Table Queries with DB::table()
 
-You can use the static `DB::table()` method to run queries on any table, not just models. This is useful for quick updates, inserts, or selects on tables without a model class.
+You can use the static `DB::table()` method to run queries on any table, not just models. This is useful for quick updates, inserts, or selects on tables without a model class. The underlying model used by `DB::table()` includes `timestamps`, `softDeletes`, `fillable`, `createdAtColumn`, and `updatedAtColumn` properties (all disabled/empty by default), so query builder features that depend on them (e.g. `upsert()`, soft-delete scoping) work without errors.
 
 **Example:**
 ```php

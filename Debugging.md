@@ -54,6 +54,10 @@ This document provides tips and built-in features to help you debug queries and 
 - Use breakpoints or Xdebug for step-by-step debugging if available.
 - **Install the [Query Monitor](https://wordpress.org/plugins/query-monitor/) plugin** for WordPress. It provides a powerful interface to inspect all database queries, hooks, HTTP requests, and more, directly from the WordPress admin bar. This is highly recommended for advanced debugging and performance analysis.
 
+## Note on Repeated/Inspecting Calls
+
+It's safe to inspect a query before executing it — e.g. calling `toSql()` or `dumpSql()` and then still calling `get()` afterward — or to call `get()`, `count()`, `toSql()` more than once on the same builder instance (as `paginate()` does internally, calling `count()` then `get()`). Soft-delete `WHERE` constraints and `HAVING` bindings are each applied only once per query builder instance, so they will not duplicate or misalign your bindings across repeated calls.
+
 ## Note on Casting and toArray()
 
 - The `toArray()` method now uses proper casting for both built-in types and custom cast classes.
