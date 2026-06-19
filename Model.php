@@ -651,10 +651,13 @@ protected function castSet($key, $value) {
 		}
 		$wpdb->insert($this->getTable(), $this->attributes);
 		$this->exists = true;
-		// Set the correct primary key after insert
+		// Store the new PK only in $attributes so it flows through __get()
+		// and castGet() like every other attribute. Writing to $this->$pk
+		// directly would bypass __set() and create a shadow property that
+		// can diverge from $attributes.
 		$pk = $this->primaryKey;
 		$this->attributes[$pk] = $wpdb->insert_id;
-		$this->$pk = $wpdb->insert_id;
+		$this->original[$pk]   = $wpdb->insert_id;
 		return true;
 	}
 
@@ -667,14 +670,10 @@ protected function castSet($key, $value) {
 			$this->attributes[$this->updatedAtColumn] = current_time('mysql');
 		}
 		$pk = $this->primaryKey;
-		// Prevent undefined array key warning by checking if PK is set
-        if (!isset($this->attributes[$pk]) && isset($this->$pk)) {
-            $this->attributes[$pk] = $this->$pk;
-        }
-        if (!isset($this->attributes[$pk])) {
-            // Cannot update without a primary key value
-            return false;
-        }
+		if (!isset($this->attributes[$pk])) {
+			// Cannot update without a primary key value
+			return false;
+		}
 		$wpdb->update($this->getTable(), $this->attributes, [$pk => $this->attributes[$pk]]);
 		return true;
 	}
