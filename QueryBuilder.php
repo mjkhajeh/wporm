@@ -168,7 +168,7 @@ class QueryBuilder {
             return $this;
         }
         $placeholders = implode(', ', array_fill(0, count($values), '%s'));
-        $this->wheres[] = "$column IN ($placeholders)";
+        $this->wheres[] = Helpers::quoteIdentifier($column) . " IN ($placeholders)";
         foreach ($values as $v) {
             $this->bindings[] = $v;
         }
@@ -181,7 +181,7 @@ class QueryBuilder {
             return $this;
         }
         $placeholders = implode(', ', array_fill(0, count($values), '%s'));
-        $this->wheres[] = "$column NOT IN ($placeholders)";
+        $this->wheres[] = Helpers::quoteIdentifier($column) . " NOT IN ($placeholders)";
         foreach ($values as $v) {
             $this->bindings[] = $v;
         }
@@ -194,7 +194,7 @@ class QueryBuilder {
             return $this;
         }
         $placeholders = implode(', ', array_fill(0, count($values), '%s'));
-        $this->wheres[] = "OR $column IN ($placeholders)";
+        $this->wheres[] = "OR " . Helpers::quoteIdentifier($column) . " IN ($placeholders)";
         foreach ($values as $v) {
             $this->bindings[] = $v;
         }
@@ -206,7 +206,7 @@ class QueryBuilder {
             return $this;
         }
         $placeholders = implode(', ', array_fill(0, count($values), '%s'));
-        $this->wheres[] = "OR $column NOT IN ($placeholders)";
+        $this->wheres[] = "OR " . Helpers::quoteIdentifier($column) . " NOT IN ($placeholders)";
         foreach ($values as $v) {
             $this->bindings[] = $v;
         }
@@ -214,25 +214,25 @@ class QueryBuilder {
     }
 
     public function whereLike($column, $value) {
-        $this->wheres[] = "$column LIKE %s";
+        $this->wheres[] = Helpers::quoteIdentifier($column) . " LIKE %s";
         $this->bindings[] = $value;
         return $this;
     }
 
     public function orWhereLike($column, $value) {
-        $this->wheres[] = "OR $column LIKE %s";
+        $this->wheres[] = "OR " . Helpers::quoteIdentifier($column) . " LIKE %s";
         $this->bindings[] = $value;
         return $this;
     }
 
     public function whereNotLike($column, $value) {
-        $this->wheres[] = "$column NOT LIKE %s";
+        $this->wheres[] = Helpers::quoteIdentifier($column) . " NOT LIKE %s";
         $this->bindings[] = $value;
         return $this;
     }
 
     public function orWhereNotLike($column, $value) {
-        $this->wheres[] = "OR $column NOT LIKE %s";
+        $this->wheres[] = "OR " . Helpers::quoteIdentifier($column) . " NOT LIKE %s";
         $this->bindings[] = $value;
         return $this;
     }
@@ -244,9 +244,9 @@ class QueryBuilder {
         }
         // Use '!=' instead of 'NOT =' for equality
         if ($operator === '=') {
-            $this->wheres[] = "$column != %s";
+            $this->wheres[] = Helpers::quoteIdentifier($column) . " != %s";
         } else {
-            $this->wheres[] = "$column NOT $operator %s";
+            $this->wheres[] = Helpers::quoteIdentifier($column) . " NOT $operator %s";
         }
         $this->bindings[] = $value;
         return $this;
@@ -259,9 +259,9 @@ class QueryBuilder {
         }
         // Use '!=' instead of 'NOT =' for equality
         if ($operator === '=') {
-            $this->wheres[] = "OR $column != %s";
+            $this->wheres[] = "OR " . Helpers::quoteIdentifier($column) . " != %s";
         } else {
-            $this->wheres[] = "OR $column NOT $operator %s";
+            $this->wheres[] = "OR " . Helpers::quoteIdentifier($column) . " NOT $operator %s";
         }
         $this->bindings[] = $value;
         return $this;
@@ -273,10 +273,10 @@ class QueryBuilder {
         foreach ($conditions as $cond) {
             if (is_array($cond)) {
                 if (count($cond) === 3) {
-                    $orGroup[] = "$cond[0] $cond[1] %s";
+                    $orGroup[] = Helpers::quoteIdentifier($cond[0]) . " $cond[1] %s";
                     $bindings[] = $cond[2];
                 } elseif (count($cond) === 2) {
-                    $orGroup[] = "$cond[0] = %s";
+                    $orGroup[] = Helpers::quoteIdentifier($cond[0]) . " = %s";
                     $bindings[] = $cond[1];
                 }
             } elseif (is_string($cond)) {
@@ -298,10 +298,10 @@ class QueryBuilder {
         foreach ($conditions as $cond) {
             if (is_array($cond)) {
                 if (count($cond) === 3) {
-                    $orGroup[] = "$cond[0] $cond[1] %s";
+                    $orGroup[] = Helpers::quoteIdentifier($cond[0]) . " $cond[1] %s";
                     $bindings[] = $cond[2];
                 } elseif (count($cond) === 2) {
-                    $orGroup[] = "$cond[0] = %s";
+                    $orGroup[] = Helpers::quoteIdentifier($cond[0]) . " = %s";
                     $bindings[] = $cond[1];
                 }
             } elseif (is_string($cond)) {
@@ -323,10 +323,10 @@ class QueryBuilder {
         foreach ($conditions as $cond) {
             if (is_array($cond)) {
                 if (count($cond) === 3) {
-                    $andGroup[] = "$cond[0] $cond[1] %s";
+                    $andGroup[] = Helpers::quoteIdentifier($cond[0]) . " $cond[1] %s";
                     $bindings[] = $cond[2];
                 } elseif (count($cond) === 2) {
-                    $andGroup[] = "$cond[0] = %s";
+                    $andGroup[] = Helpers::quoteIdentifier($cond[0]) . " = %s";
                     $bindings[] = $cond[1];
                 }
             } elseif (is_string($cond)) {
@@ -348,10 +348,10 @@ class QueryBuilder {
         foreach ($conditions as $cond) {
             if (is_array($cond)) {
                 if (count($cond) === 3) {
-                    $andGroup[] = "$cond[0] $cond[1] %s";
+                    $andGroup[] = Helpers::quoteIdentifier($cond[0]) . " $cond[1] %s";
                     $bindings[] = $cond[2];
                 } elseif (count($cond) === 2) {
-                    $andGroup[] = "$cond[0] = %s";
+                    $andGroup[] = Helpers::quoteIdentifier($cond[0]) . " = %s";
                     $bindings[] = $cond[1];
                 }
             } elseif (is_string($cond)) {
@@ -373,10 +373,10 @@ class QueryBuilder {
         foreach ($conditions as $cond) {
             if (is_array($cond)) {
                 if (count($cond) === 3) {
-                    $notGroup[] = "$cond[0] $cond[1] %s";
+                    $notGroup[] = Helpers::quoteIdentifier($cond[0]) . " $cond[1] %s";
                     $bindings[] = $cond[2];
                 } elseif (count($cond) === 2) {
-                    $notGroup[] = "$cond[0] = %s";
+                    $notGroup[] = Helpers::quoteIdentifier($cond[0]) . " = %s";
                     $bindings[] = $cond[1];
                 }
             } elseif (is_string($cond)) {
@@ -398,10 +398,10 @@ class QueryBuilder {
         foreach ($conditions as $cond) {
             if (is_array($cond)) {
                 if (count($cond) === 3) {
-                    $notGroup[] = "$cond[0] $cond[1] %s";
+                    $notGroup[] = Helpers::quoteIdentifier($cond[0]) . " $cond[1] %s";
                     $bindings[] = $cond[2];
                 } elseif (count($cond) === 2) {
-                    $notGroup[] = "$cond[0] = %s";
+                    $notGroup[] = Helpers::quoteIdentifier($cond[0]) . " = %s";
                     $bindings[] = $cond[1];
                 }
             } elseif (is_string($cond)) {
@@ -421,7 +421,7 @@ class QueryBuilder {
         if (count($values) !== 2) {
             throw new \InvalidArgumentException('whereBetween expects exactly 2 values.');
         }
-        $this->wheres[] = "$column BETWEEN %s AND %s";
+        $this->wheres[] = Helpers::quoteIdentifier($column) . " BETWEEN %s AND %s";
         $this->bindings[] = $values[0];
         $this->bindings[] = $values[1];
         return $this;
@@ -431,7 +431,7 @@ class QueryBuilder {
         if (count($values) !== 2) {
             throw new \InvalidArgumentException('orWhereBetween expects exactly 2 values.');
         }
-        $this->wheres[] = "OR $column BETWEEN %s AND %s";
+        $this->wheres[] = "OR " . Helpers::quoteIdentifier($column) . " BETWEEN %s AND %s";
         $this->bindings[] = $values[0];
         $this->bindings[] = $values[1];
         return $this;
@@ -441,7 +441,7 @@ class QueryBuilder {
         if (count($values) !== 2) {
             throw new \InvalidArgumentException('whereNotBetween expects exactly 2 values.');
         }
-        $this->wheres[] = "$column NOT BETWEEN %s AND %s";
+        $this->wheres[] = Helpers::quoteIdentifier($column) . " NOT BETWEEN %s AND %s";
         $this->bindings[] = $values[0];
         $this->bindings[] = $values[1];
         return $this;
@@ -451,7 +451,7 @@ class QueryBuilder {
         if (count($values) !== 2) {
             throw new \InvalidArgumentException('orWhereNotBetween expects exactly 2 values.');
         }
-        $this->wheres[] = "OR $column NOT BETWEEN %s AND %s";
+        $this->wheres[] = "OR " . Helpers::quoteIdentifier($column) . " NOT BETWEEN %s AND %s";
         $this->bindings[] = $values[0];
         $this->bindings[] = $values[1];
         return $this;
@@ -462,7 +462,7 @@ class QueryBuilder {
         if (count($columns) !== 2) {
             throw new \InvalidArgumentException('whereBetweenColumns expects exactly 2 columns.');
         }
-        $this->wheres[] = "$column BETWEEN {$columns[0]} AND {$columns[1]}";
+        $this->wheres[] = Helpers::quoteIdentifier($column) . " BETWEEN " . Helpers::quoteIdentifier($columns[0]) . " AND " . Helpers::quoteIdentifier($columns[1]);
         return $this;
     }
 
@@ -470,7 +470,7 @@ class QueryBuilder {
         if (count($columns) !== 2) {
             throw new \InvalidArgumentException('orWhereBetweenColumns expects exactly 2 columns.');
         }
-        $this->wheres[] = "OR $column BETWEEN {$columns[0]} AND {$columns[1]}";
+        $this->wheres[] = "OR " . Helpers::quoteIdentifier($column) . " BETWEEN " . Helpers::quoteIdentifier($columns[0]) . " AND " . Helpers::quoteIdentifier($columns[1]);
         return $this;
     }
 
@@ -478,7 +478,7 @@ class QueryBuilder {
         if (count($columns) !== 2) {
             throw new \InvalidArgumentException('whereNotBetweenColumns expects exactly 2 columns.');
         }
-        $this->wheres[] = "$column NOT BETWEEN {$columns[0]} AND {$columns[1]}";
+        $this->wheres[] = Helpers::quoteIdentifier($column) . " NOT BETWEEN " . Helpers::quoteIdentifier($columns[0]) . " AND " . Helpers::quoteIdentifier($columns[1]);
         return $this;
     }
 
@@ -486,77 +486,77 @@ class QueryBuilder {
         if (count($columns) !== 2) {
             throw new \InvalidArgumentException('orWhereNotBetweenColumns expects exactly 2 columns.');
         }
-        $this->wheres[] = "OR $column NOT BETWEEN {$columns[0]} AND {$columns[1]}";
+        $this->wheres[] = "OR " . Helpers::quoteIdentifier($column) . " NOT BETWEEN " . Helpers::quoteIdentifier($columns[0]) . " AND " . Helpers::quoteIdentifier($columns[1]);
         return $this;
     }
 
     // WHERE NULL / NOT NULL
     public function whereNull($column) {
-        $this->wheres[] = "$column IS NULL";
+        $this->wheres[] = Helpers::quoteIdentifier($column) . " IS NULL";
         return $this;
     }
 
     public function orWhereNull($column) {
-        $this->wheres[] = "OR $column IS NULL";
+        $this->wheres[] = "OR " . Helpers::quoteIdentifier($column) . " IS NULL";
         return $this;
     }
 
     public function whereNotNull($column) {
-        $this->wheres[] = "$column IS NOT NULL";
+        $this->wheres[] = Helpers::quoteIdentifier($column) . " IS NOT NULL";
         return $this;
     }
 
     public function orWhereNotNull($column) {
-        $this->wheres[] = "OR $column IS NOT NULL";
+        $this->wheres[] = "OR " . Helpers::quoteIdentifier($column) . " IS NOT NULL";
         return $this;
     }
 
     // WHERE DATE/TIME PARTS
     public function whereDate($column, $value) {
-        $this->wheres[] = "DATE($column) = %s";
+        $this->wheres[] = "DATE(" . Helpers::quoteIdentifier($column) . ") = %s";
         $this->bindings[] = $value;
         return $this;
     }
     public function whereMonth($column, $value) {
-        $this->wheres[] = "MONTH($column) = %s";
+        $this->wheres[] = "MONTH(" . Helpers::quoteIdentifier($column) . ") = %s";
         $this->bindings[] = $value;
         return $this;
     }
     public function whereDay($column, $value) {
-        $this->wheres[] = "DAY($column) = %s";
+        $this->wheres[] = "DAY(" . Helpers::quoteIdentifier($column) . ") = %s";
         $this->bindings[] = $value;
         return $this;
     }
     public function whereYear($column, $value) {
-        $this->wheres[] = "YEAR($column) = %s";
+        $this->wheres[] = "YEAR(" . Helpers::quoteIdentifier($column) . ") = %s";
         $this->bindings[] = $value;
         return $this;
     }
     public function whereTime($column, $value) {
-        $this->wheres[] = "TIME($column) = %s";
+        $this->wheres[] = "TIME(" . Helpers::quoteIdentifier($column) . ") = %s";
         $this->bindings[] = $value;
         return $this;
     }
 
     // WHERE PAST/FUTURE/TODAY
     public function wherePast($column) {
-        $this->wheres[] = "$column < CURDATE()";
+        $this->wheres[] = Helpers::quoteIdentifier($column) . " < CURDATE()";
         return $this;
     }
     public function whereFuture($column) {
-        $this->wheres[] = "$column > CURDATE()";
+        $this->wheres[] = Helpers::quoteIdentifier($column) . " > CURDATE()";
         return $this;
     }
     public function whereToday($column) {
-        $this->wheres[] = "DATE($column) = CURDATE()";
+        $this->wheres[] = "DATE(" . Helpers::quoteIdentifier($column) . ") = CURDATE()";
         return $this;
     }
     public function whereBeforeToday($column) {
-        $this->wheres[] = "DATE($column) < CURDATE()";
+        $this->wheres[] = "DATE(" . Helpers::quoteIdentifier($column) . ") < CURDATE()";
         return $this;
     }
     public function whereAfterToday($column) {
-        $this->wheres[] = "DATE($column) > CURDATE()";
+        $this->wheres[] = "DATE(" . Helpers::quoteIdentifier($column) . ") > CURDATE()";
         return $this;
     }
 
