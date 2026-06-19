@@ -1008,7 +1008,6 @@ public function forceDelete() {
         $query = $query ?: static::query();
         if ($instance->softDeletes) {
             $query->onlyTrashed = true;
-            $query->whereNotNull($instance->deletedAtColumn);
         }
         return $query;
     }
@@ -1025,7 +1024,6 @@ public function forceDelete() {
         if ($instance->softDeletes) {
             $query->withTrashed = false;
             $query->onlyTrashed = false;
-            $query->whereNull($instance->deletedAtColumn);
         }
         return $query;
     }

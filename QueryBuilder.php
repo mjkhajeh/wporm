@@ -662,6 +662,44 @@ class QueryBuilder {
     public $onlyTrashed = false;
 
     /**
+     * Tracks whether the automatic soft-delete constraint has already been applied.
+     */
+    protected $softDeleteScopeApplied = false;
+
+    /**
+     * Apply the model's soft-delete constraint once for read/count queries.
+     */
+    protected function applySoftDeleteScope() {
+        if ($this->softDeleteScopeApplied) {
+            return;
+        }
+
+        if (!isset($this->model->softDeletes) || !$this->model->softDeletes) {
+            $this->softDeleteScopeApplied = true;
+            return;
+        }
+
+        $deletedAt = $this->model->deletedAtColumn;
+        $softDeleteType = isset($this->model->softDeleteType) ? $this->model->softDeleteType : 'timestamp';
+
+        if ($softDeleteType === 'boolean') {
+            if ($this->onlyTrashed) {
+                $this->where($deletedAt, 1);
+            } elseif (!$this->withTrashed) {
+                $this->where($deletedAt, 0);
+            }
+        } else {
+            if ($this->onlyTrashed) {
+                $this->whereNotNull($deletedAt);
+            } elseif (!$this->withTrashed) {
+                $this->whereNull($deletedAt);
+            }
+        }
+
+        $this->softDeleteScopeApplied = true;
+    }
+
+    /**
      * Restore soft-deleted records matching the query.
      * Supports both timestamp and boolean-flag soft deletes via SoftDeletes trait.
      */
@@ -680,24 +718,7 @@ class QueryBuilder {
     }
 
     public function get() {
-        // Soft delete logic: filter by deleted_at or boolean flag if needed
-        if (isset($this->model->softDeletes) && $this->model->softDeletes) {
-            $deletedAt = $this->model->deletedAtColumn;
-            $softDeleteType = isset($this->model->softDeleteType) ? $this->model->softDeleteType : 'timestamp';
-            if ($softDeleteType === 'boolean') {
-                if ($this->onlyTrashed) {
-                    $this->where($deletedAt, 1);
-                } elseif (!$this->withTrashed) {
-                    $this->where($deletedAt, 0);
-                }
-            } else {
-                if ($this->onlyTrashed) {
-                    $this->whereNotNull($deletedAt);
-                } elseif (!$this->withTrashed) {
-                    $this->whereNull($deletedAt);
-                }
-            }
-        }
+        $this->applySoftDeleteScope();
         $sql = $this->buildSelectQuery();
         if (!empty($this->bindings)) {
             $sql = $this->wpdb->prepare($sql, ...$this->bindings);
@@ -758,6 +779,7 @@ class QueryBuilder {
     }
 
     public function count() {
+        $this->applySoftDeleteScope();
         $sql = $this->buildCountQuery();
         if ($this->debug) {
             error_log('[WPORM][count] SQL: ' . $sql);
