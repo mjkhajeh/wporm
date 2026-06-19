@@ -39,5 +39,5 @@ $review = new Review([
 ]);
 $review->save();
 // Relationship usage
-$reviewProduct = $review->product(); // belongsTo
-$reviewUser = $review->user(); // belongsTo
+$reviewProduct = $review->product()->first(); // belongsTo
+$reviewUser = $review->user()->first(); // belongsTo

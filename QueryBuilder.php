@@ -19,6 +19,7 @@ class QueryBuilder {
     protected $havings = [];
     protected $with = [];
     protected $applyGlobalScopes = true;
+    protected $relationContext = [];
 
     /**
      * If true, SQL and bindings will be logged before execution.
@@ -32,6 +33,19 @@ class QueryBuilder {
     public function setDebug($debug = true) {
         $this->debug = (bool)$debug;
         return $this;
+    }
+
+    public function setRelationContext($type, array $metadata = []) {
+        $this->relationContext = array_merge(['type' => $type], $metadata);
+        return $this;
+    }
+
+    public function getRelationContext() {
+        return $this->relationContext;
+    }
+
+    public function getWhereCount() {
+        return count($this->wheres);
     }
 
     public function __construct($model, $applyGlobalScopes = true) {
@@ -50,6 +64,11 @@ class QueryBuilder {
 
     public function select($columns = ['*']) {
         $this->selects = is_array($columns) ? $columns : func_get_args();
+        return $this;
+    }
+
+    public function from($table) {
+        $this->table = $table;
         return $this;
     }
 
@@ -1286,6 +1305,32 @@ class QueryBuilder {
         }
         // Handle QueryBuilder-based relationships (hasMany, belongsToMany, hasManyThrough)
         if ($related instanceof \MJ\WPORM\QueryBuilder) {
+            $relationContext = $related->getRelationContext();
+            if (($relationContext['type'] ?? null) === 'belongsTo') {
+                $foreignKey = $relationContext['foreignKey'] ?? null;
+                $ownerKey = $relationContext['ownerKey'] ?? 'id';
+                $relatedModel = $related->model;
+                if ($foreignKey && $relatedModel) {
+                    $ids = array_values(array_filter(array_map(fn($m) => $m->$foreignKey, $models), fn($id) => $id !== null));
+                    $query = $relatedModel::query(!$disableGlobalScopes)->whereIn($ownerKey, $ids);
+                    if ($constraint) {
+                        $constraint($query);
+                    }
+                    $allRelated = $query->get();
+                    $map = [];
+                    foreach ($allRelated as $rel) {
+                        $map[$rel->$ownerKey] = $rel;
+                    }
+                    foreach ($models as $m) {
+                        if (method_exists($m, 'setEagerLoaded')) {
+                            $m->setEagerLoaded($relation, $map[$m->$foreignKey] ?? null);
+                        } else {
+                            $m->_eagerLoaded[$relation] = $map[$m->$foreignKey] ?? null;
+                        }
+                    }
+                }
+                return;
+            }
             $foreignKey = null;
             $localKey = $model->primaryKey;
             $ref = new \ReflectionMethod($model, $relation);
@@ -1695,6 +1740,24 @@ class QueryBuilder {
         if ($constraint) {
             $constraint($query);
         }
+        $relationContext = $relatedQuery instanceof self ? $relatedQuery->getRelationContext() : [];
+        if (($relationContext['type'] ?? null) === 'belongsTo') {
+            $foreignKey = $relationContext['foreignKey'];
+            $ownerKey = $relationContext['ownerKey'];
+            $relatedTable = $query->table;
+            $baseWhereCount = $relationContext['baseWhereCount'] ?? 0;
+            $this->whereExists(function($q) use ($query, $relatedTable, $ownerKey, $foreignKey, $baseWhereCount) {
+                $q->from($relatedTable)
+                  ->whereColumn($relatedTable . '.' . $ownerKey, '=', $this->table . '.' . $foreignKey);
+                foreach (array_slice($query->wheres, $baseWhereCount) as $w) {
+                    $q->wheres[] = $w;
+                }
+                foreach (array_slice($query->bindings, $baseWhereCount) as $b) {
+                    $q->bindings[] = $b;
+                }
+            });
+            return $this;
+        }
         // Infer keys for hasOne/hasMany/belongsTo
         $localKey = property_exists($model, 'primaryKey') ? $model->primaryKey : 'id';
         $foreignKey = null;
@@ -1767,6 +1830,24 @@ class QueryBuilder {
         }
         if ($constraint) {
             $constraint($query);
+        }
+        $relationContext = $relatedQuery instanceof self ? $relatedQuery->getRelationContext() : [];
+        if (($relationContext['type'] ?? null) === 'belongsTo') {
+            $foreignKey = $relationContext['foreignKey'];
+            $ownerKey = $relationContext['ownerKey'];
+            $relatedTable = $query->table;
+            $baseWhereCount = $relationContext['baseWhereCount'] ?? 0;
+            $this->orWhereExists(function($q) use ($query, $relatedTable, $ownerKey, $foreignKey, $baseWhereCount) {
+                $q->from($relatedTable)
+                  ->whereColumn($relatedTable . '.' . $ownerKey, '=', $this->table . '.' . $foreignKey);
+                foreach (array_slice($query->wheres, $baseWhereCount) as $w) {
+                    $q->wheres[] = $w;
+                }
+                foreach (array_slice($query->bindings, $baseWhereCount) as $b) {
+                    $q->bindings[] = $b;
+                }
+            });
+            return $this;
         }
         $localKey = property_exists($model, 'primaryKey') ? $model->primaryKey : 'id';
         $foreignKey = null;

@@ -826,7 +826,7 @@ $posts = $user->hasMany(Post::class);
 
 **Example:**
 ```php
-$user = $profile->belongsTo(User::class);
+$user = $profile->belongsTo(User::class)->first();
 ```
 
 ### belongsToMany($related, $pivotTable = null, $foreignPivotKey = null, $relatedPivotKey = null)

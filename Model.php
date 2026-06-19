@@ -213,6 +213,10 @@ abstract class Model implements \ArrayAccess {
 			$result = $this->$key();
 			// If the relationship method returns a QueryBuilder, resolve it to a Collection
 			if ($result instanceof \MJ\WPORM\QueryBuilder) {
+                $context = $result->getRelationContext();
+                if (($context['type'] ?? null) === 'belongsTo' || ($context['type'] ?? null) === 'hasOne') {
+                    return $result->first();
+                }
 				return $result->get();
 			}
 			return $result;
@@ -866,15 +870,26 @@ public function forceDelete() {
      * @param class-string<T> $related
      * @param string|null $foreignKey
      * @param string|null $ownerKey
-     * @return T|null
+     * @return QueryBuilder<T>
      */
     public function belongsTo($related, $foreignKey = null, $ownerKey = null) {
         $instance = new $related;
         $foreignKey = $foreignKey ?: strtolower(Helpers::class_basename($related)) . '_id';
         $ownerKey = $ownerKey ?: $instance->primaryKey;
         $foreignValue = $this->attributes[$foreignKey] ?? null;
-        if ($foreignValue === null) return null;
-        return $related::query()->where($ownerKey, $foreignValue)->first();
+        $query = $related::query();
+        if ($foreignValue === null) {
+            $query->whereIn($ownerKey, []);
+        } else {
+            $query->where($ownerKey, $foreignValue);
+        }
+        return $query->setRelationContext('belongsTo', [
+            'foreignKey' => $foreignKey,
+            'ownerKey' => $ownerKey,
+            'foreignValue' => $foreignValue,
+            'related' => $related,
+            'baseWhereCount' => $query->getWhereCount(),
+        ]);
     }
 
 	public function newFromBuilder(array $attributes) {

@@ -151,8 +151,8 @@ $product->restore(); // sets deleted = 0
 
 // Relationship usage
 $userPosts = $user->posts(); // hasMany
-$reviewProduct = $review->product(); // belongsTo
-$reviewUser = $review->user(); // belongsTo
+$reviewProduct = $review->product()->first(); // belongsTo
+$reviewUser = $review->user()->first(); // belongsTo
 $productReviews = $product->reviews(); // hasMany
 
 // Casts usage
