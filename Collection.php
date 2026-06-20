@@ -35,11 +35,33 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
     /**
      * Convert the collection to its JSON representation.
      * Respects each model's $hidden/$visible via toArray().
+     *
+     * Mirrors Eloquent's behavior: if json_encode() fails, a \JsonException
+     * is thrown rather than silently returning `false`.
+     *
      * @param int $options json_encode() options
      * @return string
+     * @throws \JsonException
      */
     public function toJson($options = 0) {
-        return json_encode($this->toArray(), $options);
+        $json = json_encode($this->toArray(), $options);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \JsonException('Error encoding collection to JSON: ' . json_last_error_msg());
+        }
+
+        return $json;
+    }
+
+    /**
+     * Convert the collection to its string representation (Eloquent-style).
+     * Allows a collection to be used directly in string contexts, e.g.
+     * `echo $users;`, producing the same output as `toJson()`.
+     *
+     * @return string
+     */
+    public function __toString() {
+        return $this->toJson();
     }
 
     public function all() {

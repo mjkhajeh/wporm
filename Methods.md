@@ -1205,15 +1205,34 @@ $array = $user->toArray();
 ```
 
 ### toJson($options = 0)
-**Description:** Convert the model to a JSON string. Internally calls `toArray()`, so it respects `$hidden`/`$visible` the same way. `$options` is passed straight through to `json_encode()` (e.g. `JSON_PRETTY_PRINT`).
+**Description:** Convert the model to a JSON string (Eloquent-style serialization). Internally calls `toArray()`, so it respects `$hidden`/`$visible` (and any runtime `makeHidden()`/`makeVisible()` overrides) the same way. `$options` is passed straight through to `json_encode()` (e.g. `JSON_PRETTY_PRINT`).
+
+If the underlying `json_encode()` call fails (e.g. malformed UTF-8 in an attribute, or a `NAN`/`INF` float produced by a cast), a `\JsonException` is thrown — mirroring Eloquent's `JsonEncodingException` — instead of silently returning `false`, so encoding problems are caught immediately rather than producing an empty/corrupt payload downstream.
 
 **Example:**
 ```php
 $json = $user->toJson();
 $pretty = $user->toJson(JSON_PRETTY_PRINT);
+
+try {
+    $json = $user->toJson();
+} catch (\JsonException $e) {
+    // handle/log the encoding failure
+}
 ```
 
-> `Collection` also has a `toJson()` method that JSON-encodes the result of `Collection::toArray()`, so hidden attributes stay hidden for lists of models too.
+> `Collection` also has a `toJson()` method (same exception-on-failure behavior) that JSON-encodes the result of `Collection::toArray()`, so hidden attributes stay hidden for lists of models too.
+
+### __toString()
+**Description:** Convert the model to its string representation, Eloquent-style. Returns the same output as `toJson()`, so a model can be used directly in string contexts — `echo $user;`, string interpolation, logging, etc. — without calling `toJson()` explicitly. Subject to the same `\JsonException` on encoding failure as `toJson()`.
+
+**Example:**
+```php
+echo $user; // same as echo $user->toJson();
+$log = "Created user: {$user}";
+```
+
+> `Collection` also implements `__toString()` for the same purpose — `echo $users;` is equivalent to `echo $users->toJson();`.
 
 ### getOriginal($key = null)
 **Description:** Get the original value(s) of the model's attributes.

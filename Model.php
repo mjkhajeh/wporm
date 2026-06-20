@@ -1276,11 +1276,39 @@ public function forceDelete() {
 
     /**
      * Convert the model to its JSON representation, respecting $hidden/$visible.
+     *
+     * Mirrors Eloquent's behavior: if json_encode() fails (e.g. due to
+     * malformed UTF-8 in an attribute, or a NAN/INF float from a cast),
+     * a \JsonException is thrown rather than silently returning `false`,
+     * so encoding failures surface immediately instead of producing a
+     * corrupt/empty payload downstream.
+     *
      * @param int $options json_encode() options
      * @return string
+     * @throws \JsonException
      */
     public function toJson($options = 0) {
-        return json_encode($this->toArray(), $options);
+        $json = json_encode($this->toArray(), $options);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \JsonException(
+                'Error encoding model [' . static::class . '] to JSON: ' . json_last_error_msg()
+            );
+        }
+
+        return $json;
+    }
+
+    /**
+     * Convert the model to its string representation (Eloquent-style).
+     * Allows a model to be used directly in string contexts, e.g.
+     * `echo $user;` or `"User: {$user}"`, producing the same output as
+     * `toJson()`.
+     *
+     * @return string
+     */
+    public function __toString() {
+        return $this->toJson();
     }
 
 	public function getOriginal($key = null) {

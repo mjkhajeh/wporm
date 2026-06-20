@@ -38,7 +38,7 @@ The latest task was not completed. (Moderate Issues: 1)
   | ✅ 19 | exists() / doesntExist() | User::where('email',$e)->exists() | Boolean existence check |
   | ✅ 20 | selectRaw() / whereRaw() / orWhereRaw() / havingRaw() / orHavingRaw() / groupByRaw() | Raw SQL expressions | orderByRaw() now has full raw-clause coverage |
   | ✅ 21 | chunk() / each() | Process large datasets in batches | Memory management |
-  | 22 | toJson() on Model | $user->toJson() | Serialization |
+  | ✅ 22 | toJson() on Model | $user->toJson() | Serialization |
   | ✅ 23 | $hidden property | Hide attributes from toArray()/toJson() | API security (passwords etc.) |
   | 24 | findOrFail() / firstOrFail() | Throw exception on not found | Cleaner error handling |
   | 25 | create() static method | User::create([...]) | One-line insert + return model |
@@ -94,7 +94,7 @@ The latest task was not completed. (Moderate Issues: 1)
   ✅ 2. Add $guarded enforcement + $hidden — Security essentials
   ✅ 3. Add increment/decrement/sum/avg/min/max/value/pluck/exists — Highest-use missing features
   ✅ 4. Add selectRaw/whereRaw/havingRaw — Completes the raw SQL story
-  5. Add create()/findOrFail()/toJson()/$hidden — Common Eloquent patterns
+  5. Add create()/findOrFail() — Common Eloquent patterns (toJson()/$hidden done — see ✅22/✅23)
   6. Enrich Collection — Bring it closer to Eloquent's rich collection API
 
 Other works need to be done:
@@ -213,3 +213,24 @@ Other works need to be done:
     "Batch Processing" section + TOC entry) and Readme.md (Features list +
     new "Processing Large Datasets: chunk() and each()" section with
     examples) to document both methods.
+  - Hardened Model::toJson() and Collection::toJson() for production use:
+    both previously called json_encode() directly and would silently return
+    `false` on failure (e.g. malformed UTF-8 in an attribute, or a NAN/INF
+    float produced by a cast), which could leak a corrupt/empty payload
+    downstream with no diagnostic. Both now check json_last_error() and
+    throw a \JsonException with a descriptive message (model class name
+    included for Model::toJson()) on failure — matching Eloquent's
+    JsonEncodingException behavior — instead of swallowing the error.
+  - Added Model::__toString() and Collection::__toString() (Eloquent-style)
+    — both return the same output as toJson(), so models/collections can be
+    used directly in string contexts (echo $user;, string interpolation,
+    logging) without an explicit ->toJson() call. Safe on PHP 7.4+ (this
+    package's minimum supported version), where __toString() is allowed to
+    throw exceptions normally.
+  - Updated Methods.md (toJson() entry now documents the \JsonException
+    behavior + try/catch example; new __toString() entry for both Model and
+    Collection) and Readme.md (new "Serialization: toJson()" section
+    covering toJson()/__toString()/exception handling, placed after "Array
+    Conversion and Casting"; Collection's "Available Methods" table updated
+    with __toString() and toJson()'s exception note) to document all of the
+    above.

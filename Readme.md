@@ -19,6 +19,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Relationships**: Define `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, and `hasManyThrough` relationships, with eager loading via `with()` and existence filtering via `whereHas()`/`has()`.
 - **Aggregates & utilities**: `sum()`, `avg()`, `min()`, `max()`, `value()`, `pluck()`, `exists()`/`doesntExist()`, and `increment()`/`decrement()`.
 - **Batch processing**: `chunk()` and `each()` for iterating large result sets in pages without loading everything into memory at once.
+- **Serialization**: `toArray()`/`toJson()`/`__toString()` on both models and collections, with `$hidden`/`$visible` support and safe (exception-on-failure) JSON encoding.
 - **Raw SQL expressions**: `selectRaw()`, `whereRaw()`/`orWhereRaw()`, `groupByRaw()`, `havingRaw()`/`orHavingRaw()`, and `orderByRaw()` for dropping down to raw SQL with safe, bound placeholders.
 - **Events**: Hooks for model lifecycle events (creating, updating, deleting).
 - **Global scopes**: Add global query constraints to models.
@@ -514,6 +515,40 @@ $arrays = $collection->toArray();
 - Custom cast classes will be instantiated and their `get()` method called.
 - Built-in types will be cast using native PHP logic.
 
+## Serialization: toJson()
+
+In addition to `toArray()`, models and collections can be converted directly to a JSON string with `toJson()` (Eloquent-style):
+
+```php
+$user = User::find(1);
+$json = $user->toJson();                 // '{"id":1,"name":"Jane",...}'
+$pretty = $user->toJson(JSON_PRETTY_PRINT);
+
+$users = User::query()->where('active', true)->get();
+$json = $users->toJson();                 // JSON array of every user
+```
+
+- `toJson($options = 0)` internally calls `toArray()` and JSON-encodes the result, so it respects `$fillable`/casts and, importantly, `$hidden`/`$visible` (see [Hidden & Visible Attributes](#hidden--visible-attributes-hidden-and-visible) below) — sensitive columns stay out of the JSON output the same way they stay out of `toArray()`.
+- `$options` is passed straight through to PHP's `json_encode()` (e.g. `JSON_PRETTY_PRINT`, `JSON_UNESCAPED_UNICODE`).
+- If encoding fails — e.g. an attribute contains malformed UTF-8, or a cast produced a `NAN`/`INF` float — `toJson()` throws a `\JsonException` describing the failure, rather than silently returning `false`. Wrap calls in a `try`/`catch` if you need to handle that case explicitly:
+
+```php
+try {
+    $json = $user->toJson();
+} catch (\JsonException $e) {
+    // log / handle the encoding failure
+}
+```
+
+- Both `Model` and `Collection` also implement `__toString()`, so they can be used directly in string contexts and will produce the same output as `toJson()`:
+
+```php
+echo $user;                    // same as echo $user->toJson();
+$log = "Created user: {$user}";
+
+echo $users;                   // same as echo $users->toJson();
+```
+
 ## Mass Assignment Protection: $fillable and $guarded
 
 WPORM protects against unintended mass assignment, just like Eloquent. Use `$fillable` to whitelist attributes that can be set via `fill()`, the constructor, `__set()` (including array access like `$model['name'] = ...`), `updateOrCreate()`, `firstOrCreate()`, or `firstOrNew()`. Use `$guarded` (default: `['id']`) to blacklist attributes instead — anything **not** in `$guarded` is mass-assignable. `$guarded` is only checked when `$fillable` is empty.
@@ -551,7 +586,7 @@ class User extends Model {
 
 $user = User::find(1);
 $user->toArray(); // 'password' and 'remember_token' are excluded
-$user->toJson();  // same — toJson() is just json_encode(toArray())
+$user->toJson();  // same — toJson() JSON-encodes the result of toArray()
 ```
 
 Hidden attributes are still fully accessible on the model object itself (`$user->password` works fine) — they're only stripped when the model is converted to an array or JSON.
@@ -596,7 +631,8 @@ All multi-result queries (`get()`, `all()`, etc.) return a `Collection` instance
 | `count()` | `int` | Number of items |
 | `isEmpty()` | `bool` | Whether the collection is empty |
 | `toArray()` | `array` | Convert all items to arrays |
-| `toJson($options = 0)` | `string` | JSON-encode the collection (via `toArray()`) |
+| `toJson($options = 0)` | `string` | JSON-encode the collection (via `toArray()`); throws `\JsonException` on encoding failure |
+| `__toString()` | `string` | Same output as `toJson()`, for use in string contexts (e.g. `echo $collection;`) |
 | `filter(callable)` | `Collection` | Return a new filtered collection |
 | `map(callable)` | `Collection` | Return a new collection with transformed items |
 | `transform(callable)` | `$this` | Transform items **in-place** (mutating) |
