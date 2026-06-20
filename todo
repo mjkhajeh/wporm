@@ -37,7 +37,7 @@ The latest task was not completed. (Moderate Issues: 1)
   | ✅ 18 | pluck() | User::pluck('email', 'id') | Column extraction |
   | ✅ 19 | exists() / doesntExist() | User::where('email',$e)->exists() | Boolean existence check |
   | ✅ 20 | selectRaw() / whereRaw() / orWhereRaw() / havingRaw() / orHavingRaw() / groupByRaw() | Raw SQL expressions | orderByRaw() now has full raw-clause coverage |
-  | 21 | chunk() / each() | Process large datasets in batches | Memory management |
+  | ✅ 21 | chunk() / each() | Process large datasets in batches | Memory management |
   | 22 | toJson() on Model | $user->toJson() | Serialization |
   | ✅ 23 | $hidden property | Hide attributes from toArray()/toJson() | API security (passwords etc.) |
   | 24 | findOrFail() / firstOrFail() | Throw exception on not found | Cleaner error handling |
@@ -195,8 +195,21 @@ Other works need to be done:
     shortcuts (e.g. timestampWithDefault()), which already embedded
     CURRENT_TIMESTAMP directly into the column type string rather than
     going through ->default().
-  - Documented this in Blueprint.md with a new "Column Modifiers" section
-    covering nullable(), default(), autoIncrement(), and unique() as
-    chainable column-definition modifiers (previously undocumented as a
-    group), including examples of which default() values get quoted vs.
-    emitted as raw SQL.
+  - Added chunk($count, $callback) on QueryBuilder — processes results in
+    pages instead of loading the whole result set into memory at once.
+    Internally drives the existing limit()/offset()/get() machinery on the
+    same builder instance (the same pattern paginate()/simplePaginate()
+    already use), so it automatically respects whatever where()/join()/
+    soft-delete scoping is already on the query. The callback receives a
+    Collection of up to $count models plus the current page number; returning
+    false from the callback stops iteration early (chunk() then returns
+    false), otherwise chunk() returns true once it runs out of rows.
+  - Added each($callback, $count = 1000) on QueryBuilder — same underlying
+    paging as chunk(), but invokes the callback once per individual model
+    (with a running zero-based $index) instead of once per page. Returning
+    false from the callback stops iteration early. Implemented as a thin
+    wrapper around chunk() rather than duplicating the paging loop.
+  - Updated Methods.md (new entries under Retrieval Methods / a new
+    "Batch Processing" section + TOC entry) and Readme.md (Features list +
+    new "Processing Large Datasets: chunk() and each()" section with
+    examples) to document both methods.

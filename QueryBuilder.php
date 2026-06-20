@@ -1930,6 +1930,83 @@ class QueryBuilder {
     }
 
     /**
+     * Process the query results in chunks, running one LIMIT/OFFSET query per
+     * chunk instead of loading the whole result set into memory at once
+     * (Eloquent-style chunk()).
+     *
+     * The callback receives a Collection of up to $count models for each
+     * chunk. Returning `false` from the callback stops processing early.
+     *
+     * Usage:
+     *   User::query()->where('active', true)->chunk(100, function($users) {
+     *       foreach ($users as $user) {
+     *           // ...
+     *       }
+     *   });
+     *
+     * @param int $count Number of records per chunk
+     * @param callable $callback function(Collection $chunk, int $page): mixed
+     * @return bool false if the callback stopped iteration early, true otherwise
+     */
+    public function chunk($count, callable $callback) {
+        $count = max((int) $count, 1);
+        $page = 1;
+
+        while (true) {
+            $this->limit($count)->offset(($page - 1) * $count);
+            $results = $this->get();
+
+            $numResults = count($results);
+            if ($numResults === 0) {
+                break;
+            }
+
+            if ($callback($results, $page) === false) {
+                return false;
+            }
+
+            if ($numResults < $count) {
+                break;
+            }
+
+            $page++;
+        }
+
+        return true;
+    }
+
+    /**
+     * Process the query results one record at a time, internally fetching
+     * them in chunks for memory efficiency (Eloquent-style each()).
+     *
+     * The callback receives each individual model plus its zero-based index
+     * across the whole result set. Returning `false` from the callback stops
+     * processing early.
+     *
+     * Usage:
+     *   User::query()->where('active', true)->each(function($user, $index) {
+     *       // ...
+     *   });
+     *   User::query()->each(function($user) { ... }, 500); // custom chunk size
+     *
+     * @param callable $callback function(Model $item, int $index): mixed
+     * @param int $count Number of records to fetch per underlying chunk query
+     * @return bool false if the callback stopped iteration early, true otherwise
+     */
+    public function each(callable $callback, $count = 1000) {
+        $index = 0;
+
+        return $this->chunk($count, function($results) use ($callback, &$index) {
+            foreach ($results as $item) {
+                if ($callback($item, $index) === false) {
+                    return false;
+                }
+                $index++;
+            }
+        });
+    }
+
+    /**
      * Filter by existence of related records (Eloquent-style whereHas).
      *
      * Calls the relation method on a fresh model instance so that no

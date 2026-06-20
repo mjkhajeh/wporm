@@ -11,6 +11,7 @@ This document describes all public and static methods of the `MJ\WPORM\Model` cl
 - [Raw SQL Expressions](#raw-sql-expressions)
 - [Retrieval Methods](#retrieval-methods)
 - [Aggregates & Utility Methods](#aggregates--utility-methods)
+- [Batch Processing](#batch-processing)
 - [Persistence Methods](#persistence-methods)
 - [Relationship Methods](#relationship-methods)
 - [Relationship Existence Filtering](#relationship-existence-filtering)
@@ -991,6 +992,52 @@ $user->decrement('credits');
 $user->decrement('credits', 3);
 
 User::query()->where('subscription', 'expired')->decrement('seats', 1);
+```
+
+---
+
+## Batch Processing
+
+These methods process query results in pages instead of loading the entire
+result set into memory at once — essential for iterating over large tables
+(Eloquent-style `chunk()`/`each()`). Both are built on the same `limit()`/
+`offset()` mechanism as `paginate()`, so they respect whatever `where()`/
+`join()`/soft-delete scoping is already on the query.
+
+### chunk($count, callable $callback)
+**Description:** Run the query in pages of `$count` records, invoking `$callback` once per page with a `Collection` of up to `$count` models and the current page number (`function(Collection $chunk, int $page)`). Returning `false` from the callback stops processing early. Returns `false` if iteration was stopped early, `true` otherwise.
+
+**Example:**
+```php
+User::query()->where('active', true)->chunk(100, function($users) {
+    foreach ($users as $user) {
+        // process $user
+    }
+});
+
+// Stop early once a condition is met
+Order::query()->chunk(200, function($orders, $page) {
+    foreach ($orders as $order) {
+        if ($order->total > 1000000) {
+            return false; // stops chunk() entirely
+        }
+    }
+});
+```
+
+### each(callable $callback, $count = 1000)
+**Description:** Like `chunk()`, but invokes `$callback` once per individual model instead of once per page — `function(Model $item, int $index)`, where `$index` is a running zero-based counter across the whole result set. Internally fetches records in pages of `$count` for memory efficiency. Returning `false` from the callback stops processing early. Returns `false` if iteration was stopped early, `true` otherwise.
+
+**Example:**
+```php
+User::query()->where('active', true)->each(function($user, $index) {
+    // process one $user at a time
+});
+
+// Custom chunk size for the underlying paged fetches (default 1000)
+User::query()->each(function($user) {
+    // ...
+}, 500);
 ```
 
 ---

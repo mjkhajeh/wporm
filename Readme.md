@@ -18,6 +18,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Attribute casting**: Automatic type casting for model attributes.
 - **Relationships**: Define `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, and `hasManyThrough` relationships, with eager loading via `with()` and existence filtering via `whereHas()`/`has()`.
 - **Aggregates & utilities**: `sum()`, `avg()`, `min()`, `max()`, `value()`, `pluck()`, `exists()`/`doesntExist()`, and `increment()`/`decrement()`.
+- **Batch processing**: `chunk()` and `each()` for iterating large result sets in pages without loading everything into memory at once.
 - **Raw SQL expressions**: `selectRaw()`, `whereRaw()`/`orWhereRaw()`, `groupByRaw()`, `havingRaw()`/`orHavingRaw()`, and `orderByRaw()` for dropping down to raw SQL with safe, bound placeholders.
 - **Events**: Hooks for model lifecycle events (creating, updating, deleting).
 - **Global scopes**: Add global query constraints to models.
@@ -429,6 +430,53 @@ $result = User::query()->where('active', true)->simplePaginate(10, 2);
 ```
 
 See [Methods.md](./Methods.md) for more details and options.
+
+## Processing Large Datasets: chunk() and each()
+
+When you need to iterate over a large number of records, loading them all into memory at once with `get()` isn't practical. `chunk()` and `each()` solve this Eloquent-style, by running the query in pages (using the same `limit()`/`offset()` mechanism as `paginate()`) and feeding results to a callback as they come in.
+
+### chunk($count, $callback)
+
+Runs the query in pages of `$count` records, calling `$callback` once per page with a `Collection` of models:
+
+```php
+User::query()->where('active', true)->chunk(100, function ($users) {
+    foreach ($users as $user) {
+        // ...
+    }
+});
+```
+
+The callback also receives the current page number as a second argument, and can return `false` to stop processing early:
+
+```php
+Order::query()->chunk(200, function ($orders, $page) {
+    foreach ($orders as $order) {
+        if ($order->total > 1_000_000) {
+            return false; // stops chunk() immediately
+        }
+    }
+});
+```
+
+### each($callback, $count = 1000)
+
+Like `chunk()`, but calls `$callback` once per **individual model** instead of once per page, while still fetching records from the database in pages internally (default page size: 1000). The callback receives the model and a running zero-based index:
+
+```php
+User::query()->where('active', true)->each(function ($user, $index) {
+    // process one $user at a time
+});
+
+// Customize the internal page size
+User::query()->each(function ($user) {
+    // ...
+}, 500);
+```
+
+Just like `chunk()`, returning `false` from the callback stops processing early.
+
+Both methods automatically respect any `where()`/`join()`/soft-delete scoping already applied to the query, since they're built on the same query builder instance.
 
 ## Attribute Casting
 Add a `$casts` property to your model:
