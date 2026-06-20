@@ -534,6 +534,46 @@ $table->id();
 
 ---
 
+## Column Modifiers
+
+These methods are chained onto any column definition (the object returned by `$table->string(...)`, `$table->integer(...)`, etc.) to further configure that column.
+
+### nullable($value = true)
+**Description:** Marks the column as `NULL` (nullable). Pass `false` to explicitly force `NOT NULL`.
+**Example:**
+```php
+$table->string('middle_name')->nullable();
+```
+
+### default($value)
+**Description:** Sets a `DEFAULT` value for the column. Plain strings, ints, floats, and booleans are rendered as quoted/unquoted literals as appropriate (e.g. `'active'`, `1`, `0.5`). Raw SQL keywords/expressions — `CURRENT_TIMESTAMP`, `CURRENT_TIMESTAMP(n)`, `CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`, `NOW()`, `NULL`, `TRUE`, `FALSE`, `UUID()` (matched case-insensitively) — are detected automatically and emitted **unquoted**, so they execute as SQL rather than being stored as the literal string `'CURRENT_TIMESTAMP'`.
+**Example:**
+```php
+$table->string('status')->default('active');           // DEFAULT 'active'
+$table->integer('votes')->default(0);                   // DEFAULT 0
+$table->boolean('is_active')->default(true);             // DEFAULT 1
+$table->timestamp('created_at')->default('CURRENT_TIMESTAMP'); // DEFAULT CURRENT_TIMESTAMP (unquoted)
+$table->timestamp('updated_at')->default('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'); // unquoted
+```
+> **Note:** For the common "timestamp that defaults to (and updates with) the current time" case, prefer the dedicated shortcut column types below (e.g. `timestampWithDefault()`, `dateTimeWithDefaultCurrentOnUpdate()`) — they build the same `CURRENT_TIMESTAMP` SQL directly into the column type and need no `->default(...)` call at all. Use `->default('CURRENT_TIMESTAMP')` directly when you need it on a column type that doesn't have its own `...WithDefault()` shortcut.
+
+### autoIncrement($value = true)
+**Description:** Marks the column as `AUTO_INCREMENT`. Typically used internally by `increments()`/`bigIncrements()`/etc., but can be applied to any integer column directly.
+**Example:**
+```php
+$table->integer('seq')->autoIncrement();
+```
+
+### unique($name = null)
+**Description:** Adds a unique index for this single column (Eloquent-style chaining). For multi-column unique indexes, use the Blueprint-level `unique(['col1', 'col2'])` instead.
+**Example:**
+```php
+$table->string('email')->unique();
+$table->integer('user_id')->unique('custom_index_name');
+```
+
+---
+
 ## Timestamps & Soft Deletes
 
 ### timestamps()

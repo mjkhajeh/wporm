@@ -62,6 +62,58 @@ class ColumnDefinition
         return $this;
     }
 
+    /**
+     * Raw SQL default expressions/keywords that must NOT be quoted as string
+     * literals when rendered in DEFAULT (...). Matched case-insensitively,
+     * with an optional parenthesized argument (e.g. CURRENT_TIMESTAMP(3)).
+     *
+     * @var string[]
+     */
+    protected static $rawDefaultKeywords = [
+        'CURRENT_TIMESTAMP',
+        'NULL',
+        'TRUE',
+        'FALSE',
+        'NOW',
+        'UUID',
+    ];
+
+    /**
+     * Determine whether a given default value should be emitted as a raw,
+     * unquoted SQL expression (e.g. CURRENT_TIMESTAMP, CURRENT_TIMESTAMP(3),
+     * NOW()) rather than a quoted string literal.
+     *
+     * @param mixed $value
+     * @return bool
+     */
+    protected static function isRawDefaultExpression($value): bool
+    {
+        if (!is_string($value)) {
+            return false;
+        }
+
+        $trimmed = trim($value);
+
+        foreach (static::$rawDefaultKeywords as $keyword) {
+            // Matches the bare keyword, or the keyword followed by an
+            // optional parenthesized argument list, e.g.:
+            //   CURRENT_TIMESTAMP
+            //   CURRENT_TIMESTAMP(3)
+            //   current_timestamp ON UPDATE CURRENT_TIMESTAMP
+            if (preg_match('/^' . preg_quote($keyword, '/') . '(\s*\(.*\))?$/i', $trimmed)) {
+                return true;
+            }
+        }
+
+        // Also treat "<KEYWORD> ON UPDATE <KEYWORD>(...)" style compound
+        // defaults as raw, since they're SQL expressions, not literals.
+        if (preg_match('/^(CURRENT_TIMESTAMP|NOW)(\s*\([^)]*\))?\s+ON\s+UPDATE\s+(CURRENT_TIMESTAMP|NOW)(\s*\([^)]*\))?$/i', $trimmed)) {
+            return true;
+        }
+
+        return false;
+    }
+
     public function toSql(): string
     {
         $sql = "{$this->name} {$this->type}";
@@ -71,7 +123,19 @@ class ColumnDefinition
         if ($this->nullable) $sql .= " NULL";
 
         if ($this->default !== null) {
-            $val = is_string($this->default) ? "'{$this->default}'" : $this->default;
+            if (is_bool($this->default)) {
+                // Booleans map to 1/0, never quoted.
+                $val = $this->default ? '1' : '0';
+            } elseif (is_int($this->default) || is_float($this->default)) {
+                $val = $this->default;
+            } elseif (static::isRawDefaultExpression($this->default)) {
+                // Raw SQL keyword/expression (CURRENT_TIMESTAMP, NOW(), etc.)
+                // — emit as-is, uppercased for readability, never quoted.
+                $val = strtoupper(trim($this->default));
+            } else {
+                // Plain string literal — quote it (and escape embedded quotes).
+                $val = "'" . str_replace("'", "\\'", $this->default) . "'";
+            }
             $sql .= " DEFAULT $val";
         }
 

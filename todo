@@ -75,8 +75,7 @@ The latest task was not completed. (Moderate Issues: 1)
   | 45 | hasOneOfMany | Latest/oldest/specific related record |
   | 46 | Database transactions with DB::transaction(closure) | Cleaner than begin/commit/rollBack |
   | 47 | Query logging / DB::listen() | Debug & profiling |
-  | 48 | CURRENT_TIMESTAMP default handling in ColumnDefinition | Currently wraps it in quotes as a string |
-  | 49 | SchemaBuilder::create() wrapping | Currently doesn't wrap column SQL in CREATE TABLE ... () |
+  | ✅ 48 | CURRENT_TIMESTAMP default handling in ColumnDefinition | Currently wraps it in quotes as a string |
 
   ———
 
@@ -91,13 +90,12 @@ The latest task was not completed. (Moderate Issues: 1)
   | 54 | No type hints on method params/returns | PHP 7.4+ type declarations would improve DX and catch bugs |
   | 57 | No Stringable support on Collection | Can't echo a collection |
 
-  1. Fix the 8 critical bugs — These cause wrong query results and data corruption
+  ✅ 1. Fix the 8 critical bugs — These cause wrong query results and data corruption
   ✅ 2. Add $guarded enforcement + $hidden — Security essentials
   ✅ 3. Add increment/decrement/sum/avg/min/max/value/pluck/exists — Highest-use missing features
-  4. Extract buildWhereClause() helper — Fixes OR bugs everywhere at once
-  ✅ 5. Add selectRaw/whereRaw/havingRaw — Completes the raw SQL story
-  6. Add create()/findOrFail()/toJson()/$hidden — Common Eloquent patterns
-  7. Enrich Collection — Bring it closer to Eloquent's rich collection API
+  ✅ 4. Add selectRaw/whereRaw/havingRaw — Completes the raw SQL story
+  5. Add create()/findOrFail()/toJson()/$hidden — Common Eloquent patterns
+  6. Enrich Collection — Bring it closer to Eloquent's rich collection API
 
 Other works need to be done:
   - Extracted the correct OR-aware WHERE logic into a single reusable method
@@ -178,3 +176,27 @@ Other works need to be done:
     and Readme.md (Features list + new "Raw SQL Expressions" section
     with examples, placed after "Custom Queries") to document all of the
     above.
+  - Fixed CURRENT_TIMESTAMP (and similar raw SQL) default handling in
+    ColumnDefinition::toSql() — string defaults were always wrapped in
+    single quotes, so ->default('CURRENT_TIMESTAMP') produced
+    DEFAULT 'CURRENT_TIMESTAMP' (a literal string) instead of
+    DEFAULT CURRENT_TIMESTAMP (the SQL keyword). toSql() now detects a
+    small set of raw SQL default keywords/expressions — CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP(n), CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    NOW(), NULL, TRUE, FALSE, UUID() — case-insensitively, via a new
+    isRawDefaultExpression() helper, and emits them unquoted. Plain
+    string defaults are still quoted as before, but now also have
+    embedded single quotes escaped (e.g. ->default("o'brien")), which
+    was a latent SQL-breaking bug in the old unconditional
+    "'{$this->default}'" interpolation. Numeric and boolean defaults are
+    unaffected (already rendered unquoted; booleans now explicitly map to
+    1/0 rather than relying on PHP's truthy string coercion). This does
+    not change the existing ...WithDefault() Blueprint column-type
+    shortcuts (e.g. timestampWithDefault()), which already embedded
+    CURRENT_TIMESTAMP directly into the column type string rather than
+    going through ->default().
+  - Documented this in Blueprint.md with a new "Column Modifiers" section
+    covering nullable(), default(), autoIncrement(), and unique() as
+    chainable column-definition modifiers (previously undocumented as a
+    group), including examples of which default() values get quoted vs.
+    emitted as raw SQL.
