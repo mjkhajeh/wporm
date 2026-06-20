@@ -31,11 +31,11 @@ The latest task was not completed. (Moderate Issues: 1)
 
   | # | Feature | Eloquent Equivalent | Impact |
   |---|---------|-------------------|--------|
-  | 15 | increment() / decrement() | User::where(...)->increment('votes') | Very common for counters |
-  | 16 | sum() / avg() / min() / max() | Order::where('status','paid')->sum('total') | Essential aggregates |
-  | 17 | value() | User::where('id',1)->value('email') | Single column, single row |
-  | 18 | pluck() | User::pluck('email', 'id') | Column extraction |
-  | 19 | exists() / doesntExist() | User::where('email',$e)->exists() | Boolean existence check |
+  | ✅ 15 | increment() / decrement() | User::where(...)->increment('votes') | Very common for counters |
+  | ✅ 16 | sum() / avg() / min() / max() | Order::where('status','paid')->sum('total') | Essential aggregates |
+  | ✅ 17 | value() | User::where('id',1)->value('email') | Single column, single row |
+  | ✅ 18 | pluck() | User::pluck('email', 'id') | Column extraction |
+  | ✅ 19 | exists() / doesntExist() | User::where('email',$e)->exists() | Boolean existence check |
   | 20 | selectRaw() / whereRaw() / havingRaw() | Raw SQL expressions | Only orderByRaw() exists |
   | 21 | chunk() / each() | Process large datasets in batches | Memory management |
   | 22 | toJson() on Model | $user->toJson() | Serialization |
@@ -93,7 +93,7 @@ The latest task was not completed. (Moderate Issues: 1)
 
   1. Fix the 8 critical bugs — These cause wrong query results and data corruption
   ✅ 2. Add $guarded enforcement + $hidden — Security essentials
-  3. Add increment/decrement/sum/avg/min/max/value/pluck/exists — Highest-use missing features
+  ✅ 3. Add increment/decrement/sum/avg/min/max/value/pluck/exists — Highest-use missing features
   4. Extract buildWhereClause() helper — Fixes OR bugs everywhere at once
   5. Add selectRaw/whereRaw/havingRaw — Completes the raw SQL story
   6. Add create()/findOrFail()/toJson()/$hidden — Common Eloquent patterns
@@ -114,3 +114,33 @@ Other works need to be done:
     properties, toArray()/toJson() now filter through applyVisibility(),
     plus getHidden()/setHidden()/getVisible()/setVisible()/makeHidden()/
     makeVisible() helpers (Eloquent-style). Collection::toJson() added too.
+  - Added sum()/avg() (+ average() alias)/min()/max() to QueryBuilder, all
+    backed by a shared protected aggregate() helper that swaps in a single
+    aggregate SELECT, respects the current WHERE/JOIN/GROUP BY and the
+    model's soft-delete scope, then restores the original select list so
+    the builder instance stays reusable afterward.
+  - Added value($column) — SELECTs just that column, reuses first(), and
+    resolves dot-notation/aliased column names back to the correct result
+    key via a new resultColumnName() helper.
+  - Added pluck($column, $key = null) at the QueryBuilder level — queries
+    only the requested column(s) directly (no full model hydration) and
+    returns a flat array, or an associative array keyed by $key. Distinct
+    from (and complements) the existing Collection::pluck(), which plucks
+    from an already-fetched collection of hydrated models.
+  - Added exists()/doesntExist() — short-circuits with LIMIT 1 and a
+    minimal SELECT 1, cheaper than count() > 0 or checking first().
+  - Added increment()/decrement() in two places:
+      - QueryBuilder::increment()/decrement() — bulk, affects every row
+        matching the current query via a single atomic
+        UPDATE ... SET col = col +/- %s [, extra...] WHERE ... statement.
+      - Model::increment()/decrement() (instance methods) — automatically
+        scoped to the model's own primary key (so $user->increment('votes')
+        only touches that one row, unlike the generic __call() proxy which
+        would have run on an unscoped fresh query), and syncs the new
+        value(s) onto the in-memory model afterward so no refresh() is
+        needed. Both forms auto-touch updated_at when timestamps are
+        enabled, unless the caller supplies it via the optional $extra
+        array.
+  - Updated Methods.md (new "Aggregates & Utility Methods" section + TOC
+    entry) and Readme.md (Features list + new "Aggregates & Utility
+    Methods" section with examples) to document all of the above.

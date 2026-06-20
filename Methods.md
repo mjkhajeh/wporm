@@ -9,6 +9,7 @@ This document describes all public and static methods of the `MJ\WPORM\Model` cl
 - [Constructor](#constructor)
 - [Query Methods](#query-methods)
 - [Retrieval Methods](#retrieval-methods)
+- [Aggregates & Utility Methods](#aggregates--utility-methods)
 - [Persistence Methods](#persistence-methods)
 - [Relationship Methods](#relationship-methods)
 - [Relationship Existence Filtering](#relationship-existence-filtering)
@@ -777,6 +778,111 @@ DB::table('users')->upsert([
 - If timestamps are enabled on the model, `created_at` and `updated_at` are handled automatically.
 - The `$uniqueBy` columns must have a unique or primary key constraint in the database for the ON DUPLICATE KEY behavior to work.
 - If `$update` is empty (no columns to update), falls back to `INSERT IGNORE` behavior.
+
+---
+
+## Aggregates & Utility Methods
+
+These query builder methods cover the most common aggregate/lookup needs (Eloquent-style) without requiring a full `get()`/`toArray()` round-trip.
+
+### sum($column)
+**Description:** Get the sum of a column's values across all rows matching the query. Returns `0` if no rows matched.
+
+**Example:**
+```php
+$total = Order::query()->where('status', 'paid')->sum('total');
+```
+
+### avg($column) / average($column)
+**Description:** Get the average of a column's values across all rows matching the query. Returns `null` if no rows matched. `average()` is an alias for `avg()`.
+
+**Example:**
+```php
+$avgPrice = Product::query()->avg('price');
+$avgPrice = Product::query()->average('price'); // same thing
+```
+
+### min($column)
+**Description:** Get the minimum value of a column across all rows matching the query.
+
+**Example:**
+```php
+$cheapest = Product::query()->min('price');
+```
+
+### max($column)
+**Description:** Get the maximum value of a column across all rows matching the query.
+
+**Example:**
+```php
+$mostExpensive = Product::query()->max('price');
+```
+
+### value($column)
+**Description:** Get a single column's value from the first row matching the query — useful when you only need one field and don't want to hydrate (or look at) the rest of the model.
+
+**Example:**
+```php
+$email = User::query()->where('id', 1)->value('email');
+```
+
+### pluck($column, $key = null)
+**Description:** Get a flat array of a single column's values across all matching rows, without hydrating full models. If `$key` is provided, returns an associative array keyed by that column instead.
+
+**Example:**
+```php
+$emails = User::query()->pluck('email');
+$emailsById = User::query()->pluck('email', 'id'); // [1 => 'a@test.com', 2 => 'b@test.com', ...]
+```
+> Note: This is the query-builder-level `pluck()`, which queries only the requested column(s) directly from the database. `Collection::pluck()` (see [Collections](./Readme.md#collections)) operates on an already-fetched collection of hydrated models instead.
+
+### exists()
+**Description:** Determine whether any rows match the current query. More efficient than `count() > 0` or checking `first()` since it short-circuits with `LIMIT 1`.
+
+**Example:**
+```php
+if (User::query()->where('email', $email)->exists()) {
+    // Email is already taken
+}
+```
+
+### doesntExist()
+**Description:** Inverse of `exists()` — returns `true` if no rows match the current query.
+
+**Example:**
+```php
+if (User::query()->where('email', $email)->doesntExist()) {
+    // Safe to create a new user with this email
+}
+```
+
+### increment($column, $amount = 1, array $extra = [])
+**Description:** Increment a column's value. Available both as a **query builder** method (affects every row matching the current query, in a single atomic `UPDATE ... SET col = col + amount` statement) and as an **instance** method on a model (affects only that model's row, scoped automatically by its primary key, and syncs the new value onto the in-memory model). An optional `$extra` array of additional `column => value` pairs can be set in the same query (e.g. to bump a `last_voted_at` timestamp alongside the counter). If the model uses timestamps, `updated_at` is touched automatically unless you supply it yourself in `$extra`.
+
+**Examples:**
+```php
+// Instance usage — increments votes for this one user only
+$user = User::find(1);
+$user->increment('votes');
+$user->increment('votes', 5);
+$user->increment('votes', 1, ['last_voted_at' => current_time('mysql')]);
+
+// Query builder usage — increments votes for every matching row
+User::query()->where('active', true)->increment('votes');
+User::query()->where('role', 'admin')->increment('credits', 10);
+```
+
+### decrement($column, $amount = 1, array $extra = [])
+**Description:** Decrement a column's value. Same usage and semantics as `increment()`, just subtracting instead of adding.
+
+**Examples:**
+```php
+$user = User::find(1);
+$user->decrement('credits');
+$user->decrement('credits', 3);
+
+User::query()->where('subscription', 'expired')->decrement('seats', 1);
+```
 
 ---
 

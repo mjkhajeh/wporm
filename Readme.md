@@ -17,6 +17,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Query builder**: Chainable query builder for flexible and safe SQL queries.
 - **Attribute casting**: Automatic type casting for model attributes.
 - **Relationships**: Define `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, and `hasManyThrough` relationships, with eager loading via `with()` and existence filtering via `whereHas()`/`has()`.
+- **Aggregates & utilities**: `sum()`, `avg()`, `min()`, `max()`, `value()`, `pluck()`, `exists()`/`doesntExist()`, and `increment()`/`decrement()`.
 - **Events**: Hooks for model lifecycle events (creating, updating, deleting).
 - **Global scopes**: Add global query constraints to models.
 
@@ -336,6 +337,60 @@ You can quickly remove all rows from a model's table using `truncate()` on the m
 // Remove all records from the table
 Parts::query()->truncate();
 ```
+
+## Aggregates & Utility Methods
+
+WPORM provides Eloquent-style aggregate and utility methods on the query builder for common lookups, so you don't always need to fetch full models just to compute a number or check a single value.
+
+```php
+// Sum, average, min, max
+$totalQty   = Parts::query()->where('product_id', 2)->sum('qty');
+$avgPrice   = Product::query()->avg('price');     // or ->average('price')
+$cheapest   = Product::query()->min('price');
+$mostExpensive = Product::query()->max('price');
+
+// Get a single column's value from the first matching row
+$email = User::query()->where('id', 1)->value('email');
+
+// Get a flat array of a column's values (optionally keyed by another column)
+$emails     = User::query()->pluck('email');
+$emailsById = User::query()->pluck('email', 'id');
+
+// Existence checks
+if (User::query()->where('email', $email)->exists()) {
+    // already taken
+}
+if (User::query()->where('email', $email)->doesntExist()) {
+    // free to use
+}
+```
+
+### increment() / decrement()
+
+Bump a numeric column up or down in a single atomic `UPDATE` statement — no need to read the value, add to it in PHP, then write it back.
+
+```php
+// Instance usage — scoped automatically to this model's primary key
+$user = User::find(1);
+$user->increment('votes');                 // votes + 1
+$user->increment('votes', 5);               // votes + 5
+$user->increment('votes', 1, [
+    'last_voted_at' => current_time('mysql'),
+]);
+
+$user->decrement('credits');                // credits - 1
+$user->decrement('credits', 3);             // credits - 3
+
+// Query builder usage — affects every row matching the query
+User::query()->where('active', true)->increment('votes');
+User::query()->where('role', 'admin')->increment('credits', 10);
+User::query()->where('subscription', 'expired')->decrement('seats');
+```
+
+- If the model uses timestamps, `updated_at` is touched automatically (unless you pass it yourself via the optional `$extra` array).
+- The instance form keeps the in-memory model in sync with the new value, so you don't need to `refresh()`/re-fetch afterward.
+
+See [Methods.md](./Methods.md#aggregates--utility-methods) for the full list with signatures.
 
 ## Pagination
 

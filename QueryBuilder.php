@@ -2049,4 +2049,300 @@ class QueryBuilder {
         $primaryKey = $this->model->primaryKey ?? 'id';
         return $this->where($primaryKey, $id)->first();
     }
+
+    // -------------------------------------------------------------------------
+    // Aggregates & single-value helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Run an aggregate function (COUNT, SUM, AVG, MIN, MAX) against a column,
+     * respecting the current WHERE/JOIN/GROUP BY constraints and the model's
+     * soft-delete scope.
+     *
+     * @param string $function SQL aggregate function name, e.g. 'SUM', 'AVG'
+     * @param string $column   Column to aggregate
+     * @return mixed The scalar result, or null if no rows matched.
+     */
+    protected function aggregate($function, $column) {
+        $this->applySoftDeleteScope();
+
+        $quotedColumn = $column === '*' ? '*' : Helpers::quoteIdentifier($column);
+        $selects = $this->selects;
+        $this->selects = ["$function($quotedColumn) as aggregate"];
+
+        $sql = $this->buildSelectQuery();
+        $bindings = $this->getBindings();
+
+        // Restore selects so the builder remains reusable.
+        $this->selects = $selects;
+
+        if ($this->debug) {
+            error_log("[WPORM][$function] SQL: " . $sql);
+            error_log("[WPORM][$function] Bindings: " . print_r($bindings, true));
+        }
+
+        if (!empty($bindings)) {
+            $result = $this->wpdb->get_row($this->wpdb->prepare($sql, ...$bindings), ARRAY_A);
+        } else {
+            $result = $this->wpdb->get_row($sql, ARRAY_A);
+        }
+
+        return $result['aggregate'] ?? null;
+    }
+
+    /**
+     * Get the sum of a column's values.
+     * Usage: Order::query()->where('status', 'paid')->sum('total')
+     * @param string $column
+     * @return float|int
+     */
+    public function sum($column) {
+        $result = $this->aggregate('SUM', $column);
+        return $result === null ? 0 : $result + 0; // +0 promotes numeric string to int|float
+    }
+
+    /**
+     * Get the average of a column's values.
+     * Usage: Product::query()->avg('price')
+     * @param string $column
+     * @return float|int|null
+     */
+    public function avg($column) {
+        $result = $this->aggregate('AVG', $column);
+        return $result === null ? null : $result + 0;
+    }
+
+    /**
+     * Alias for avg().
+     * @param string $column
+     * @return float|int|null
+     */
+    public function average($column) {
+        return $this->avg($column);
+    }
+
+    /**
+     * Get the minimum value of a column.
+     * Usage: Product::query()->min('price')
+     * @param string $column
+     * @return mixed
+     */
+    public function min($column) {
+        $result = $this->aggregate('MIN', $column);
+        return is_numeric($result) ? $result + 0 : $result;
+    }
+
+    /**
+     * Get the maximum value of a column.
+     * Usage: Product::query()->max('price')
+     * @param string $column
+     * @return mixed
+     */
+    public function max($column) {
+        $result = $this->aggregate('MAX', $column);
+        return is_numeric($result) ? $result + 0 : $result;
+    }
+
+    /**
+     * Get a single column's value from the first matching row.
+     * Usage: User::query()->where('id', 1)->value('email')
+     * @param string $column
+     * @return mixed|null
+     */
+    public function value($column) {
+        $row = $this->select([$column])->first();
+        if ($row === null) {
+            return null;
+        }
+        $key = $this->resultColumnName($column);
+        return $row->$key;
+    }
+
+    /**
+     * Get a flat array (or key/value map) of a column's values across all
+     * matching rows, without hydrating full models.
+     * Usage: User::query()->pluck('email'); User::query()->pluck('email', 'id')
+     * @param string $column
+     * @param string|null $key
+     * @return array
+     */
+    public function pluck($column, $key = null) {
+        $this->applySoftDeleteScope();
+
+        $columns = $key !== null ? [$column, $key] : [$column];
+        $selects = $this->selects;
+        $this->selects = $columns;
+
+        $sql = $this->buildSelectQuery();
+        $bindings = $this->getBindings();
+
+        $this->selects = $selects;
+
+        if ($this->debug) {
+            error_log('[WPORM][pluck] SQL: ' . $sql);
+            error_log('[WPORM][pluck] Bindings: ' . print_r($bindings, true));
+        }
+
+        if (!empty($bindings)) {
+            $rows = $this->wpdb->get_results($this->wpdb->prepare($sql, ...$bindings), ARRAY_A);
+        } else {
+            $rows = $this->wpdb->get_results($sql, ARRAY_A);
+        }
+
+        if (!$rows) {
+            return [];
+        }
+
+        // Resolve the actual result column names, since quoteIdentifier()/aliasing
+        // may differ from the raw column name passed in (e.g. 'table.col').
+        $columnKey = $this->resultColumnName($column);
+        $keyKey = $key !== null ? $this->resultColumnName($key) : null;
+
+        $results = [];
+        foreach ($rows as $row) {
+            $value = $row[$columnKey] ?? null;
+            if ($keyKey !== null) {
+                $results[$row[$keyKey] ?? null] = $value;
+            } else {
+                $results[] = $value;
+            }
+        }
+        return $results;
+    }
+
+    /**
+     * Resolve the array key a given select expression will appear under in
+     * a $wpdb ARRAY_A result row (handles "table.column" and "col AS alias").
+     * @param string $column
+     * @return string
+     */
+    protected function resultColumnName($column) {
+        if (preg_match('/\s+as\s+(.+)$/i', $column, $m)) {
+            return trim($m[1], ' `');
+        }
+        if (strpos($column, '.') !== false) {
+            $parts = explode('.', $column);
+            return trim(end($parts), ' `');
+        }
+        return trim($column, ' `');
+    }
+
+    /**
+     * Determine if any rows match the current query.
+     * Usage: User::query()->where('email', $email)->exists()
+     * @return bool
+     */
+    public function exists() {
+        $this->applySoftDeleteScope();
+
+        $selects = $this->selects;
+        $this->selects = ['1 as exists_flag'];
+
+        // We only need to know whether at least one row matches.
+        $this->limit(1);
+        $sql = $this->buildSelectQuery();
+        $bindings = $this->getBindings();
+
+        $this->selects = $selects;
+
+        if ($this->debug) {
+            error_log('[WPORM][exists] SQL: ' . $sql);
+            error_log('[WPORM][exists] Bindings: ' . print_r($bindings, true));
+        }
+
+        if (!empty($bindings)) {
+            $result = $this->wpdb->get_var($this->wpdb->prepare($sql, ...$bindings));
+        } else {
+            $result = $this->wpdb->get_var($sql);
+        }
+
+        return $result !== null;
+    }
+
+    /**
+     * Determine if no rows match the current query (inverse of exists()).
+     * Usage: User::query()->where('email', $email)->doesntExist()
+     * @return bool
+     */
+    public function doesntExist() {
+        return !$this->exists();
+    }
+
+    // -------------------------------------------------------------------------
+    // increment / decrement
+    // -------------------------------------------------------------------------
+
+    /**
+     * Increment a column's value for all rows matching the current query.
+     * Usage: User::query()->where('id', 1)->increment('votes');
+     *        User::query()->where('id', 1)->increment('votes', 5);
+     *        User::query()->where('id', 1)->increment('votes', 1, ['last_voted_at' => current_time('mysql')]);
+     *
+     * @param string $column Column to increment
+     * @param int|float $amount Amount to increment by (default 1)
+     * @param array $extra Additional column => value pairs to set in the same query
+     * @return int|false Number of affected rows, or false on failure
+     */
+    public function increment($column, $amount = 1, array $extra = []) {
+        return $this->incrementOrDecrement($column, $amount, $extra, '+');
+    }
+
+    /**
+     * Decrement a column's value for all rows matching the current query.
+     * Usage: User::query()->where('id', 1)->decrement('votes');
+     *        User::query()->where('id', 1)->decrement('votes', 5);
+     *
+     * @param string $column Column to decrement
+     * @param int|float $amount Amount to decrement by (default 1)
+     * @param array $extra Additional column => value pairs to set in the same query
+     * @return int|false Number of affected rows, or false on failure
+     */
+    public function decrement($column, $amount = 1, array $extra = []) {
+        return $this->incrementOrDecrement($column, $amount, $extra, '-');
+    }
+
+    /**
+     * Shared implementation for increment()/decrement(). Builds a single
+     * UPDATE ... SET col = col +/- %d [, extra = %s ...] WHERE ... statement.
+     *
+     * @param string $column
+     * @param int|float $amount
+     * @param array $extra
+     * @param string $sign '+' or '-'
+     * @return int|false
+     */
+    protected function incrementOrDecrement($column, $amount, array $extra, $sign) {
+        $quotedColumn = Helpers::quoteIdentifier($column);
+        $set = ["$quotedColumn = $quotedColumn $sign %s"];
+        $bindings = [$amount];
+
+        // Auto-touch updated_at if the model supports timestamps, unless the
+        // caller already provided a value for it via $extra.
+        $updatedAtColumn = $this->model->updatedAtColumn ?? null;
+        if (!empty($this->model->timestamps) && $updatedAtColumn && !array_key_exists($updatedAtColumn, $extra)) {
+            $extra[$updatedAtColumn] = current_time('mysql');
+        }
+
+        foreach ($extra as $col => $val) {
+            $set[] = Helpers::quoteIdentifier($col) . ' = %s';
+            $bindings[] = $val;
+        }
+
+        $sql = 'UPDATE ' . Helpers::quoteIdentifier($this->table) . ' SET ' . implode(', ', $set);
+        $where = $this->buildWhereClause();
+        if (!empty($where)) {
+            $sql .= ' WHERE ' . $where;
+        }
+        $allBindings = array_merge($bindings, $this->bindings);
+
+        if ($this->debug) {
+            error_log('[WPORM][incrementOrDecrement] SQL: ' . $sql);
+            error_log('[WPORM][incrementOrDecrement] Bindings: ' . print_r($allBindings, true));
+        }
+
+        if (!empty($allBindings)) {
+            return $this->wpdb->query($this->wpdb->prepare($sql, ...$allBindings));
+        }
+        return $this->wpdb->query($sql);
+    }
 }

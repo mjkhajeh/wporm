@@ -733,6 +733,84 @@ protected function castSet($key, $value) {
 		return true;
 	}
 
+	/**
+	 * Increment a column's value for THIS model's row only (Eloquent-style).
+	 * Runs a single atomic `UPDATE ... SET col = col + amount` query scoped to
+	 * the model's primary key, and syncs the new value onto the in-memory
+	 * attribute so the model reflects the change without a re-fetch.
+	 *
+	 * Usage:
+	 *   $user->increment('votes');
+	 *   $user->increment('votes', 5);
+	 *   $user->increment('votes', 1, ['last_voted_at' => current_time('mysql')]);
+	 *
+	 * @param string $column
+	 * @param int|float $amount
+	 * @param array $extra Additional column => value pairs to set in the same query
+	 * @return int|false Number of affected rows, or false if the model has no PK value
+	 */
+	public function increment($column, $amount = 1, array $extra = []) {
+		return $this->incrementOrDecrement($column, $amount, $extra, 1);
+	}
+
+	/**
+	 * Decrement a column's value for THIS model's row only (Eloquent-style).
+	 * See increment() for details — identical behavior, opposite direction.
+	 *
+	 * @param string $column
+	 * @param int|float $amount
+	 * @param array $extra Additional column => value pairs to set in the same query
+	 * @return int|false Number of affected rows, or false if the model has no PK value
+	 */
+	public function decrement($column, $amount = 1, array $extra = []) {
+		return $this->incrementOrDecrement($column, $amount, $extra, -1);
+	}
+
+	/**
+	 * Shared implementation for the instance increment()/decrement() methods.
+	 * Scopes the update to this model's primary key value via the query builder.
+	 *
+	 * @param string $column
+	 * @param int|float $amount
+	 * @param array $extra
+	 * @param int $direction 1 for increment, -1 for decrement
+	 * @return int|false
+	 */
+	protected function incrementOrDecrement($column, $amount, array $extra, $direction) {
+		$pk = $this->primaryKey;
+		if (!isset($this->attributes[$pk]) && isset($this->$pk)) {
+			$this->attributes[$pk] = $this->$pk;
+		}
+		if (!isset($this->attributes[$pk])) {
+			// Cannot scope the update without a primary key value
+			return false;
+		}
+
+		$query = static::query()->where($pk, $this->attributes[$pk]);
+		$result = $direction > 0
+			? $query->increment($column, $amount, $extra)
+			: $query->decrement($column, $amount, $extra);
+
+		// Sync the new value(s) onto the in-memory model so it reflects the change.
+		$current = (float) ($this->attributes[$column] ?? 0);
+		$newValue = $current + ($direction * $amount);
+		// Preserve int type when possible (most counter columns are integers).
+		$this->attributes[$column] = (floor($newValue) == $newValue) ? (int) $newValue : $newValue;
+		$this->original[$column] = $this->attributes[$column];
+
+		foreach ($extra as $key => $value) {
+			$this->attributes[$key] = $value;
+			$this->original[$key] = $value;
+		}
+		if ($this->timestamps && !array_key_exists($this->updatedAtColumn, $extra)) {
+			// incrementOrDecrement() on the query builder auto-touches updated_at;
+			// mirror that onto the in-memory model too (best-effort, approximate).
+			$this->original[$this->updatedAtColumn] = $this->attributes[$this->updatedAtColumn] ?? null;
+		}
+
+		return $result;
+	}
+
 	public function delete() {
         if ($this->softDeletes) {
             if (method_exists($this, 'softDeleting')) {
