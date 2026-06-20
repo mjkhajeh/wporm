@@ -16,7 +16,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Schema management**: Create and modify tables using a fluent schema builder.
 - **Query builder**: Chainable query builder for flexible and safe SQL queries.
 - **Attribute casting**: Automatic type casting for model attributes.
-- **Relationships**: Define `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, and `hasManyThrough` relationships.
+- **Relationships**: Define `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, and `hasManyThrough` relationships, with eager loading via `with()` and existence filtering via `whereHas()`/`has()`.
 - **Events**: Hooks for model lifecycle events (creating, updating, deleting).
 - **Global scopes**: Add global query constraints to models.
 
@@ -91,6 +91,11 @@ $schema->create('parts', function($table) {
     $table->index('product_id');
 });
 ```
+
+> `SchemaBuilder::create()` automatically wraps your column definitions in a full
+> `CREATE TABLE {prefix}parts (...) {charset_collate};` statement (using `$wpdb->get_charset_collate()`)
+> before handing it to WordPress's `dbDelta()`, and prefixes the table name for you — you only
+> need to supply the bare table name and build columns on `$table`, as shown above.
 
 ### Unique Indexes (Eloquent-style)
 
@@ -572,20 +577,41 @@ WPORM supports Eloquent-style relationships. You can define them in your model u
       return $this->belongsToMany(Role::class, 'user_role', 'user_id', 'role_id');
   }
   ```
+  **Pivot table naming:** If `$pivotTable` is omitted, WPORM follows Eloquent's convention — the
+  lowercased, singular basenames of both models, alphabetically sorted, joined with an underscore,
+  and automatically prefixed (e.g. `User` + `Role` → `{prefix}role_user`). Pass an explicit pivot
+  table name (with or without the prefix) to override this.
+
+  **Join column:** The related table is joined on its own `$primaryKey` (not a hardcoded `id`), so
+  this works correctly even if the related model uses a custom primary key.
 - **hasManyThrough**: Has-many-through
   ```php
   public function comments() {
       return $this->hasManyThrough(Comment::class, Post::class, 'user_id', 'post_id');
   }
   ```
+  **Key convention (matches Eloquent):**
+  - `$firstKey` — the foreign key **on the through table** (`Post`) that points back to *this*
+    model (`User`). Defaults to `{this_model}_id`, e.g. `user_id`.
+  - `$secondKey` — the foreign key **on the related table** (`Comment`) that points to the
+    through table (`Post`). Defaults to `{through_model}_id`, e.g. `post_id`.
+  - `$localKey` — the primary key on *this* model (`User`), defaults to `$primaryKey`.
+
+  In other words: `User` → (`Post.user_id`) → `Post` → (`Comment.post_id`) → `Comment`.
 
 All relationship methods (`hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`) return a lazy, chainable `QueryBuilder` when called directly — e.g. `$user->posts()->where('published', 1)->get()`. When accessed as a property instead (e.g. `$user->posts`, `$comment->user`), WPORM automatically resolves the query for you: `hasOne`/`belongsTo`-style relations resolve to a single model (or `null`), and `hasMany`/`belongsToMany`/`hasManyThrough`-style relations resolve to a `Collection`.
+
+> **Note:** Every relationship method embeds metadata about its type and keys on the returned
+> `QueryBuilder` (its "relation context"). This is what powers property-access resolution,
+> `with()` eager loading, and `whereHas()`/`has()` — there's no reflection or guesswork involved,
+> so eager loading and existence filtering work correctly for all five relationship types,
+> including `belongsToMany` and `hasManyThrough`.
 
 ### Relationship Existence Filtering: whereHas, orWhereHas, has
 
 - `whereHas('relation', function($q) { ... })`: Filter models where the relation exists and matches constraints.
 - `orWhereHas('relation', function($q) { ... })`: OR version of whereHas.
-- `has('relation', '>=', 2)`: Filter models with at least (or exactly, or at most) N related records. Operator and count are optional (defaults to ">= 1").
+- `has('relation', '>=', 2)`: Filter models with at least (or exactly, or at most) N related records. Operator and count are optional (defaults to ">= 1"). Implemented as a correlated `COUNT(*)` subquery, so the count comparison is enforced precisely (not just existence).
 
 **Examples:**
 ```php
@@ -602,7 +628,53 @@ User::query()->has('posts', '=', 2)->get();
 User::query()->whereHas('posts', function($q) {
     $q->where('published', 1);
 })->get();
+
+// Works for belongsToMany and hasManyThrough too:
+User::query()->whereHas('roles', function($q) {
+    $q->where('name', 'admin');
+})->get();
 ```
+
+## Eager Loading: with()
+
+To avoid N+1 query problems, load relations up front with `with()` instead of accessing them lazily per-model. All five relationship types (`hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`) are supported.
+
+```php
+// Eager load a single relation
+$users = User::with('posts')->get();
+
+// Eager load multiple relations
+$users = User::with(['posts', 'profile'])->get();
+
+// Works the same on an instance query chain
+$users = User::query()->where('active', true)->with('posts')->get();
+
+// And with first()
+$user = User::with('posts')->where('id', 1)->first();
+```
+
+`with()` runs exactly **one extra query per relation** (not one per model), regardless of how many parent rows were fetched — it batches all parent keys into a single `WHERE ... IN (...)` (or, for `belongsToMany`/`hasManyThrough`, a single joined query), then distributes results back onto each parent model in memory.
+
+### Constraining an eager-loaded relation
+
+Pass a closure to add extra `WHERE` constraints to the relation's query:
+
+```php
+$users = User::with(['posts' => function($q) {
+    $q->where('published', 1)->orderBy('created_at', 'desc');
+}])->get();
+```
+
+### Result shape
+
+- `hasOne` / `belongsTo` relations resolve to a single model instance (or `null` if none matched).
+- `hasMany` / `belongsToMany` / `hasManyThrough` relations resolve to a `Collection` (empty if none matched).
+
+This applies whether the relation was eager-loaded via `with()` or accessed lazily as a property (e.g. `$user->posts`, `$post->user`).
+
+### Disabling global scopes for an eager-loaded relation
+
+See [Per-relation global-scope control](#per-relation-global-scope-control-eager-loads) below — pass an options array instead of a plain closure to disable global scopes and/or apply a constraint together.
 
 ## Custom Attribute Accessors/Mutators
 ```php
@@ -651,6 +723,11 @@ $results = Parts::query()
     ->orderBy('total_qty', 'desc')
     ->limit(5) // Limit to top 5 parts
     ->get();
+
+// Plain column aliasing also works: ->select(['user_id as uid', 'email'])
+
+// Selecting all columns from a specific (joined) table with `.*` is also supported:
+// ->select(['parts.*', 'products.name as product_name'])
 
 // Using $wpdb directly for full custom SQL
 global $wpdb;

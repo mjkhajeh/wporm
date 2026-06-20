@@ -24,7 +24,7 @@ The latest task was not completed. (Moderate Issues: 1)
   ✅ 6.  Dual schema systems — Both raw $schema string and up(Blueprint) exist. Constructor calls both, but only $schema actually creates the table. Confusing and error-prone.
 
   ———
-
+****
   ## 🟡 Missing Eloquent Features (By Priority)
 
   ### High Value — Used Frequently

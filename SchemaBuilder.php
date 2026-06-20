@@ -19,8 +19,21 @@ class SchemaBuilder
     {
         $blueprint = new Blueprint($this->prefix . $table, false, $this->db);
         $callback($blueprint);
-        $sql = $blueprint->toSql();
+        $columnSql = $blueprint->toSql();
+
+        if (empty($columnSql)) {
+            return;
+        }
+
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+
+        $charsetCollate = $this->db->get_charset_collate();
+        $fullTable      = $this->prefix . $table;
+
+        $sql = "CREATE TABLE {$fullTable} (
+{$columnSql}
+) {$charsetCollate};";
+
         \dbDelta($sql);
     }
 

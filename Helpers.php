@@ -11,9 +11,22 @@ class Helpers {
         if ($name === '*' || strpos($name, '`') !== false || preg_match('/\w+\s*\(/', $name)) {
             return $name;
         }
-        // Support dot notation (table.column)
+
+        // Handle "column AS alias" / "column as alias" — quote each side
+        // separately and preserve the AS keyword verbatim.
+        if (preg_match('/^(.+?)\s+as\s+(.+)$/i', $name, $m)) {
+            $expr  = trim($m[1]);
+            $alias = trim($m[2]);
+            return self::quoteIdentifier($expr) . ' AS ' . self::quoteIdentifier($alias);
+        }
+
+        // Support dot notation (table.column or table.*)
         if (strpos($name, '.') !== false) {
             return implode('.', array_map(function($part) {
+                $part = trim($part);
+                if ($part === '*') {
+                    return '*';
+                }
                 return '`' . str_replace('`', '', $part) . '`';
             }, explode('.', $name)));
         }

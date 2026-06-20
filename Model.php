@@ -58,7 +58,7 @@ abstract class Model implements \ArrayAccess {
      * If non-empty, ONLY these attributes (plus appended ones not excluded)
      * are included in toArray()/toJson() output. Eloquent-style $visible.
      * When both $visible and $hidden are set, $visible is applied first,
-     * then $hidden subtracts from that set.
+     * then $hidden subtracts from what remains.
      *
      * @var array
      */
@@ -252,8 +252,8 @@ abstract class Model implements \ArrayAccess {
 	}
 
 	public function __get($key) {
-        // Eager loaded relations
-        if (isset($this->_eagerLoaded[$key])) {
+        // Eager loaded relations: always return the cached value (even null means "loaded but empty")
+        if (array_key_exists($key, $this->_eagerLoaded)) {
             return $this->_eagerLoaded[$key];
         }
 		$method = 'get' . Helpers::convert_to_pascal_case($key) . 'Attribute';
@@ -262,12 +262,15 @@ abstract class Model implements \ArrayAccess {
 		}
 		if (method_exists($this, $key)) {
 			$result = $this->$key();
-			// If the relationship method returns a QueryBuilder, resolve it to a Collection
+			// If the relationship method returns a QueryBuilder, resolve it based on context
 			if ($result instanceof \MJ\WPORM\QueryBuilder) {
                 $context = $result->getRelationContext();
-                if (($context['type'] ?? null) === 'belongsTo' || ($context['type'] ?? null) === 'hasOne') {
+                $type = $context['type'] ?? null;
+                // Single-result relations
+                if ($type === 'belongsTo' || $type === 'hasOne') {
                     return $result->first();
                 }
+                // Collection relations (hasMany, belongsToMany, hasManyThrough)
 				return $result->get();
 			}
 			return $result;
@@ -796,15 +799,34 @@ public function forceDelete() {
      */
     public function forceDeleteWith(array $relations = []) {
         foreach ($relations as $relation) {
-            if (method_exists($this, $relation)) {
-                $related = $this->$relation();
-                if ($related instanceof \MJ\WPORM\Model) {
-                    $related->forceDelete();
-                } elseif ($related instanceof \MJ\WPORM\Collection) {
-                    foreach ($related as $item) {
+            if (!method_exists($this, $relation)) {
+                continue;
+            }
+            $related = $this->$relation();
+
+            // All relationship methods return a QueryBuilder; resolve it based
+            // on its relation type (single model vs collection of models).
+            if ($related instanceof \MJ\WPORM\QueryBuilder) {
+                $context = $related->getRelationContext();
+                $type = $context['type'] ?? null;
+                if ($type === 'belongsTo' || $type === 'hasOne') {
+                    $resolved = $related->first();
+                    if ($resolved instanceof \MJ\WPORM\Model) {
+                        $resolved->forceDelete();
+                    }
+                } else {
+                    foreach ($related->get() as $item) {
                         if ($item instanceof \MJ\WPORM\Model) {
                             $item->forceDelete();
                         }
+                    }
+                }
+            } elseif ($related instanceof \MJ\WPORM\Model) {
+                $related->forceDelete();
+            } elseif ($related instanceof \MJ\WPORM\Collection) {
+                foreach ($related as $item) {
+                    if ($item instanceof \MJ\WPORM\Model) {
+                        $item->forceDelete();
                     }
                 }
             }
@@ -839,79 +861,157 @@ public function forceDelete() {
 		return $wpdb->prefix . strtolower(Helpers::class_basename(static::class));
 	}
 
+	// -------------------------------------------------------------------------
 	// Relationships
+	// -------------------------------------------------------------------------
+
 	/**
+	 * One-to-one relationship.
+	 * Returns a QueryBuilder that resolves to a single related model.
+	 *
 	 * @template T of Model
 	 * @param class-string<T> $related
-	 * @param string|null $foreignKey
-	 * @param string|null $localKey
+	 * @param string|null $foreignKey  FK on the related table pointing to this model
+	 * @param string|null $localKey    PK on this table (default: $primaryKey)
 	 * @return QueryBuilder<T>
 	 */
 	public function hasOne($related, $foreignKey = null, $localKey = null) {
-		$instance = new $related;
 		$foreignKey = $foreignKey ?: strtolower(Helpers::class_basename(static::class)) . '_id';
-		$localKey = $localKey ?: $this->primaryKey;
-		return $related::query()->where($foreignKey, $this->$localKey);
+		$localKey   = $localKey   ?: $this->primaryKey;
+		$query = $related::query()->where($foreignKey, $this->$localKey);
+		return $query->setRelationContext('hasOne', [
+			'foreignKey' => $foreignKey,
+			'localKey'   => $localKey,
+			'related'    => $related,
+		]);
 	}
 
 	/**
-     * @template T of Model
-     * @param class-string<T> $related
-     * @param string|null $foreignKey
-     * @param string|null $localKey
-     * @return QueryBuilder<T>
-     */
+	 * One-to-many relationship.
+	 * Returns a QueryBuilder that resolves to a Collection.
+	 *
+	 * @template T of Model
+	 * @param class-string<T> $related
+	 * @param string|null $foreignKey  FK on the related table pointing to this model
+	 * @param string|null $localKey    PK on this table (default: $primaryKey)
+	 * @return QueryBuilder<T>
+	 */
     public function hasMany($related, $foreignKey = null, $localKey = null) {
-        $instance = new $related;
         $foreignKey = $foreignKey ?: strtolower(Helpers::class_basename(static::class)) . '_id';
-        $localKey = $localKey ?: $this->primaryKey;
-        return $related::query()->where($foreignKey, $this->$localKey);
+        $localKey   = $localKey   ?: $this->primaryKey;
+        $query = $related::query()->where($foreignKey, $this->$localKey);
+        return $query->setRelationContext('hasMany', [
+            'foreignKey' => $foreignKey,
+            'localKey'   => $localKey,
+            'related'    => $related,
+        ]);
     }
 
-    /**
-     * @template T of Model
-     * @param class-string<T> $related
-     * @param string|null $pivotTable
-     * @param string|null $foreignPivotKey
-     * @param string|null $relatedPivotKey
-     * @return QueryBuilder<T>
-     */
+	/**
+	 * Many-to-many relationship via a pivot table.
+	 * Returns a QueryBuilder that resolves to a Collection.
+	 *
+	 * Pivot table default follows Eloquent convention: alphabetically-sorted
+	 * singular model names joined by an underscore (without the DB prefix).
+	 *
+	 * @template T of Model
+	 * @param class-string<T> $related
+	 * @param string|null $pivotTable       Name of the pivot table (without prefix)
+	 * @param string|null $foreignPivotKey  FK for *this* model on the pivot table
+	 * @param string|null $relatedPivotKey  FK for the *related* model on the pivot table
+	 * @return QueryBuilder<T>
+	 */
     public function belongsToMany($related, $pivotTable = null, $foreignPivotKey = null, $relatedPivotKey = null) {
+        global $wpdb;
         $relatedInstance = new $related;
-        $pivotTable = $pivotTable ?: $this->getTable() . '_' . $relatedInstance->getTable();
-        $foreignPivotKey = $foreignPivotKey ?: strtolower(Helpers::class_basename(static::class)) . '_id';
-        $relatedPivotKey = $relatedPivotKey ?: strtolower(Helpers::class_basename($related)) . '_id';
-        $relatedTable = $relatedInstance->getTable();
-        $primaryKey = $this->primaryKey;
+
+        // Eloquent convention: alphabetically-sorted singular model names, no prefix.
+        if ($pivotTable === null) {
+            $models = [
+                strtolower(Helpers::class_basename(static::class)),
+                strtolower(Helpers::class_basename($related)),
+            ];
+            sort($models);
+            $pivotTable = $wpdb->prefix . implode('_', $models);
+        } else {
+            // If the caller supplied a bare table name, add the prefix.
+            if (strpos($pivotTable, $wpdb->prefix) !== 0) {
+                $pivotTable = $wpdb->prefix . $pivotTable;
+            }
+        }
+
+        $foreignPivotKey  = $foreignPivotKey  ?: strtolower(Helpers::class_basename(static::class)) . '_id';
+        $relatedPivotKey  = $relatedPivotKey  ?: strtolower(Helpers::class_basename($related)) . '_id';
+        $relatedTable     = $relatedInstance->getTable();
+        $relatedPrimaryKey = $relatedInstance->primaryKey;
+        $localKey         = $this->primaryKey;
+
         $query = $related::query();
-        $query->join($pivotTable, "$relatedTable.id", '=', "$pivotTable.$relatedPivotKey")
-              ->where("$pivotTable.$foreignPivotKey", $this->$primaryKey);
-        return $query;
+        $query->join(
+            $pivotTable,
+            "$relatedTable.$relatedPrimaryKey",
+            '=',
+            "$pivotTable.$relatedPivotKey"
+        )->where("$pivotTable.$foreignPivotKey", $this->$localKey);
+
+        return $query->setRelationContext('belongsToMany', [
+            'pivotTable'      => $pivotTable,
+            'foreignPivotKey' => $foreignPivotKey,
+            'relatedPivotKey' => $relatedPivotKey,
+            'localKey'        => $localKey,
+            'relatedTable'    => $relatedTable,
+            'related'         => $related,
+        ]);
     }
 
-    /**
-     * @template T of Model
-     * @template Through of Model
-     * @param class-string<T> $related
-     * @param class-string<Through> $through
-     * @param string|null $firstKey
-     * @param string|null $secondKey
-     * @param string|null $localKey
-     * @return QueryBuilder<T>
-     */
+	/**
+	 * Has-many-through relationship.
+	 *
+	 * Convention (matching Eloquent):
+	 *   $firstKey  = FK on the *through* table pointing to *this* model  (e.g. user_id  on posts)
+	 *   $secondKey = FK on the *related* table pointing to the *through* model (e.g. post_id on comments)
+	 *   $localKey  = PK on *this* table (default: $primaryKey)
+	 *
+	 * @template T of Model
+	 * @template Through of Model
+	 * @param class-string<T>       $related
+	 * @param class-string<Through> $through
+	 * @param string|null $firstKey
+	 * @param string|null $secondKey
+	 * @param string|null $localKey
+	 * @return QueryBuilder<T>
+	 */
     public function hasManyThrough($related, $through, $firstKey = null, $secondKey = null, $localKey = null) {
-        global $wpdb;
         $throughInstance = new $through;
         $relatedInstance = new $related;
-        $firstKey = $firstKey ?: strtolower(Helpers::class_basename($through)) . '_id';
-        $secondKey = $secondKey ?: strtolower(Helpers::class_basename($related)) . '_id';
-        $localKey = $localKey ?: $this->primaryKey;
-        $relatedTable = $relatedInstance->getTable();
-        $throughTable = $throughInstance->getTable();
+
+        // $firstKey:  FK on the through table pointing back to this model
+        $firstKey  = $firstKey  ?: strtolower(Helpers::class_basename(static::class)) . '_id';
+        // $secondKey: FK on the related table pointing to the through table
+        $secondKey = $secondKey ?: strtolower(Helpers::class_basename($through)) . '_id';
+        $localKey  = $localKey  ?: $this->primaryKey;
+
+        $relatedTable  = $relatedInstance->getTable();
+        $throughTable  = $throughInstance->getTable();
+        $throughPK     = $throughInstance->primaryKey;
+
         $query = $related::query();
-        $query->join($throughTable, "$relatedTable.$secondKey", '=', "$throughTable.id")
-              ->where("$throughTable.$firstKey", $this->$localKey);
-        return $query;
+        $query->join(
+            $throughTable,
+            "$relatedTable.$secondKey",
+            '=',
+            "$throughTable.$throughPK"
+        )->where("$throughTable.$firstKey", $this->$localKey);
+
+        return $query->setRelationContext('hasManyThrough', [
+            'firstKey'     => $firstKey,
+            'secondKey'    => $secondKey,
+            'localKey'     => $localKey,
+            'relatedTable' => $relatedTable,
+            'throughTable' => $throughTable,
+            'throughPK'    => $throughPK,
+            'related'      => $related,
+        ]);
     }
 
 	/**
@@ -935,10 +1035,10 @@ public function forceDelete() {
             $query->where($ownerKey, $foreignValue);
         }
         return $query->setRelationContext('belongsTo', [
-            'foreignKey' => $foreignKey,
-            'ownerKey' => $ownerKey,
-            'foreignValue' => $foreignValue,
-            'related' => $related,
+            'foreignKey'     => $foreignKey,
+            'ownerKey'       => $ownerKey,
+            'foreignValue'   => $foreignValue,
+            'related'        => $related,
             'baseWhereCount' => $query->getWhereCount(),
         ]);
     }
@@ -955,7 +1055,21 @@ public function forceDelete() {
 		$instance->original = $attributes;
 		$instance->exists = true;
 		return $instance;
-	}    
+	}
+
+	/**
+	 * Remove an internal/transient attribute (e.g. a pivot-table alias column
+	 * selected only for eager-loading bookkeeping) so it does not leak into
+	 * toArray()/toJson() output. Safe to call even if the key isn't set.
+	 *
+	 * @param string $key
+	 * @return $this
+	 */
+	public function forgetAttribute($key) {
+		unset($this->attributes[$key]);
+		unset($this->original[$key]);
+		return $this;
+	}
 
 	public function toArray() {
         $attributes = [];
@@ -964,11 +1078,12 @@ public function forceDelete() {
         }
         // Add already eager loaded relations only (avoid infinite loop)
         foreach ($this->_eagerLoaded as $relation => $data) {
-            if (is_array($data) || $data instanceof \MJ\WPORM\Collection) {
-                $attributes[$relation] = [];
-                foreach ($data as $item) {
-                    $attributes[$relation][] = method_exists($item, 'toArray') ? $item->toArray() : $item;
-                }
+            if ($data instanceof \MJ\WPORM\Collection) {
+                $attributes[$relation] = $data->toArray();
+            } elseif (is_array($data)) {
+                $attributes[$relation] = array_map(function($item) {
+                    return method_exists($item, 'toArray') ? $item->toArray() : (array)$item;
+                }, $data);
             } elseif (is_object($data) && method_exists($data, 'toArray')) {
                 $attributes[$relation] = $data->toArray();
             } else {
@@ -1188,8 +1303,8 @@ public function forceDelete() {
     }
 
     public function __isset($key) {
-        // Eager loaded relations
-        if (isset($this->_eagerLoaded[$key])) {
+        // Eager loaded relations (use array_key_exists so null values are considered "set")
+        if (array_key_exists($key, $this->_eagerLoaded)) {
             return true;
         }
         $method = 'get' . Helpers::convert_to_pascal_case($key) . 'Attribute';

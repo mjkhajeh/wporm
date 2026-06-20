@@ -773,25 +773,9 @@ class QueryBuilder {
 
     public function first() {
         $this->limit(1);
+        // get() already handles eager loading and retrieved() for each model.
         $results = $this->get();
         $model = $results[0] ?? null;
-        // Eager load relations for single model if requested
-        if ($model && !empty($this->with)) {
-            foreach ($this->with as $relation => $constraint) {
-                if (is_int($relation)) {
-                    $relation = $constraint;
-                    $constraint = null;
-                }
-                // Use the same eager loading logic as in get(), but for a single model
-                $models = [$model];
-                $this->eagerLoadRelation($models, $relation, $constraint);
-                // Ensure we return the same instance with _eagerLoaded set
-                $model = $models[0];
-            }
-        }
-        if ($model && method_exists($model, 'retrieved')) {
-            $model->retrieved();
-        }
         if ($this->debug) {
             error_log('[WPORM][first] Results: ' . print_r($results, true));
         }
@@ -1280,139 +1264,215 @@ class QueryBuilder {
         return $sql;
     }
 
+    /**
+     * Eager-load a single relation onto an array of already-hydrated models.
+     *
+     * All relationship types are driven by the relationContext metadata that
+     * the relationship methods (hasOne, hasMany, belongsTo, belongsToMany,
+     * hasManyThrough) embed on the returned QueryBuilder. This eliminates the
+     * need for fragile reflection-based key inference.
+     *
+     * @param array  &$models    Array of model instances to populate (mutated in-place)
+     * @param string  $relation  Name of the relation method on the model
+     * @param mixed   $constraint Closure|array|null — additional query constraints or
+     *                            an options array (keys: 'constraint', 'disableGlobalScopes')
+     */
     protected function eagerLoadRelation(array &$models, $relation, $constraint = null) {
         if (empty($models)) return;
-        $model = $models[0];
-        if (!method_exists($model, $relation)) return;
-        $related = $model->$relation();
-        // Support per-relation options passed via with():
-        // e.g. ['topics' => ['disableGlobalScopes' => true, 'constraint' => function($q){...}]]
+
+        $firstModel = $models[0];
+        if (!method_exists($firstModel, $relation)) return;
+
+        // ── Parse constraint / options array ──────────────────────────────────
         $disableGlobalScopes = false;
         if (is_array($constraint)) {
             if (isset($constraint['disableGlobalScopes'])) {
-                $disableGlobalScopes = (bool)$constraint['disableGlobalScopes'];
+                $disableGlobalScopes = (bool) $constraint['disableGlobalScopes'];
             }
             if (isset($constraint['constraint']) && is_callable($constraint['constraint'])) {
                 $constraint = $constraint['constraint'];
             } else {
-                // If array contains a single callable element (shorthand), use it
+                $found = null;
                 foreach ($constraint as $c) {
-                    if (is_callable($c)) { $constraint = $c; break; }
+                    if (is_callable($c)) { $found = $c; break; }
                 }
-                // If no callable found, set to null
-                if (!is_callable($constraint)) $constraint = null;
+                $constraint = $found;
             }
         }
-        // Handle QueryBuilder-based relationships (hasMany, belongsToMany, hasManyThrough)
-        if ($related instanceof \MJ\WPORM\QueryBuilder) {
-            $relationContext = $related->getRelationContext();
-            if (($relationContext['type'] ?? null) === 'belongsTo') {
-                $foreignKey = $relationContext['foreignKey'] ?? null;
-                $ownerKey = $relationContext['ownerKey'] ?? 'id';
-                $relatedModel = $related->model;
-                if ($foreignKey && $relatedModel) {
-                    $ids = array_values(array_filter(array_map(fn($m) => $m->$foreignKey, $models), fn($id) => $id !== null));
-                    $query = $relatedModel::query(!$disableGlobalScopes)->whereIn($ownerKey, $ids);
-                    if ($constraint) {
-                        $constraint($query);
-                    }
-                    $allRelated = $query->get();
-                    $map = [];
-                    foreach ($allRelated as $rel) {
-                        $map[$rel->$ownerKey] = $rel;
-                    }
-                    foreach ($models as $m) {
-                        if (method_exists($m, 'setEagerLoaded')) {
-                            $m->setEagerLoaded($relation, $map[$m->$foreignKey] ?? null);
-                        } else {
-                            $m->_eagerLoaded[$relation] = $map[$m->$foreignKey] ?? null;
-                        }
-                    }
-                }
+
+        // ── Call the relation on a *fresh* (attribute-less) instance so that
+        //    belongsTo / hasOne etc. don't embed a single concrete FK value
+        //    into the query — we always rebuild using whereIn below.        ──
+        $sampleQuery = $firstModel->$relation();
+
+        // All relations must return a QueryBuilder; if somehow a plain model
+        // came back (old-style) fall through to a safe no-op.
+        if (!($sampleQuery instanceof \MJ\WPORM\QueryBuilder)) {
+            return;
+        }
+
+        $ctx  = $sampleQuery->getRelationContext();
+        $type = $ctx['type'] ?? null;
+
+        // ══════════════════════════════════════════════════════════════════════
+        // belongsTo — FK lives on *this* model, PK lives on the related model
+        // ══════════════════════════════════════════════════════════════════════
+        if ($type === 'belongsTo') {
+            $foreignKey = $ctx['foreignKey'];
+            $ownerKey   = $ctx['ownerKey'];
+            $relClass   = $ctx['related'];
+
+            $ids = array_values(array_unique(array_filter(
+                array_map(fn($m) => $m->$foreignKey, $models),
+                fn($id) => $id !== null
+            )));
+
+            if (empty($ids)) {
+                foreach ($models as $m) $m->setEagerLoaded($relation, null);
                 return;
             }
-            $foreignKey = null;
-            $localKey = $model->primaryKey;
-            $ref = new \ReflectionMethod($model, $relation);
-            $params = $ref->getParameters();
-            if (isset($params[0])) {
-                $name = $params[0]->getName();
-                $$name = $params[0]->getDefaultValue();
-            }
-            $ids = array_map(fn($m) => $m->$localKey, $models);
-            $relatedModel = $related->model;
-            if ($relatedModel) {
-                // If reflection didn't yield a foreign key, try to infer it from the relation's where clauses
-                if (!$foreignKey) {
-                    $foreignKey = null;
-                    foreach ($related->wheres as $w) {
-                        $cl = preg_replace('/^OR\s+/i', '', $w);
-                        $cl = str_replace('`', '', $cl);
-                        if (preg_match('/([a-zA-Z0-9_\.]+)\s*(?:=|!=|<|>|NOT|IN)\b/i', $cl, $mcol)) {
-                            $col = $mcol[1];
-                            if (strpos($col, '.') !== false) {
-                                $parts = explode('.', $col);
-                                $col = end($parts);
-                            }
-                            $foreignKey = $col;
-                            break;
-                        }
-                    }
-                    // Fallback: compute default similar to Model::hasMany()
-                    if (!$foreignKey) {
-                        $foreignKey = strtolower(\MJ\WPORM\Helpers::class_basename(get_class($model))) . '_id';
-                    }
-                }
-                $query = $relatedModel::query(!$disableGlobalScopes)->whereIn($foreignKey, $ids);
-                if ($constraint) {
-                    $constraint($query);
-                }
-                $allRelated = $query->get();
-                $grouped = [];
-                foreach ($allRelated as $rel) {
-                    $grouped[$rel->$foreignKey][] = $rel;
-                }
-                foreach ($models as $m) {
-                    if (method_exists($m, 'setEagerLoaded')) {
-                        $m->setEagerLoaded($relation, $grouped[$m->$localKey] ?? []);
-                    } else {
-                        $m->_eagerLoaded[$relation] = $grouped[$m->$localKey] ?? [];
-                    }
-                }
-            }
-        }
-        // belongsTo
-        elseif ($related instanceof \MJ\WPORM\Model) {
-            $foreignKey = null;
-            $ownerKey = $related->primaryKey;
-            $ref = new \ReflectionMethod($model, $relation);
-            $params = $ref->getParameters();
-            if (isset($params[0])) {
-                $foreignKey = $params[0]->getDefaultValue();
-            }
-            $relatedModel = get_class($related);
-            // If reflection didn't yield the foreign key name, compute default (like Model::belongsTo)
-            if (!$foreignKey) {
-                $foreignKey = strtolower(\MJ\WPORM\Helpers::class_basename(get_class($related))) . '_id';
-            }
-            $ids = array_map(fn($m) => $m->$foreignKey, $models);
-            $query = $relatedModel::query(!$disableGlobalScopes)->whereIn($ownerKey, $ids);
-            if ($constraint) {
-                $constraint($query);
-            }
-            $allRelated = $query->get();
+
+            $query = $relClass::query(!$disableGlobalScopes)->whereIn($ownerKey, $ids);
+            if ($constraint) $constraint($query);
+
             $map = [];
-            foreach ($allRelated as $rel) {
+            foreach ($query->get() as $rel) {
                 $map[$rel->$ownerKey] = $rel;
             }
             foreach ($models as $m) {
-                if (method_exists($m, 'setEagerLoaded')) {
-                    $m->setEagerLoaded($relation, $map[$m->$foreignKey] ?? null);
-                } else {
-                    $m->_eagerLoaded[$relation] = $map[$m->$foreignKey] ?? null;
+                $m->setEagerLoaded($relation, $map[$m->$foreignKey] ?? null);
+            }
+            return;
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
+        // hasOne — FK on related table, single result per parent
+        // ══════════════════════════════════════════════════════════════════════
+        if ($type === 'hasOne') {
+            $foreignKey = $ctx['foreignKey'];
+            $localKey   = $ctx['localKey'];
+            $relClass   = $ctx['related'];
+
+            $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
+
+            $query = $relClass::query(!$disableGlobalScopes)->whereIn($foreignKey, $ids);
+            if ($constraint) $constraint($query);
+
+            $map = [];
+            foreach ($query->get() as $rel) {
+                // Keep only the first match (hasOne semantics)
+                if (!isset($map[$rel->$foreignKey])) {
+                    $map[$rel->$foreignKey] = $rel;
                 }
             }
+            foreach ($models as $m) {
+                $m->setEagerLoaded($relation, $map[$m->$localKey] ?? null);
+            }
+            return;
         }
+
+        // ══════════════════════════════════════════════════════════════════════
+        // hasMany — FK on related table, multiple results per parent
+        // ══════════════════════════════════════════════════════════════════════
+        if ($type === 'hasMany') {
+            $foreignKey = $ctx['foreignKey'];
+            $localKey   = $ctx['localKey'];
+            $relClass   = $ctx['related'];
+
+            $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
+
+            $query = $relClass::query(!$disableGlobalScopes)->whereIn($foreignKey, $ids);
+            if ($constraint) $constraint($query);
+
+            $grouped = [];
+            foreach ($query->get() as $rel) {
+                $grouped[$rel->$foreignKey][] = $rel;
+            }
+            foreach ($models as $m) {
+                $m->setEagerLoaded($relation, new \MJ\WPORM\Collection($grouped[$m->$localKey] ?? []));
+            }
+            return;
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
+        // belongsToMany — many-to-many via pivot table
+        // ══════════════════════════════════════════════════════════════════════
+        if ($type === 'belongsToMany') {
+            $pivotTable      = $ctx['pivotTable'];
+            $foreignPivotKey = $ctx['foreignPivotKey']; // FK for *this* model on pivot
+            $relatedPivotKey = $ctx['relatedPivotKey']; // FK for related model on pivot
+            $localKey        = $ctx['localKey'];
+            $relatedTable    = $ctx['relatedTable'];
+            $relClass        = $ctx['related'];
+
+            $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
+
+            // Load related rows joining through the pivot; also SELECT the pivot FK
+            // so we can group results back to each parent.
+            $relatedInstance = new $relClass;
+            $relatedPK       = $relatedInstance->primaryKey;
+
+            $query = $relClass::query(!$disableGlobalScopes)
+                ->select(["$relatedTable.*", "$pivotTable.$foreignPivotKey as _pivot_fk"])
+                ->join($pivotTable, "$relatedTable.$relatedPK", '=', "$pivotTable.$relatedPivotKey")
+                ->whereIn("$pivotTable.$foreignPivotKey", $ids);
+
+            if ($constraint) $constraint($query);
+
+            $grouped = [];
+            foreach ($query->get() as $rel) {
+                $pivotFk = $rel->_pivot_fk ?? null;
+                if ($pivotFk !== null) {
+                    // Remove the internal alias from the model's attributes so it
+                    // does not appear in toArray() / toJson() output.
+                    $rel->forgetAttribute('_pivot_fk');
+                    $grouped[$pivotFk][] = $rel;
+                }
+            }
+            foreach ($models as $m) {
+                $m->setEagerLoaded($relation, new \MJ\WPORM\Collection($grouped[$m->$localKey] ?? []));
+            }
+            return;
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
+        // hasManyThrough — results reached via an intermediate (through) table
+        // ══════════════════════════════════════════════════════════════════════
+        if ($type === 'hasManyThrough') {
+            $firstKey    = $ctx['firstKey'];    // FK on through table → this model
+            $secondKey   = $ctx['secondKey'];   // FK on related table → through table
+            $localKey    = $ctx['localKey'];    // PK on this model
+            $relatedTable  = $ctx['relatedTable'];
+            $throughTable  = $ctx['throughTable'];
+            $throughPK     = $ctx['throughPK'];
+            $relClass      = $ctx['related'];
+
+            $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
+
+            // Fetch related rows with the through-table FK so we can group by parent.
+            $query = $relClass::query(!$disableGlobalScopes)
+                ->select(["$relatedTable.*", "$throughTable.$firstKey as _through_fk"])
+                ->join($throughTable, "$relatedTable.$secondKey", '=', "$throughTable.$throughPK")
+                ->whereIn("$throughTable.$firstKey", $ids);
+
+            if ($constraint) $constraint($query);
+
+            $grouped = [];
+            foreach ($query->get() as $rel) {
+                $throughFk = $rel->_through_fk ?? null;
+                if ($throughFk !== null) {
+                    // Remove internal alias from output.
+                    $rel->forgetAttribute('_through_fk');
+                    $grouped[$throughFk][] = $rel;
+                }
+            }
+            foreach ($models as $m) {
+                $m->setEagerLoaded($relation, new \MJ\WPORM\Collection($grouped[$m->$localKey] ?? []));
+            }
+            return;
+        }
+
+        // ── Unknown / unsupported relation type: no-op (fail silently) ───────
     }
 
     // WHERE EXISTS / NOT EXISTS
@@ -1721,205 +1781,262 @@ class QueryBuilder {
 
     /**
      * Filter by existence of related records (Eloquent-style whereHas).
-     * Usage: ->whereHas('relation', function($q) { ... })
+     *
+     * Calls the relation method on a fresh model instance so that no
+     * concrete FK value from a real row leaks into the existence subquery.
+     * The relation context carried on the returned QueryBuilder drives all
+     * key resolution — no reflection needed.
+     *
+     * Usage: ->whereHas('posts', function($q) { $q->where('published', 1); })
      */
     public function whereHas($relation, $constraint = null) {
-        $model = $this->model;
-        if (!method_exists($model, $relation)) {
-            throw new \InvalidArgumentException("Relation '$relation' not defined on model " . get_class($model));
-        }
-        $relatedQuery = $model->$relation();
-        // If the relation returns a QueryBuilder, use it directly
-        if ($relatedQuery instanceof self) {
-            $query = $relatedQuery;
-        } elseif ($relatedQuery instanceof \MJ\WPORM\Model) {
-            $query = $relatedQuery::query();
-        } else {
-            throw new \InvalidArgumentException("Relation '$relation' must return a Model or QueryBuilder");
-        }
-        if ($constraint) {
-            $constraint($query);
-        }
-        $relationContext = $relatedQuery instanceof self ? $relatedQuery->getRelationContext() : [];
-        if (($relationContext['type'] ?? null) === 'belongsTo') {
-            $foreignKey = $relationContext['foreignKey'];
-            $ownerKey = $relationContext['ownerKey'];
-            $relatedTable = $query->table;
-            $baseWhereCount = $relationContext['baseWhereCount'] ?? 0;
-            $this->whereExists(function($q) use ($query, $relatedTable, $ownerKey, $foreignKey, $baseWhereCount) {
-                $q->from($relatedTable)
-                  ->whereColumn($relatedTable . '.' . $ownerKey, '=', $this->table . '.' . $foreignKey);
-                foreach (array_slice($query->wheres, $baseWhereCount) as $w) {
-                    $q->wheres[] = $w;
-                }
-                foreach (array_slice($query->bindings, $baseWhereCount) as $b) {
-                    $q->bindings[] = $b;
-                }
-            });
-            return $this;
-        }
-        // Infer keys for hasOne/hasMany/belongsTo
-        $localKey = property_exists($model, 'primaryKey') ? $model->primaryKey : 'id';
-        $foreignKey = null;
-        // Try to get foreign key from relation method signature
-        $ref = new \ReflectionMethod($model, $relation);
-        $params = $ref->getParameters();
-        if (isset($params[0])) {
-            $foreignKey = $params[0]->getDefaultValue();
-        }
-        // If belongsTo, swap keys
-        if ($relatedQuery instanceof \MJ\WPORM\Model && isset($params[0])) {
-            $foreignKey = $params[0]->getDefaultValue();
-            $ownerKey = $relatedQuery->primaryKey;
-            $column = $model->$foreignKey;
-            $relatedTable = $relatedQuery->getTable();
-            $this->whereExists(function($q) use ($query, $relatedTable, $ownerKey, $foreignKey) {
-                $q->from($relatedTable)
-                  ->whereColumn($relatedTable . '.' . $ownerKey, '=', $this->table . '.' . $foreignKey);
-                foreach ($query->wheres as $w) {
-                    $q->wheres[] = $w;
-                }
-                foreach ($query->bindings as $b) {
-                    $q->bindings[] = $b;
-                }
-            });
-            return $this;
-        }
-        // Default: hasOne/hasMany
-        if ($foreignKey && $localKey) {
-            $relatedTable = $query->table;
-            $this->whereExists(function($q) use ($query, $relatedTable, $foreignKey, $localKey) {
-                $q->from($relatedTable)
-                  ->whereColumn($relatedTable . '.' . $foreignKey, '=', $this->table . '.' . $localKey);
-                foreach ($query->wheres as $w) {
-                    $q->wheres[] = $w;
-                }
-                foreach ($query->bindings as $b) {
-                    $q->bindings[] = $b;
-                }
-            });
-            return $this;
-        }
-        // Fallback: just use subquery
-        $this->whereExists(function($q) use ($query) {
-            foreach ($query->wheres as $w) {
-                $q->wheres[] = $w;
-            }
-            foreach ($query->bindings as $b) {
-                $q->bindings[] = $b;
-            }
-        });
+        $this->applyRelationExistenceClause('whereExists', $relation, $constraint);
         return $this;
     }
 
     /**
-     * OR version of whereHas (Eloquent-style orWhereHas).
+     * OR version of whereHas.
      */
     public function orWhereHas($relation, $constraint = null) {
-        $model = $this->model;
-        if (!method_exists($model, $relation)) {
-            throw new \InvalidArgumentException("Relation '$relation' not defined on model " . get_class($model));
-        }
-        $relatedQuery = $model->$relation();
-        if ($relatedQuery instanceof self) {
-            $query = $relatedQuery;
-        } elseif ($relatedQuery instanceof \MJ\WPORM\Model) {
-            $query = $relatedQuery::query();
-        } else {
-            throw new \InvalidArgumentException("Relation '$relation' must return a Model or QueryBuilder");
-        }
-        if ($constraint) {
-            $constraint($query);
-        }
-        $relationContext = $relatedQuery instanceof self ? $relatedQuery->getRelationContext() : [];
-        if (($relationContext['type'] ?? null) === 'belongsTo') {
-            $foreignKey = $relationContext['foreignKey'];
-            $ownerKey = $relationContext['ownerKey'];
-            $relatedTable = $query->table;
-            $baseWhereCount = $relationContext['baseWhereCount'] ?? 0;
-            $this->orWhereExists(function($q) use ($query, $relatedTable, $ownerKey, $foreignKey, $baseWhereCount) {
-                $q->from($relatedTable)
-                  ->whereColumn($relatedTable . '.' . $ownerKey, '=', $this->table . '.' . $foreignKey);
-                foreach (array_slice($query->wheres, $baseWhereCount) as $w) {
-                    $q->wheres[] = $w;
-                }
-                foreach (array_slice($query->bindings, $baseWhereCount) as $b) {
-                    $q->bindings[] = $b;
-                }
-            });
-            return $this;
-        }
-        $localKey = property_exists($model, 'primaryKey') ? $model->primaryKey : 'id';
-        $foreignKey = null;
-        $ref = new \ReflectionMethod($model, $relation);
-        $params = $ref->getParameters();
-        if (isset($params[0])) {
-            $foreignKey = $params[0]->getDefaultValue();
-        }
-        if ($relatedQuery instanceof \MJ\WPORM\Model && isset($params[0])) {
-            $foreignKey = $params[0]->getDefaultValue();
-            $ownerKey = $relatedQuery->primaryKey;
-            $column = $model->$foreignKey;
-            $relatedTable = $relatedQuery->getTable();
-            $this->orWhereExists(function($q) use ($query, $relatedTable, $ownerKey, $foreignKey) {
-                $q->from($relatedTable)
-                  ->whereColumn($relatedTable . '.' . $ownerKey, '=', $this->table . '.' . $foreignKey);
-                foreach ($query->wheres as $w) {
-                    $q->wheres[] = $w;
-                }
-                foreach ($query->bindings as $b) {
-                    $q->bindings[] = $b;
-                }
-            });
-            return $this;
-        }
-        if ($foreignKey && $localKey) {
-            $relatedTable = $query->table;
-            $this->orWhereExists(function($q) use ($query, $relatedTable, $foreignKey, $localKey) {
-                $q->from($relatedTable)
-                  ->whereColumn($relatedTable . '.' . $foreignKey, '=', $this->table . '.' . $localKey);
-                foreach ($query->wheres as $w) {
-                    $q->wheres[] = $w;
-                }
-                foreach ($query->bindings as $b) {
-                    $q->bindings[] = $b;
-                }
-            });
-            return $this;
-        }
-        $this->orWhereExists(function($q) use ($query) {
-            foreach ($query->wheres as $w) {
-                $q->wheres[] = $w;
-            }
-            foreach ($query->bindings as $b) {
-                $q->bindings[] = $b;
-            }
-        });
+        $this->applyRelationExistenceClause('orWhereExists', $relation, $constraint);
         return $this;
+    }
+
+    /**
+     * Shared implementation for whereHas / orWhereHas.
+     *
+     * @param string   $existsMethod  'whereExists' or 'orWhereExists'
+     * @param string   $relation      Relation method name on the model
+     * @param callable|null $constraint Additional WHERE constraints for the subquery
+     */
+    protected function applyRelationExistenceClause($existsMethod, $relation, $constraint = null) {
+        $model = $this->model;
+
+        if (!method_exists($model, $relation)) {
+            throw new \InvalidArgumentException(
+                "Relation '$relation' not defined on model " . get_class($model)
+            );
+        }
+
+        // Call on a *fresh* instance so no concrete attribute values pollute the subquery.
+        $relQuery = $model->$relation();
+
+        if (!($relQuery instanceof self)) {
+            throw new \InvalidArgumentException(
+                "Relation '$relation' must return a QueryBuilder"
+            );
+        }
+
+        $ctx  = $relQuery->getRelationContext();
+        $type = $ctx['type'] ?? null;
+
+        $outerTable = $this->table;
+
+        // ── belongsTo ────────────────────────────────────────────────────────
+        // EXISTS (SELECT 1 FROM related WHERE related.ownerKey = outer.foreignKey [AND ...])
+        if ($type === 'belongsTo') {
+            $foreignKey = $ctx['foreignKey'];
+            $ownerKey   = $ctx['ownerKey'];
+            $relatedTable = $relQuery->table;
+            $baseWhereCount = $ctx['baseWhereCount'] ?? 0;
+
+            $this->$existsMethod(function($q) use (
+                $relQuery, $relatedTable, $ownerKey, $foreignKey, $outerTable,
+                $baseWhereCount, $constraint
+            ) {
+                $q->from($relatedTable)
+                  ->whereColumn("$relatedTable.$ownerKey", '=', "$outerTable.$foreignKey");
+                // Append only the user-added wheres (beyond the base FK constraint)
+                foreach (array_slice($relQuery->wheres,   $baseWhereCount) as $w) {
+                    $q->wheres[] = $w;
+                }
+                foreach (array_slice($relQuery->bindings, $baseWhereCount) as $b) {
+                    $q->bindings[] = $b;
+                }
+                if ($constraint) $constraint($q);
+            });
+            return;
+        }
+
+        // ── hasOne / hasMany ──────────────────────────────────────────────────
+        // EXISTS (SELECT 1 FROM related WHERE related.foreignKey = outer.localKey [AND ...])
+        if ($type === 'hasOne' || $type === 'hasMany') {
+            $foreignKey = $ctx['foreignKey'];
+            $localKey   = $ctx['localKey'];
+            $relatedTable = $relQuery->table;
+
+            $this->$existsMethod(function($q) use (
+                $relQuery, $relatedTable, $foreignKey, $localKey, $outerTable, $constraint
+            ) {
+                $q->from($relatedTable)
+                  ->whereColumn("$relatedTable.$foreignKey", '=', "$outerTable.$localKey");
+                if ($constraint) $constraint($q);
+            });
+            return;
+        }
+
+        // ── belongsToMany ─────────────────────────────────────────────────────
+        // EXISTS (SELECT 1 FROM pivot WHERE pivot.foreignPivotKey = outer.localKey [AND ...])
+        if ($type === 'belongsToMany') {
+            $pivotTable      = $ctx['pivotTable'];
+            $foreignPivotKey = $ctx['foreignPivotKey'];
+            $localKey        = $ctx['localKey'];
+
+            $this->$existsMethod(function($q) use (
+                $pivotTable, $foreignPivotKey, $localKey, $outerTable, $constraint
+            ) {
+                $q->from($pivotTable)
+                  ->whereColumn("$pivotTable.$foreignPivotKey", '=', "$outerTable.$localKey");
+                if ($constraint) $constraint($q);
+            });
+            return;
+        }
+
+        // ── hasManyThrough ────────────────────────────────────────────────────
+        // EXISTS (SELECT 1 FROM related JOIN through ON related.secondKey = through.throughPK
+        //         WHERE through.firstKey = outer.localKey [AND ...])
+        if ($type === 'hasManyThrough') {
+            $firstKey     = $ctx['firstKey'];
+            $secondKey    = $ctx['secondKey'];
+            $localKey     = $ctx['localKey'];
+            $relatedTable = $ctx['relatedTable'];
+            $throughTable = $ctx['throughTable'];
+            $throughPK    = $ctx['throughPK'];
+
+            $this->$existsMethod(function($q) use (
+                $relatedTable, $throughTable, $throughPK,
+                $firstKey, $secondKey, $localKey, $outerTable, $constraint
+            ) {
+                $q->from($relatedTable)
+                  ->join($throughTable, "$relatedTable.$secondKey", '=', "$throughTable.$throughPK")
+                  ->whereColumn("$throughTable.$firstKey", '=', "$outerTable.$localKey");
+                if ($constraint) $constraint($q);
+            });
+            return;
+        }
+
+        // ── Unknown relation type: fall back to passing through existing wheres ──
+        $this->$existsMethod(function($q) use ($relQuery, $constraint) {
+            foreach ($relQuery->wheres   as $w) { $q->wheres[]   = $w; }
+            foreach ($relQuery->bindings as $b) { $q->bindings[] = $b; }
+            if ($constraint) $constraint($q);
+        });
     }
 
     /**
      * Filter by existence of related records (Eloquent-style has).
-     * Usage: ->has('relation', '>=', 2)
-     * Equivalent to whereHas, but allows count/operator.
+     *
+     * ->has('posts')           → at least 1 related record
+     * ->has('posts', '>=', 5) → at least 5 related records
+     * ->has('posts', '=', 2)  → exactly 2 related records
+     *
+     * Implemented as a WHERE (SELECT COUNT(*) FROM related WHERE ...) OPERATOR COUNT
+     * correlated subquery so the count constraint is correctly enforced.
      */
     public function has($relation, $operator = '>=', $count = 1) {
-        // If only relation is given, default to at least 1 related record
         if (func_num_args() === 1) {
             $operator = '>=';
-            $count = 1;
+            $count    = 1;
         } elseif (func_num_args() === 2) {
-            $count = $operator;
+            // has('posts', 5) → interpret second arg as $count
+            $count    = $operator;
             $operator = '>=';
         }
-        return $this->whereHas($relation, function($q) use ($operator, $count) {
-            // Add HAVING COUNT(*) $operator $count to the subquery
-            if (method_exists($q, 'groupBy')) {
-                $q->groupBy($q->table . '.' . ($q->model->primaryKey ?? 'id'));
-            }
-            if (!isset($q->havings)) $q->havings = [];
-            $q->havings[] = ["COUNT(*) $operator %s", [$count]];
-        });
+
+        $model = $this->model;
+        if (!method_exists($model, $relation)) {
+            throw new \InvalidArgumentException(
+                "Relation '$relation' not defined on model " . get_class($model)
+            );
+        }
+
+        // Build the correlated subquery for the count.
+        $relQuery = $model->$relation();
+        if (!($relQuery instanceof self)) {
+            throw new \InvalidArgumentException(
+                "Relation '$relation' must return a QueryBuilder"
+            );
+        }
+
+        $ctx  = $relQuery->getRelationContext();
+        $type = $ctx['type'] ?? null;
+
+        $outerTable = $this->table;
+
+        // ── hasOne / hasMany ─────────────────────────────────────────────────
+        if ($type === 'hasOne' || $type === 'hasMany') {
+            $foreignKey   = $ctx['foreignKey'];
+            $localKey     = $ctx['localKey'];
+            $relatedTable = $relQuery->table;
+
+            $sub = new self($this->model, false);
+            $sub->from($relatedTable)
+                ->select(["COUNT(*)"])
+                ->whereColumn("$relatedTable.$foreignKey", '=', "$outerTable.$localKey");
+
+            $subSql = $sub->buildSelectQuery();
+            $this->wheres[]   = "($subSql) $operator %s";
+            $this->bindings[] = (int) $count;
+            return $this;
+        }
+
+        // ── belongsTo ────────────────────────────────────────────────────────
+        if ($type === 'belongsTo') {
+            $foreignKey   = $ctx['foreignKey'];
+            $ownerKey     = $ctx['ownerKey'];
+            $relatedTable = $relQuery->table;
+
+            $sub = new self($this->model, false);
+            $sub->from($relatedTable)
+                ->select(["COUNT(*)"])
+                ->whereColumn("$relatedTable.$ownerKey", '=', "$outerTable.$foreignKey");
+
+            $subSql = $sub->buildSelectQuery();
+            $this->wheres[]   = "($subSql) $operator %s";
+            $this->bindings[] = (int) $count;
+            return $this;
+        }
+
+        // ── belongsToMany ─────────────────────────────────────────────────────
+        if ($type === 'belongsToMany') {
+            $pivotTable      = $ctx['pivotTable'];
+            $foreignPivotKey = $ctx['foreignPivotKey'];
+            $localKey        = $ctx['localKey'];
+
+            $sub = new self($this->model, false);
+            $sub->from($pivotTable)
+                ->select(["COUNT(*)"])
+                ->whereColumn("$pivotTable.$foreignPivotKey", '=', "$outerTable.$localKey");
+
+            $subSql = $sub->buildSelectQuery();
+            $this->wheres[]   = "($subSql) $operator %s";
+            $this->bindings[] = (int) $count;
+            return $this;
+        }
+
+        // ── hasManyThrough ────────────────────────────────────────────────────
+        if ($type === 'hasManyThrough') {
+            $firstKey     = $ctx['firstKey'];
+            $secondKey    = $ctx['secondKey'];
+            $localKey     = $ctx['localKey'];
+            $relatedTable = $ctx['relatedTable'];
+            $throughTable = $ctx['throughTable'];
+            $throughPK    = $ctx['throughPK'];
+
+            $sub = new self($this->model, false);
+            $sub->from($relatedTable)
+                ->select(["COUNT(*)"])
+                ->join($throughTable, "$relatedTable.$secondKey", '=', "$throughTable.$throughPK")
+                ->whereColumn("$throughTable.$firstKey", '=', "$outerTable.$localKey");
+
+            $subSql = $sub->buildSelectQuery();
+            $this->wheres[]   = "($subSql) $operator %s";
+            $this->bindings[] = (int) $count;
+            return $this;
+        }
+
+        // ── Fallback: delegate to whereHas (existence only, count ignored) ───
+        return $this->whereHas($relation);
     }
 
     /**

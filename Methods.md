@@ -11,6 +11,8 @@ This document describes all public and static methods of the `MJ\WPORM\Model` cl
 - [Retrieval Methods](#retrieval-methods)
 - [Persistence Methods](#persistence-methods)
 - [Relationship Methods](#relationship-methods)
+- [Relationship Existence Filtering](#relationship-existence-filtering)
+- [Eager Loading](#eager-loading)
 - [Utility Methods](#utility-methods)
 - [Mass Assignment Protection](#mass-assignment-protection)
 - [Hidden & Visible Attributes](#hidden--visible-attributes)
@@ -812,19 +814,21 @@ User::query()->truncate();
 ## Relationship Methods
 
 ### hasOne($related, $foreignKey = null, $localKey = null)
-**Description:** Define a one-to-one relationship.
+**Description:** Define a one-to-one relationship. Returns a lazy, chainable `QueryBuilder` — call `->first()` to resolve it, or access it as a property (e.g. `$user->profile`) to have it resolved to a single model (or `null`) automatically.
 
 **Example:**
 ```php
-$profile = $user->hasOne(Profile::class);
+$profile = $user->hasOne(Profile::class)->first();
+$profile = $user->profile; // equivalent, via property access
 ```
 
 ### hasMany($related, $foreignKey = null, $localKey = null)
-**Description:** Define a one-to-many relationship.
+**Description:** Define a one-to-many relationship. Returns a lazy, chainable `QueryBuilder` — call `->get()` to resolve it, or access it as a property (e.g. `$user->posts`) to have it resolved to a `Collection` automatically.
 
 **Example:**
 ```php
-$posts = $user->hasMany(Post::class);
+$posts = $user->hasMany(Post::class)->get();
+$posts = $user->posts; // equivalent, via property access
 ```
 
 ### belongsTo($related, $foreignKey = null, $ownerKey = null)
@@ -836,19 +840,44 @@ $user = $profile->belongsTo(User::class)->first();
 ```
 
 ### belongsToMany($related, $pivotTable = null, $foreignPivotKey = null, $relatedPivotKey = null)
-**Description:** Define a many-to-many relationship.
+**Description:** Define a many-to-many relationship via a pivot table.
+
+**Parameters:**
+- `$pivotTable` — (Optional) Name of the pivot table. If omitted, follows Eloquent's convention: the lowercased, singular basenames of both models, alphabetically sorted and joined with an underscore (e.g. `User` + `Role` → `role_user`), automatically prefixed with the WordPress table prefix. A bare name you pass in is also auto-prefixed if needed.
+- `$foreignPivotKey` — (Optional) FK column on the pivot table referencing *this* model. Defaults to `{this_model}_id`.
+- `$relatedPivotKey` — (Optional) FK column on the pivot table referencing the *related* model. Defaults to `{related_model}_id`.
+
+The related table is joined on its own `$primaryKey`, so this also works with non-`id` primary keys.
 
 **Example:**
 ```php
 $roles = $user->belongsToMany(Role::class);
+// Equivalent to: $user->belongsToMany(Role::class, 'role_user', 'user_id', 'role_id');
+
+// With an explicit pivot table and keys:
+$roles = $user->belongsToMany(Role::class, 'user_role', 'user_id', 'role_id');
 ```
 
 ### hasManyThrough($related, $through, $firstKey = null, $secondKey = null, $localKey = null)
-**Description:** Define a has-many-through relationship.
+**Description:** Define a has-many-through relationship — access a distant relation through an intermediate ("through") model.
+
+**Parameters (matching Eloquent's convention):**
+- `$firstKey` — FK **on the through table** that points back to *this* model. Defaults to `{this_model}_id`.
+- `$secondKey` — FK **on the related table** that points to the through table. Defaults to `{through_model}_id`.
+- `$localKey` — PK on *this* model. Defaults to `$primaryKey`.
 
 **Example:**
 ```php
-$comments = $user->hasManyThrough(Comment::class, Post::class);
+// Country hasManyThrough Post, through User:
+// users.country_id   -> $firstKey  (FK on the through table -> Country)
+// posts.user_id       -> $secondKey (FK on the related table -> User)
+public function posts() {
+    return $this->hasManyThrough(Post::class, User::class, 'country_id', 'user_id');
+}
+
+$comments = $user->hasManyThrough(Comment::class, Post::class, 'user_id', 'post_id');
+// posts.user_id     -> $firstKey  (FK on Post, the through table, -> User)
+// comments.post_id  -> $secondKey (FK on Comment, the related table, -> Post)
 ```
 
 ---
@@ -857,6 +886,7 @@ $comments = $user->hasManyThrough(Comment::class, Post::class);
 
 ### whereHas($relation, $constraint = null)
 - Filter models where the given relation exists and matches the constraint closure.
+- Supported for all relationship types: `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`.
 - Example: `$query->whereHas('posts', function($q) { $q->where('published', 1); })`
 
 ### orWhereHas($relation, $constraint = null)
@@ -864,8 +894,30 @@ $comments = $user->hasManyThrough(Comment::class, Post::class);
 
 ### has($relation, $operator = '>=', $count = 1)
 - Filter models with a number of related records matching the operator and count.
+- Implemented as a correlated `COUNT(*)` subquery, so the comparison is enforced exactly (not just an existence check).
 - Example: `$query->has('posts', '>=', 5)`
 - Operator and count are optional (defaults to ">= 1").
+
+---
+
+## Eager Loading
+
+### with($relations)
+**Description:** Eager-load one or more relations alongside the main query, avoiding N+1 queries. Accepts a relation name, an array of relation names, or an associative array mapping relation names to constraint closures (or an options array — see below). Works for all five relationship types (`hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`) and runs exactly one extra query per relation, regardless of how many parent rows were loaded.
+
+**Example:**
+```php
+$users = User::with('posts')->get();
+$users = User::with(['posts', 'profile'])->get();
+$users = User::with(['posts' => function($q) {
+    $q->where('published', 1);
+}])->get();
+```
+
+- `hasOne`/`belongsTo` relations resolve to a single model (or `null`).
+- `hasMany`/`belongsToMany`/`hasManyThrough` relations resolve to a `Collection`.
+
+See [Per-relation global-scope control](./Readme.md#per-relation-global-scope-control-eager-loads) in the Readme for disabling global scopes on a specific eager-loaded relation.
 
 ---
 
@@ -923,6 +975,14 @@ if ($user->isDirty('name')) { /* ... */ }
 **Example:**
 ```php
 $changes = $user->getChanges();
+```
+
+### forgetAttribute($key)
+**Description:** Remove an internal/transient attribute from the model so it no longer appears on the model or in `toArray()`/`toJson()` output. Mainly used internally by `with()` eager loading to strip bookkeeping columns (e.g. a pivot-table foreign key selected only to group `belongsToMany`/`hasManyThrough` results back onto their parent models), but available for any case where you've added a transient/computed attribute and want to discard it before serializing. Safe to call even if the key was never set. Returns `$this` for chaining.
+
+**Example:**
+```php
+$user->forgetAttribute('_pivot_fk');
 ```
 
 ---
@@ -1274,6 +1334,8 @@ $user->forceDelete();
 ### forceDeleteWith(array $relations = [])
 
 Force delete the model and all specified relationships. Useful for cascading deletes on related models when using soft deletes.
+
+Works with any relationship type (`hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`) — single-result relations (`hasOne`/`belongsTo`) force-delete the one related model if present, and collection relations (`hasMany`/`belongsToMany`/`hasManyThrough`) force-delete every related model returned.
 
 **Parameters:**
 - `$relations` (array): Array of relationship method names (strings) to force delete.
