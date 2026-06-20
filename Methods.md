@@ -8,6 +8,7 @@ This document describes all public and static methods of the `MJ\WPORM\Model` cl
 - [Global Scopes](#global-scopes)
 - [Constructor](#constructor)
 - [Query Methods](#query-methods)
+- [Raw SQL Expressions](#raw-sql-expressions)
 - [Retrieval Methods](#retrieval-methods)
 - [Aggregates & Utility Methods](#aggregates--utility-methods)
 - [Persistence Methods](#persistence-methods)
@@ -366,6 +367,114 @@ $users = User::query()
     ->havingBetween('count(*)', [5, 20])
     ->get();
 ```
+
+### orHaving($column, $operator = null, $value = null)
+**Description:** Add an OR HAVING clause to the query. Usage is similar to having().
+
+**Example:**
+```php
+$users = User::query()
+    ->groupBy('country')
+    ->having('count(*)', '>', 10)
+    ->orHaving('count(*)', '<', 2)
+    ->get();
+```
+
+### orHavingBetween($column, array $values)
+**Description:** Add an OR HAVING ... BETWEEN ... AND ... clause to the query.
+
+**Example:**
+```php
+$users = User::query()
+    ->groupBy('country')
+    ->havingBetween('count(*)', [5, 20])
+    ->orHavingBetween('count(*)', [50, 100])
+    ->get();
+```
+
+---
+
+## Raw SQL Expressions
+
+These methods let you drop down to raw SQL for the SELECT, WHERE, GROUP BY, and HAVING clauses when the fluent builder doesn't (or can't cleanly) express what you need — e.g. SQL functions, computed columns, or vendor-specific syntax. Bindings use the same `%s`-style placeholders as the rest of WPORM and are passed straight through to `$wpdb->prepare()`, so they're just as safe as the regular query builder methods. Placeholders are substituted in the order their clause appears in the final SQL (SELECT → WHERE → GROUP BY → HAVING → ORDER BY), so you don't need to worry about binding order across mixed raw/non-raw calls.
+
+### selectRaw($sql, array $bindings = [])
+**Description:** Add a raw SQL expression to the SELECT clause, with optional bindings. Can be combined with `select()` and/or multiple `selectRaw()` calls — all are concatenated into the final SELECT list. If `select()` is never called, the default `*` selection is kept alongside the raw expression(s).
+
+**Example:**
+```php
+$products = Product::query()
+    ->selectRaw('COUNT(*) as total')
+    ->get();
+
+$products = Product::query()
+    ->select('name')
+    ->selectRaw('price * %s as adjusted_price', [1.1])
+    ->get();
+```
+
+### whereRaw($sql, array $bindings = [])
+**Description:** Add a raw SQL WHERE clause, with optional bindings.
+
+**Example:**
+```php
+$products = Product::query()
+    ->whereRaw('price > %s', [100])
+    ->get();
+
+$orders = Order::query()
+    ->whereRaw('YEAR(created_at) = %s AND MONTH(created_at) = %s', [2025, 6])
+    ->get();
+```
+
+### orWhereRaw($sql, array $bindings = [])
+**Description:** Add a raw SQL OR WHERE clause, with optional bindings.
+
+**Example:**
+```php
+$products = Product::query()
+    ->where('featured', true)
+    ->orWhereRaw('price > %s', [1000])
+    ->get();
+```
+
+### groupByRaw($sql, array $bindings = [])
+**Description:** Add a raw SQL GROUP BY expression, with optional bindings. Useful for grouping by SQL expressions/functions rather than plain column names.
+
+**Example:**
+```php
+$dailyTotals = Order::query()
+    ->selectRaw('DATE(created_at) as day, SUM(total) as total')
+    ->groupByRaw('DATE(created_at)')
+    ->get();
+```
+
+### havingRaw($sql, array $bindings = [])
+**Description:** Add a raw SQL HAVING clause, with optional bindings.
+
+**Example:**
+```php
+$users = User::query()
+    ->groupBy('country')
+    ->havingRaw('COUNT(*) > %s', [5])
+    ->get();
+```
+
+### orHavingRaw($sql, array $bindings = [])
+**Description:** Add a raw SQL OR HAVING clause, with optional bindings.
+
+**Example:**
+```php
+$users = User::query()
+    ->groupBy('country')
+    ->having('count(*)', '>', 10)
+    ->orHavingRaw('SUM(votes) > %s', [1000])
+    ->get();
+```
+
+> Note: `orderByRaw()` (raw SQL ORDER BY with optional bindings) is documented above under [Query Methods](#orderbyrawsql-array-bindings).
+
+---
 
 ### whereBetween($column, array $values)
 Add a WHERE ... BETWEEN ... AND ... clause to the query.

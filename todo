@@ -36,7 +36,7 @@ The latest task was not completed. (Moderate Issues: 1)
   | ✅ 17 | value() | User::where('id',1)->value('email') | Single column, single row |
   | ✅ 18 | pluck() | User::pluck('email', 'id') | Column extraction |
   | ✅ 19 | exists() / doesntExist() | User::where('email',$e)->exists() | Boolean existence check |
-  | 20 | selectRaw() / whereRaw() / havingRaw() | Raw SQL expressions | Only orderByRaw() exists |
+  | ✅ 20 | selectRaw() / whereRaw() / orWhereRaw() / havingRaw() / orHavingRaw() / groupByRaw() | Raw SQL expressions | orderByRaw() now has full raw-clause coverage |
   | 21 | chunk() / each() | Process large datasets in batches | Memory management |
   | 22 | toJson() on Model | $user->toJson() | Serialization |
   | ✅ 23 | $hidden property | Hide attributes from toArray()/toJson() | API security (passwords etc.) |
@@ -95,7 +95,7 @@ The latest task was not completed. (Moderate Issues: 1)
   ✅ 2. Add $guarded enforcement + $hidden — Security essentials
   ✅ 3. Add increment/decrement/sum/avg/min/max/value/pluck/exists — Highest-use missing features
   4. Extract buildWhereClause() helper — Fixes OR bugs everywhere at once
-  5. Add selectRaw/whereRaw/havingRaw — Completes the raw SQL story
+  ✅ 5. Add selectRaw/whereRaw/havingRaw — Completes the raw SQL story
   6. Add create()/findOrFail()/toJson()/$hidden — Common Eloquent patterns
   7. Enrich Collection — Bring it closer to Eloquent's rich collection API
 
@@ -144,3 +144,37 @@ Other works need to be done:
   - Updated Methods.md (new "Aggregates & Utility Methods" section + TOC
     entry) and Readme.md (Features list + new "Aggregates & Utility
     Methods" section with examples) to document all of the above.
+  - Added selectRaw($sql, $bindings = []) — appends a raw expression to
+    the SELECT list (combinable with select() and/or other selectRaw()
+    calls); raw entries are stored as ['raw' => ..., 'bindings' => ...]
+    so they bypass quoteIdentifier() entirely and carry their own bindings.
+  - Added whereRaw()/orWhereRaw($sql, $bindings = []) — push a raw SQL
+    fragment straight into $this->wheres (OR-prefixed for the orWhere
+    variant), reusing the exact same OR-prefix detection that
+    buildWhereClause() already applies to every other where*() method.
+  - Added groupByRaw($sql, $bindings = []) — same raw-entry pattern as
+    selectRaw(), for grouping by SQL expressions (e.g. DATE(created_at))
+    rather than plain column names.
+  - Added havingRaw()/orHavingRaw($sql, $bindings = []) — push directly
+    into $this->havings using the same [$expr, $values] shape that
+    having()/havingBetween() already use, so no changes were needed to
+    the HAVING-rendering code in buildSelectQuery().
+  - Fixed a binding-order bug surfaced while wiring this up: getBindings()
+    previously returned WHERE bindings before HAVING/ORDER-BY-raw
+    bindings but had no concept of SELECT- or GROUP-BY-raw bindings at
+    all. Replaced the old single getSelectExtraBindings() helper with
+    four focused helpers (getSelectBindings/getGroupByBindings/
+    getHavingBindings/getOrderByBindings) and rebuilt getBindings() to
+    merge them in true left-to-right SQL clause order: SELECT, WHERE,
+    GROUP BY, HAVING, ORDER BY. This matters for any query mixing
+    selectRaw()/groupByRaw() with regular where()/having() calls — count(),
+    delete(), and update() are unaffected since they never touch the
+    SELECT list and build their SQL independently of buildSelectQuery().
+  - Updated buildSelectQuery()'s SELECT and GROUP BY rendering to detect
+    and pass through raw entries (arrays with a 'raw' key) instead of
+    running them through Helpers::quoteIdentifier().
+  - Updated Methods.md (new "Raw SQL Expressions" section + TOC entry;
+    also backfilled previously-undocumented orHaving()/orHavingBetween())
+    and Readme.md (Features list + new "Raw SQL Expressions" section
+    with examples, placed after "Custom Queries") to document all of the
+    above.

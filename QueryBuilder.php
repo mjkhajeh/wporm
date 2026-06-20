@@ -67,6 +67,25 @@ class QueryBuilder {
         return $this;
     }
 
+    /**
+     * Add a raw SQL expression to the SELECT clause, with optional bindings.
+     * Can be combined with select()/multiple selectRaw() calls — all are
+     * concatenated together in the final SELECT list.
+     *
+     * Usage:
+     *   ->selectRaw('COUNT(*) as total')
+     *   ->selectRaw('price * %s as adjusted_price', [1.1])
+     *   ->select('name')->selectRaw('price * %s as adjusted_price', [1.1])
+     *
+     * @param string $sql
+     * @param array $bindings
+     * @return $this
+     */
+    public function selectRaw($sql, array $bindings = []) {
+        $this->selects[] = ['raw' => $sql, 'bindings' => $bindings];
+        return $this;
+    }
+
     public function from($table) {
         $this->table = $table;
         return $this;
@@ -177,6 +196,40 @@ class QueryBuilder {
         }
         $this->wheres[] = 'OR ' . Helpers::quoteIdentifier($column) . " $operator %s";
         $this->bindings[] = $value;
+        return $this;
+    }
+
+    /**
+     * Add a raw SQL WHERE clause, with optional bindings (%s-style placeholders,
+     * matching the rest of WPORM — they're passed straight to $wpdb->prepare).
+     * Usage: ->whereRaw('price > %s', [100])
+     *        ->whereRaw('YEAR(created_at) = %s AND MONTH(created_at) = %s', [2025, 6])
+     *
+     * @param string $sql
+     * @param array $bindings
+     * @return $this
+     */
+    public function whereRaw($sql, array $bindings = []) {
+        $this->wheres[] = $sql;
+        foreach ($bindings as $b) {
+            $this->bindings[] = $b;
+        }
+        return $this;
+    }
+
+    /**
+     * Add a raw SQL OR WHERE clause, with optional bindings.
+     * Usage: ->orWhereRaw('price > %s', [100])
+     *
+     * @param string $sql
+     * @param array $bindings
+     * @return $this
+     */
+    public function orWhereRaw($sql, array $bindings = []) {
+        $this->wheres[] = 'OR ' . $sql;
+        foreach ($bindings as $b) {
+            $this->bindings[] = $b;
+        }
         return $this;
     }
 
@@ -977,6 +1030,20 @@ class QueryBuilder {
     }
 
     /**
+     * Add a raw SQL GROUP BY expression, with optional bindings.
+     * Usage: ->groupByRaw('DATE(created_at)')
+     *        ->groupByRaw('YEAR(created_at), MONTH(created_at)')
+     *
+     * @param string $sql
+     * @param array $bindings
+     * @return $this
+     */
+    public function groupByRaw($sql, array $bindings = []) {
+        $this->groups[] = ['raw' => $sql, 'bindings' => $bindings];
+        return $this;
+    }
+
+    /**
      * Add a HAVING clause to the query.
      */
     public function having($column, $operator = null, $value = null) {
@@ -1025,6 +1092,33 @@ class QueryBuilder {
     }
 
     /**
+     * Add a raw SQL HAVING clause, with optional bindings.
+     * Usage: ->havingRaw('COUNT(*) > %s', [5])
+     *        ->havingRaw('SUM(total) > %s', [1000])
+     *
+     * @param string $sql
+     * @param array $bindings
+     * @return $this
+     */
+    public function havingRaw($sql, array $bindings = []) {
+        $this->havings[] = [$sql, $bindings];
+        return $this;
+    }
+
+    /**
+     * Add a raw SQL OR HAVING clause, with optional bindings.
+     * Usage: ->orHavingRaw('SUM(total) > %s', [1000])
+     *
+     * @param string $sql
+     * @param array $bindings
+     * @return $this
+     */
+    public function orHavingRaw($sql, array $bindings = []) {
+        $this->havings[] = ["OR $sql", $bindings];
+        return $this;
+    }
+
+    /**
      * Disable global scopes for this query.
      * Usage: Model::query()->withoutGlobalScopes()
      */
@@ -1042,23 +1136,70 @@ class QueryBuilder {
 
     /**
      * Return the current bindings array (for debugging).
+     *
+     * Bindings must be returned in the same left-to-right order their
+     * placeholders appear in the final SQL string (SELECT, then WHERE,
+     * then GROUP BY, then HAVING, then ORDER BY) so that $wpdb->prepare()
+     * substitutes them correctly.
      */
     public function getBindings() {
-        return array_merge($this->bindings, $this->getSelectExtraBindings());
+        return array_merge(
+            $this->getSelectBindings(),
+            $this->bindings,
+            $this->getGroupByBindings(),
+            $this->getHavingBindings(),
+            $this->getOrderByBindings()
+        );
     }
 
     /**
-     * Return bindings used by SELECT-only clauses that are stored outside the main WHERE bindings.
+     * Bindings from selectRaw() entries, in SELECT-list order.
      */
-    protected function getSelectExtraBindings() {
+    protected function getSelectBindings() {
         $bindings = [];
+        foreach ($this->selects as $select) {
+            if (is_array($select) && isset($select['raw']) && !empty($select['bindings'])) {
+                foreach ($select['bindings'] as $value) {
+                    $bindings[] = $value;
+                }
+            }
+        }
+        return $bindings;
+    }
 
+    /**
+     * Bindings from groupByRaw() entries, in GROUP BY-list order.
+     */
+    protected function getGroupByBindings() {
+        $bindings = [];
+        foreach ($this->groups as $group) {
+            if (is_array($group) && isset($group['raw']) && !empty($group['bindings'])) {
+                foreach ($group['bindings'] as $value) {
+                    $bindings[] = $value;
+                }
+            }
+        }
+        return $bindings;
+    }
+
+    /**
+     * Bindings from having()/havingBetween()/havingRaw() (and OR variants) entries.
+     */
+    protected function getHavingBindings() {
+        $bindings = [];
         foreach ($this->havings as [$expr, $values]) {
             foreach ($values as $value) {
                 $bindings[] = $value;
             }
         }
+        return $bindings;
+    }
 
+    /**
+     * Bindings from orderByRaw() entries.
+     */
+    protected function getOrderByBindings() {
+        $bindings = [];
         foreach ($this->orders as $order) {
             if (is_array($order) && isset($order['raw']) && !empty($order['bindings'])) {
                 foreach ($order['bindings'] as $value) {
@@ -1066,7 +1207,6 @@ class QueryBuilder {
                 }
             }
         }
-
         return $bindings;
     }
 
@@ -1173,8 +1313,13 @@ class QueryBuilder {
 
     protected function buildSelectQuery() {
         $where = $this->buildWhereClause();
-        // Quote columns in SELECT
-    $selects = array_map('\MJ\WPORM\Helpers::quoteIdentifier', $this->selects);
+        // Quote columns in SELECT, passing raw entries through as-is
+        $selects = array_map(function($col) {
+            if (is_array($col) && isset($col['raw'])) {
+                return $col['raw'];
+            }
+            return Helpers::quoteIdentifier($col);
+        }, $this->selects);
         $sql = "SELECT ";
         if ($this->isDistinct) {
             $sql .= "DISTINCT ";
@@ -1203,7 +1348,12 @@ class QueryBuilder {
         }
         // GROUP BY
         if (!empty($this->groups)) {
-            $groups = array_map('\MJ\WPORM\Helpers::quoteIdentifier', $this->groups);
+            $groups = array_map(function($g) {
+                if (is_array($g) && isset($g['raw'])) {
+                    return $g['raw'];
+                }
+                return Helpers::quoteIdentifier($g);
+            }, $this->groups);
             $sql .= " GROUP BY " . implode(", ", $groups);
         }
         // HAVING

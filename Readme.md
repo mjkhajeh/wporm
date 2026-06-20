@@ -18,6 +18,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Attribute casting**: Automatic type casting for model attributes.
 - **Relationships**: Define `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, and `hasManyThrough` relationships, with eager loading via `with()` and existence filtering via `whereHas()`/`has()`.
 - **Aggregates & utilities**: `sum()`, `avg()`, `min()`, `max()`, `value()`, `pluck()`, `exists()`/`doesntExist()`, and `increment()`/`decrement()`.
+- **Raw SQL expressions**: `selectRaw()`, `whereRaw()`/`orWhereRaw()`, `groupByRaw()`, `havingRaw()`/`orHavingRaw()`, and `orderByRaw()` for dropping down to raw SQL with safe, bound placeholders.
 - **Events**: Hooks for model lifecycle events (creating, updating, deleting).
 - **Global scopes**: Add global query constraints to models.
 
@@ -806,6 +807,42 @@ class Parts extends Model {
 // Usage:
 $parts = Parts::partsWithMinQty(5);
 ```
+
+## Raw SQL Expressions
+
+When the fluent query builder can't cleanly express what you need — SQL functions, computed columns, vendor-specific syntax — drop down to raw SQL for individual clauses with `selectRaw()`, `whereRaw()`/`orWhereRaw()`, `groupByRaw()`, and `havingRaw()`/`orHavingRaw()` (alongside the existing `orderByRaw()`). Bindings use the same `%s`-style placeholders as the rest of WPORM and are passed straight through to `$wpdb->prepare()`, so they're just as safe as the regular query builder methods — and they can be freely mixed with non-raw calls in the same query.
+
+```php
+// selectRaw() — add a raw expression to the SELECT list (combine with select())
+$products = Product::query()
+    ->select('name')
+    ->selectRaw('price * %s as adjusted_price', [1.1])
+    ->get();
+
+// whereRaw() / orWhereRaw() — raw WHERE conditions
+$orders = Order::query()
+    ->whereRaw('YEAR(created_at) = %s AND MONTH(created_at) = %s', [2025, 6])
+    ->get();
+
+$products = Product::query()
+    ->where('featured', true)
+    ->orWhereRaw('price > %s', [1000])
+    ->get();
+
+// groupByRaw() — group by a SQL expression instead of a plain column
+$dailyTotals = Order::query()
+    ->selectRaw('DATE(created_at) as day, SUM(total) as total')
+    ->groupByRaw('DATE(created_at)')
+    ->get();
+
+// havingRaw() / orHavingRaw() — raw HAVING conditions
+$bigSpenders = Order::query()
+    ->groupBy('user_id')
+    ->havingRaw('SUM(total) > %s', [1000])
+    ->get();
+```
+
+See [Methods.md](./Methods.md#raw-sql-expressions) for the full list with signatures.
 
 ## Raw Table Queries with DB::table()
 
