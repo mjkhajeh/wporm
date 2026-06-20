@@ -462,6 +462,44 @@ protected function castSet($key, $value) {
 		return $result;
 	}
 
+	/**
+	 * Find a model by its primary key or throw a ModelNotFoundException
+	 * if no record matches (Eloquent-style). Same single query as find();
+	 * only the not-found behavior differs.
+	 *
+	 * Usage: $user = User::findOrFail(1); // throws if id 1 doesn't exist
+	 *
+	 * @param mixed $id
+	 * @return static
+	 * @throws ModelNotFoundException
+	 */
+	public static function findOrFail($id) {
+		$result = static::find($id);
+		if ($result === null) {
+			throw (new ModelNotFoundException())->setModel(static::class, $id);
+		}
+		return $result;
+	}
+
+	/**
+	 * Get the first record matching the given attributes, or throw a
+	 * ModelNotFoundException if nothing matches (Eloquent-style).
+	 *
+	 * Usage: $user = User::firstOrFail(['email' => $email]);
+	 *        $user = User::query()->where('email', $email)->firstOrFail();
+	 *
+	 * @param array $attributes
+	 * @return static
+	 * @throws ModelNotFoundException
+	 */
+	public static function firstOrFail(array $attributes = []) {
+		$result = static::query()->where($attributes)->first();
+		if ($result === null) {
+			throw (new ModelNotFoundException())->setModel(static::class);
+		}
+		return $result;
+	}
+
 	// Add a wrapper for triggering retrieved() after get/first
 	public static function getWithEvent($query) {
 		$results = $query->get();

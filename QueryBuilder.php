@@ -2277,6 +2277,48 @@ class QueryBuilder {
         return $this->where($primaryKey, $id)->first();
     }
 
+    /**
+     * Find a model by its primary key or throw a ModelNotFoundException
+     * (Eloquent-style). Identical to find() otherwise — same single query,
+     * no extra DB round-trip is incurred just to check existence first.
+     *
+     * Usage: Model::query()->findOrFail($id)
+     *        Model::with('rel')->findOrFail($id)
+     *
+     * @param mixed $id
+     * @return Model
+     * @throws ModelNotFoundException
+     */
+    public function findOrFail($id) {
+        $result = $this->find($id);
+
+        if ($result === null) {
+            throw (new ModelNotFoundException())->setModel(get_class($this->model), $id);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get the first result matching the query, or throw a
+     * ModelNotFoundException if nothing matched (Eloquent-style).
+     * Identical to first() otherwise.
+     *
+     * Usage: Model::query()->where('email', $email)->firstOrFail()
+     *
+     * @return Model
+     * @throws ModelNotFoundException
+     */
+    public function firstOrFail() {
+        $result = $this->first();
+
+        if ($result === null) {
+            throw (new ModelNotFoundException())->setModel(get_class($this->model));
+        }
+
+        return $result;
+    }
+
     // -------------------------------------------------------------------------
     // Aggregates & single-value helpers
     // -------------------------------------------------------------------------

@@ -18,6 +18,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Attribute casting**: Automatic type casting for model attributes.
 - **Relationships**: Define `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, and `hasManyThrough` relationships, with eager loading via `with()` and existence filtering via `whereHas()`/`has()`.
 - **Aggregates & utilities**: `sum()`, `avg()`, `min()`, `max()`, `value()`, `pluck()`, `exists()`/`doesntExist()`, and `increment()`/`decrement()`.
+- **Fail-fast lookups**: `findOrFail()`/`firstOrFail()` throw a `ModelNotFoundException` instead of silently returning `null`.
 - **Batch processing**: `chunk()` and `each()` for iterating large result sets in pages without loading everything into memory at once.
 - **Serialization**: `toArray()`/`toJson()`/`__toString()` on both models and collections, with `$hidden`/`$visible` support and safe (exception-on-failure) JSON encoding.
 - **Raw SQL expressions**: `selectRaw()`, `whereRaw()`/`orWhereRaw()`, `groupByRaw()`, `havingRaw()`/`orHavingRaw()`, and `orderByRaw()` for dropping down to raw SQL with safe, bound placeholders.
@@ -52,6 +53,7 @@ require_once __DIR__ . '/ORM/SchemaBuilder.php';
 require_once __DIR__ . '/ORM/ColumnDefinition.php';
 require_once __DIR__ . '/ORM/DB.php';
 require_once __DIR__ . '/ORM/Collection.php';
+require_once __DIR__ . '/ORM/ModelNotFoundException.php';
 ```
 
 ## Defining a Model
@@ -169,6 +171,36 @@ $recentUsers = User::query()->where('created_at', '>=', '2025-01-01')->get();
 ```
 
 This approach works for any column in your table.
+
+### Finding a Record or Failing: findOrFail and firstOrFail
+
+When a missing record should be treated as an error rather than handled as `null`, use `findOrFail()` / `firstOrFail()` (Eloquent-style). They behave exactly like `find()` / `first()` — same single query, same `retrieved()` event — except they throw a `MJ\WPORM\ModelNotFoundException` instead of returning `null` when nothing matches.
+
+```php
+use MJ\WPORM\ModelNotFoundException;
+
+// Find by primary key, or throw
+try {
+    $user = User::findOrFail(1);
+} catch (ModelNotFoundException $e) {
+    wp_die('User not found', '', ['response' => 404]);
+}
+
+// Works mid-chain on the query builder too
+$user = User::with('posts')->findOrFail(1);
+$user = User::query()->withTrashed()->findOrFail(1);
+
+// First match by attributes, or throw
+$user = User::firstOrFail(['email' => 'user@example.com']);
+
+// Or build up arbitrary constraints on the query builder, then fail if empty
+$user = User::query()
+    ->where('active', true)
+    ->orderBy('created_at', 'desc')
+    ->firstOrFail();
+```
+
+`ModelNotFoundException` extends PHP's built-in `\RuntimeException`, and exposes `getModel()` (the model class that was queried) and `getIds()` (the id(s) passed to `findOrFail()`, if any) so error handlers can respond appropriately (e.g. a JSON 404) without parsing the message string.
 
 ### Creating or Updating Records: updateOrCreate
 

@@ -785,6 +785,50 @@ $users = User::all();
 $user = User::find(1);
 ```
 
+### findOrFail($id)
+**Description:** Find a record by primary key, or throw a `MJ\WPORM\ModelNotFoundException` if no record matches (Eloquent-style). Runs the exact same single query as `find()` — it does not perform an extra existence check first — and still triggers the `retrieved()` event when a record is found. Available both as a static method on the model and as an instance method on the query builder, so it works mid-chain (e.g. after `with()`, `withTrashed()`).
+
+**Example:**
+```php
+try {
+    $user = User::findOrFail(1);
+} catch (\MJ\WPORM\ModelNotFoundException $e) {
+    // $e->getModel() === User::class
+    // $e->getIds()   === 1
+    wp_die('User not found', '', ['response' => 404]);
+}
+
+// Also available on the query builder, mid-chain:
+$user = User::with('posts')->findOrFail(1);
+$user = User::query()->withTrashed()->findOrFail(1);
+```
+
+### firstOrFail($attributes = [])
+**Description:** Get the first record matching the given attributes (or, with no arguments, the first record overall), or throw a `MJ\WPORM\ModelNotFoundException` if nothing matches. The static `Model::firstOrFail($attributes)` form builds a `where($attributes)` query for you; the query-builder instance form, `->firstOrFail()`, takes no arguments and simply fails if the already-built query returns no rows — letting you express arbitrarily complex constraints before failing.
+
+**Example:**
+```php
+try {
+    $user = User::firstOrFail(['email' => 'foo@bar.com']);
+} catch (\MJ\WPORM\ModelNotFoundException $e) {
+    // handle not-found
+}
+
+// Equivalent, built on the query builder directly:
+$user = User::query()->where('email', 'foo@bar.com')->firstOrFail();
+
+// Works with any query constraints, not just simple equality:
+$user = User::query()
+    ->where('active', true)
+    ->orderBy('created_at', 'desc')
+    ->firstOrFail();
+```
+
+**Notes (both methods):**
+- `MJ\WPORM\ModelNotFoundException` extends PHP's built-in `\RuntimeException`, so it can be caught broadly (`catch (\RuntimeException $e)`) or specifically.
+- `getModel()` returns the fully-qualified model class name that was queried; `getIds()` returns the id(s) passed to `findOrFail()` (`null` for `firstOrFail()`).
+- Neither method issues any additional queries beyond what `find()`/`first()` already perform — the "OrFail" behavior is purely a `null`-check plus a throw, so there is no performance cost over the non-failing variants.
+
 ### getWithEvent($query)
 **Description:** Get results from a query and trigger `retrieved()` on each instance.
 

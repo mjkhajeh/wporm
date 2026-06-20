@@ -40,7 +40,7 @@ The latest task was not completed. (Moderate Issues: 1)
   | ✅ 21 | chunk() / each() | Process large datasets in batches | Memory management |
   | ✅ 22 | toJson() on Model | $user->toJson() | Serialization |
   | ✅ 23 | $hidden property | Hide attributes from toArray()/toJson() | API security (passwords etc.) |
-  | 24 | findOrFail() / firstOrFail() | Throw exception on not found | Cleaner error handling |
+  | ✅ 24 | findOrFail() / firstOrFail() | Throw exception on not found | Cleaner error handling |
   | 25 | create() static method | User::create([...]) | One-line insert + return model |
 
   ### Medium Value — Common Patterns
@@ -94,7 +94,7 @@ The latest task was not completed. (Moderate Issues: 1)
   ✅ 2. Add $guarded enforcement + $hidden — Security essentials
   ✅ 3. Add increment/decrement/sum/avg/min/max/value/pluck/exists — Highest-use missing features
   ✅ 4. Add selectRaw/whereRaw/havingRaw — Completes the raw SQL story
-  5. Add create()/findOrFail() — Common Eloquent patterns (toJson()/$hidden done — see ✅22/✅23)
+  5. Add create() — Common Eloquent pattern (toJson()/$hidden done — see ✅22/✅23; findOrFail()/firstOrFail() done — see ✅24)
   6. Enrich Collection — Bring it closer to Eloquent's rich collection API
 
 Other works need to be done:
@@ -234,3 +234,31 @@ Other works need to be done:
     Conversion and Casting"; Collection's "Available Methods" table updated
     with __toString() and toJson()'s exception note) to document all of the
     above.
+  - Added findOrFail()/firstOrFail() (Eloquent-style), in three places:
+      - New MJ\WPORM\ModelNotFoundException class (extends \RuntimeException)
+        — carries the offending model's class name (getModel()) and, for
+        findOrFail(), the id(s) that were searched for (getIds()), with an
+        Eloquent-style "No query results for model [...]" message built via
+        setModel($model, $ids = null).
+      - QueryBuilder::findOrFail($id) / QueryBuilder::firstOrFail() —
+        thin wrappers around the existing find()/first() (which themselves
+        already wrap get()), so they run the exact same single query and
+        still trigger retrieved() on a hit; only a null-check + throw is
+        added, no extra DB round-trip. Works mid-chain, e.g. after with()
+        or withTrashed().
+      - Model::findOrFail($id) (static) — mirrors Model::find()'s existing
+        shape/behavior (including its own explicit retrieved() trigger),
+        just adds the not-found throw.
+      - Model::firstOrFail(array $attributes = []) (static) — builds
+        static::query()->where($attributes)->first() (an empty array is a
+        no-op where(), matching Eloquent's "first record overall" fallback
+        behavior) and throws if nothing matched.
+  - Updated composer.json's PSR-4 root mapping already covers the new
+    ModelNotFoundException.php (flat file at the package root, same as
+    Model.php/Collection.php/etc.) — no composer.json change needed.
+  - Updated Readme.md (Features list; new "Finding a Record or Failing:
+    findOrFail and firstOrFail" section placed after "Querying by a
+    Specific Column"; added ModelNotFoundException.php to the Manual
+    Installation require list) and Methods.md (new findOrFail()/
+    firstOrFail() entries under Retrieval Methods, directly after find())
+    to document all of the above.
