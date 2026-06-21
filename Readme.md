@@ -18,7 +18,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Attribute casting**: Automatic type casting for model attributes.
 - **Relationships**: Define `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, and `hasManyThrough` relationships, with eager loading via `with()` and existence filtering via `whereHas()`/`has()`.
 - **Aggregates & utilities**: `sum()`, `avg()`, `min()`, `max()`, `value()`, `pluck()`, `exists()`/`doesntExist()`, and `increment()`/`decrement()`.
-- **Fail-fast lookups**: `findOrFail()`/`firstOrFail()` throw a `ModelNotFoundException` instead of silently returning `null`.
+- **Fail-fast lookups**: `findOrFail()`/`firstOrFail()` (including array-of-ids lookups, and `Collection::firstOrFail()`) throw a `ModelNotFoundException` instead of silently returning `null`.
 - **Batch processing**: `chunk()` and `each()` for iterating large result sets in pages without loading everything into memory at once.
 - **Serialization**: `toArray()`/`toJson()`/`__toString()` on both models and collections, with `$hidden`/`$visible` support and safe (exception-on-failure) JSON encoding.
 - **Raw SQL expressions**: `selectRaw()`, `whereRaw()`/`orWhereRaw()`, `groupByRaw()`, `havingRaw()`/`orHavingRaw()`, and `orderByRaw()` for dropping down to raw SQL with safe, bound placeholders.
@@ -190,6 +190,16 @@ try {
 $user = User::with('posts')->findOrFail(1);
 $user = User::query()->withTrashed()->findOrFail(1);
 
+// Find multiple records by an array of ids — returns a Collection.
+// find() simply omits any ids that don't exist; findOrFail() throws
+// if ANY of them are missing, listing every missing id.
+$users = User::find([1, 2, 3]);        // Collection of whichever ids exist
+try {
+    $users = User::findOrFail([1, 2, 3]);
+} catch (ModelNotFoundException $e) {
+    // $e->getIds() === [2, 3] if only id 1 existed
+}
+
 // First match by attributes, or throw
 $user = User::firstOrFail(['email' => 'user@example.com']);
 
@@ -198,9 +208,20 @@ $user = User::query()
     ->where('active', true)
     ->orderBy('created_at', 'desc')
     ->firstOrFail();
+
+// Collection::firstOrFail() — same idea, but on an already-fetched
+// Collection (e.g. after in-memory filtering), where re-running a query
+// isn't an option:
+$activeAdmins = User::query()->where('role', 'admin')->get()
+    ->filter(fn($u) => $u->active);
+try {
+    $admin = $activeAdmins->firstOrFail();
+} catch (ModelNotFoundException $e) {
+    // no active admins found
+}
 ```
 
-`ModelNotFoundException` extends PHP's built-in `\RuntimeException`, and exposes `getModel()` (the model class that was queried) and `getIds()` (the id(s) passed to `findOrFail()`, if any) so error handlers can respond appropriately (e.g. a JSON 404) without parsing the message string.
+`ModelNotFoundException` extends PHP's built-in `\RuntimeException`, and exposes `getModel()` (the model class that was queried) and `getIds()` (the id(s) passed to `findOrFail()` — a single value, or the array of missing ids for an array lookup; `null` for `firstOrFail()`/`Collection::firstOrFail()`) so error handlers can respond appropriately (e.g. a JSON 404) without parsing the message string.
 
 ### Creating or Updating Records: updateOrCreate
 
@@ -659,6 +680,7 @@ All multi-result queries (`get()`, `all()`, etc.) return a `Collection` instance
 |---|---|---|
 | `all()` | `array` | Get the underlying array of items |
 | `first()` | `mixed` | Get the first item |
+| `firstOrFail()` | `mixed` | Get the first item, or throw `ModelNotFoundException` if the collection is empty |
 | `last()` | `mixed` | Get the last item |
 | `count()` | `int` | Number of items |
 | `isEmpty()` | `bool` | Whether the collection is empty |

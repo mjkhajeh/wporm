@@ -2267,30 +2267,65 @@ class QueryBuilder {
     }
 
     /**
-     * Find a model by its primary key (Eloquent-style).
-     * Usage: Model::query()->find($id) or Model::with('rel')->find($id)
-     * @param mixed $id
-     * @return Model|null
+     * Find a model by its primary key, or multiple models by an array of
+     * primary keys (Eloquent-style).
+     *
+     * Usage: Model::query()->find($id)         // single id  -> Model|null
+     *        Model::query()->find([1, 2, 3])    // array of ids -> Collection
+     *        Model::with('rel')->find($id)
+     *
+     * @param mixed $id A single primary key value, or an array of values.
+     * @return Model|\MJ\WPORM\Collection|null Model|null for a single id,
+     *         Collection for an array of ids (missing ids are simply
+     *         omitted, same as Eloquent).
      */
     public function find($id) {
         $primaryKey = $this->model->primaryKey ?? 'id';
+        if (is_array($id)) {
+            if (empty($id)) {
+                return new \MJ\WPORM\Collection([]);
+            }
+            return $this->whereIn($primaryKey, $id)->get();
+        }
         return $this->where($primaryKey, $id)->first();
     }
 
     /**
-     * Find a model by its primary key or throw a ModelNotFoundException
-     * (Eloquent-style). Identical to find() otherwise — same single query,
-     * no extra DB round-trip is incurred just to check existence first.
+     * Find a model by its primary key, or throw a ModelNotFoundException if
+     * no record matches (Eloquent-style). Identical to find() otherwise —
+     * same single query, no extra DB round-trip is incurred just to check
+     * existence first.
+     *
+     * When given an array of ids, behaves like Eloquent's findOrFail(): all
+     * matching models are returned as a Collection, but if ANY of the
+     * requested ids was not found, a ModelNotFoundException is thrown
+     * listing every missing id (not just the first).
      *
      * Usage: Model::query()->findOrFail($id)
+     *        Model::query()->findOrFail([1, 2, 3])
      *        Model::with('rel')->findOrFail($id)
      *
-     * @param mixed $id
-     * @return Model
+     * @param mixed $id A single primary key value, or an array of values.
+     * @return Model|\MJ\WPORM\Collection
      * @throws ModelNotFoundException
      */
     public function findOrFail($id) {
         $result = $this->find($id);
+
+        if (is_array($id)) {
+            $primaryKey = $this->model->primaryKey ?? 'id';
+            $foundIds = [];
+            foreach ($result as $model) {
+                $foundIds[] = $model->$primaryKey;
+            }
+            $missingIds = array_values(array_diff($id, $foundIds));
+
+            if (!empty($missingIds)) {
+                throw (new ModelNotFoundException())->setModel(get_class($this->model), $missingIds);
+            }
+
+            return $result;
+        }
 
         if ($result === null) {
             throw (new ModelNotFoundException())->setModel(get_class($this->model), $id);

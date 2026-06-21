@@ -452,7 +452,28 @@ protected function castSet($key, $value) {
 		return $results;
 	}
 
+	/**
+	 * Find a model by its primary key, or multiple models by an array of
+	 * primary keys (Eloquent-style).
+	 *
+	 * Usage: $user  = User::find(1);          // single id  -> Model|null
+	 *        $users = User::find([1, 2, 3]);   // array of ids -> Collection
+	 *
+	 * @param mixed $id A single primary key value, or an array of values.
+	 * @return static|\MJ\WPORM\Collection|null Model|null for a single id,
+	 *         Collection for an array of ids.
+	 */
 	public static function find($id) {
+		if (is_array($id)) {
+			$results = static::query()->find($id);
+			foreach ($results as $instance) {
+				if (method_exists($instance, 'retrieved')) {
+					$instance->retrieved();
+				}
+			}
+			return $results;
+		}
+
 		$instance = new static;
 		$pk = $instance->primaryKey;
 		$result = static::query()->where($pk, $id)->first();
@@ -467,13 +488,33 @@ protected function castSet($key, $value) {
 	 * if no record matches (Eloquent-style). Same single query as find();
 	 * only the not-found behavior differs.
 	 *
-	 * Usage: $user = User::findOrFail(1); // throws if id 1 doesn't exist
+	 * When given an array of ids, all matching models are returned as a
+	 * Collection, but if ANY requested id was not found, a
+	 * ModelNotFoundException is thrown listing every missing id.
 	 *
-	 * @param mixed $id
-	 * @return static
+	 * Usage: $user  = User::findOrFail(1);        // throws if id 1 doesn't exist
+	 *        $users = User::findOrFail([1, 2, 3]); // throws if any of 1, 2, 3 are missing
+	 *
+	 * @param mixed $id A single primary key value, or an array of values.
+	 * @return static|\MJ\WPORM\Collection
 	 * @throws ModelNotFoundException
 	 */
 	public static function findOrFail($id) {
+		if (is_array($id)) {
+			$instance = new static;
+			$pk = $instance->primaryKey;
+			$result = static::find($id);
+			$foundIds = [];
+			foreach ($result as $model) {
+				$foundIds[] = $model->$pk;
+			}
+			$missingIds = array_values(array_diff($id, $foundIds));
+			if (!empty($missingIds)) {
+				throw (new ModelNotFoundException())->setModel(static::class, $missingIds);
+			}
+			return $result;
+		}
+
 		$result = static::find($id);
 		if ($result === null) {
 			throw (new ModelNotFoundException())->setModel(static::class, $id);

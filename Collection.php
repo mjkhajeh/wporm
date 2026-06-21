@@ -116,6 +116,32 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
     }
 
     /**
+     * Get the first item in the collection, or throw a ModelNotFoundException
+     * if the collection is empty (Eloquent-style).
+     *
+     * Useful after in-memory filtering (e.g. ->filter(...)->firstOrFail())
+     * where the underlying query already ran and a query-builder-level
+     * firstOrFail() is no longer an option.
+     *
+     * Checks isEmpty() (rather than first() === null) so a collection whose
+     * first item happens to be a falsy value (0, false, '') is not mistaken
+     * for an empty collection.
+     *
+     * @return mixed
+     * @throws ModelNotFoundException
+     */
+    public function firstOrFail() {
+        if ($this->isEmpty()) {
+            // The collection has no model context of its own (it's just a
+            // plain bag of items), so the exception names the Collection
+            // class itself rather than a specific model.
+            throw (new ModelNotFoundException())->setModel(static::class);
+        }
+
+        return $this->first();
+    }
+
+    /**
      * Get the last item in the collection.
      */
     public function last() {

@@ -778,15 +778,18 @@ $users = User::all();
 ```
 
 ### find($id)
-**Description:** Find a record by primary key. Triggers `retrieved()` event.
+**Description:** Find a record by primary key, or multiple records by an array of primary keys (Eloquent-style). A single id returns a `Model` or `null`; an array of ids returns a `Collection` (missing ids are simply omitted, same as Eloquent). Triggers `retrieved()` event on each instance found.
 
 **Example:**
 ```php
-$user = User::find(1);
+$user = User::find(1);          // Model|null
+$users = User::find([1, 2, 3]); // Collection (only the ids that exist)
 ```
 
 ### findOrFail($id)
 **Description:** Find a record by primary key, or throw a `MJ\WPORM\ModelNotFoundException` if no record matches (Eloquent-style). Runs the exact same single query as `find()` — it does not perform an extra existence check first — and still triggers the `retrieved()` event when a record is found. Available both as a static method on the model and as an instance method on the query builder, so it works mid-chain (e.g. after `with()`, `withTrashed()`).
+
+Also accepts an array of ids, just like `find()`: all matching models are returned as a `Collection`, but if **any** of the requested ids was not found, the exception is thrown listing **every** missing id (not just the first one).
 
 **Example:**
 ```php
@@ -801,6 +804,13 @@ try {
 // Also available on the query builder, mid-chain:
 $user = User::with('posts')->findOrFail(1);
 $user = User::query()->withTrashed()->findOrFail(1);
+
+// Array of ids: returns a Collection, or throws listing every missing id
+try {
+    $users = User::findOrFail([1, 2, 3]);
+} catch (\MJ\WPORM\ModelNotFoundException $e) {
+    // $e->getIds() === [2, 3] if only id 1 existed
+}
 ```
 
 ### firstOrFail($attributes = [])
@@ -824,10 +834,25 @@ $user = User::query()
     ->firstOrFail();
 ```
 
-**Notes (both methods):**
+### Collection::firstOrFail()
+**Description:** Get the first item in an already-fetched `Collection`, or throw a `MJ\WPORM\ModelNotFoundException` if the collection is empty (Eloquent-style). Useful after in-memory operations (`filter()`, `map()`, `slice()`, etc.) where the query already ran and a query-builder-level `firstOrFail()` is no longer an option.
+
+**Example:**
+```php
+$activeAdmins = User::query()->where('role', 'admin')->get()
+    ->filter(fn($u) => $u->active);
+
+try {
+    $admin = $activeAdmins->firstOrFail();
+} catch (\MJ\WPORM\ModelNotFoundException $e) {
+    // no active admins found
+}
+```
+
+**Notes (all methods above):**
 - `MJ\WPORM\ModelNotFoundException` extends PHP's built-in `\RuntimeException`, so it can be caught broadly (`catch (\RuntimeException $e)`) or specifically.
-- `getModel()` returns the fully-qualified model class name that was queried; `getIds()` returns the id(s) passed to `findOrFail()` (`null` for `firstOrFail()`).
-- Neither method issues any additional queries beyond what `find()`/`first()` already perform — the "OrFail" behavior is purely a `null`-check plus a throw, so there is no performance cost over the non-failing variants.
+- `getModel()` returns the fully-qualified model class name that was queried; `getIds()` returns the id(s) passed to `findOrFail()` (a single value, or an array when any ids were missing from an array lookup; `null` for `firstOrFail()`).
+- None of these methods issue any additional queries beyond what `find()`/`first()`/`get()` already perform — the "OrFail" behavior is purely a check on the already-fetched result plus a throw, so there is no performance cost over the non-failing variants.
 
 ### getWithEvent($query)
 **Description:** Get results from a query and trigger `retrieved()` on each instance.
