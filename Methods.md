@@ -878,6 +878,19 @@ $admin = User::firstWithEvent(User::query()->where('role', 'admin'));
 $user = User::updateOrCreate(['email' => 'foo@bar.com'], ['name' => 'Foo']);
 ```
 
+### create(array $attributes = [])
+**Description:** Instantiate a new model with the given attributes, save it, and return the instance — a one-line insert + return model (Eloquent-style). Attributes are mass-assigned through the same `$fillable`/`$guarded` rules as `new Model([...])`; anything not allowed through mass assignment is silently skipped. Equivalent to `new static($attributes)` followed by `->save()`, just shorter.
+
+**Example:**
+```php
+$user = User::create(['name' => 'Foo', 'email' => 'foo@bar.com']);
+echo $user->id; // newly-inserted primary key
+```
+
+**Notes:**
+- Returns the model instance regardless of whether the underlying `save()` succeeded; check `$user->exists` if you need to confirm the insert happened.
+- Runs a single `INSERT` query (via `save()` → `insert()`), the same as manually constructing and saving the model — no extra queries.
+
 ### firstOrCreate(array $attributes, array $values = [])
 **Description:** Return the first record matching attributes or create it.
 

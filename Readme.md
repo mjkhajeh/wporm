@@ -17,6 +17,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Query builder**: Chainable query builder for flexible and safe SQL queries.
 - **Attribute casting**: Automatic type casting for model attributes.
 - **Relationships**: Define `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, and `hasManyThrough` relationships, with eager loading via `with()` and existence filtering via `whereHas()`/`has()`.
+- **Convenient creation**: `create()` for a one-line insert + return model, plus `updateOrCreate()`, `firstOrCreate()`, and `firstOrNew()` for upsert-style lookups.
 - **Aggregates & utilities**: `sum()`, `avg()`, `min()`, `max()`, `value()`, `pluck()`, `exists()`/`doesntExist()`, and `increment()`/`decrement()`.
 - **Fail-fast lookups**: `findOrFail()`/`firstOrFail()` (including array-of-ids lookups, and `Collection::firstOrFail()`) throw a `ModelNotFoundException` instead of silently returning `null`.
 - **Batch processing**: `chunk()` and `each()` for iterating large result sets in pages without loading everything into memory at once.
@@ -127,6 +128,8 @@ $part = new Parts(['part_id' => 1, 'product_id' => 2, 'qty' => 10]);
 $part->save();
 ```
 
+> Prefer a one-liner? `Parts::create([...])` does the same thing (instantiate + `save()`) in a single call — see [One-Line Create: create()](#one-line-create-create) below.
+
 ### Querying Records
 ```php
 // Get all parts
@@ -222,6 +225,30 @@ try {
 ```
 
 `ModelNotFoundException` extends PHP's built-in `\RuntimeException`, and exposes `getModel()` (the model class that was queried) and `getIds()` (the id(s) passed to `findOrFail()` — a single value, or the array of missing ids for an array lookup; `null` for `firstOrFail()`/`Collection::firstOrFail()`) so error handlers can respond appropriately (e.g. a JSON 404) without parsing the message string.
+
+### One-Line Create: create()
+
+WPORM provides a `create` static method, similar to Laravel Eloquent, for instantiating a new model with the given attributes, saving it, and returning the instance — all in one call.
+
+**Usage:**
+
+```php
+// One-line insert + return model
+$user = User::create([
+    'name' => 'John Doe',
+    'email' => 'user@example.com',
+]);
+
+echo $user->id; // the newly-inserted primary key
+```
+
+- Attributes are mass-assigned through the same `$fillable`/`$guarded` rules as `new Model([...])` — any attribute not allowed through mass assignment is silently skipped, exactly like the constructor.
+- Equivalent to (and a shorthand for):
+  ```php
+  $user = new User(['name' => 'John Doe', 'email' => 'user@example.com']);
+  $user->save();
+  ```
+- Returns the model instance regardless of whether the underlying `save()` succeeded; check `$user->exists` (or your own validation beforehand) if you need to confirm the insert actually happened.
 
 ### Creating or Updating Records: updateOrCreate
 

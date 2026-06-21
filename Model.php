@@ -598,6 +598,29 @@ protected function castSet($key, $value) {
 		return $instance;
 	}
 
+	/**
+	 * create: Instantiate a new model with the given (mass-assignable)
+	 * attributes, save it, and return the resulting instance — a one-line
+	 * insert + return model, Eloquent-style.
+	 *
+	 * Mass assignment still goes through the constructor/fill()/__set()
+	 * pipeline, so $fillable/$guarded are enforced exactly as they are for
+	 * `new static($attributes)`. Any attribute not allowed through mass
+	 * assignment is silently skipped (consistent with the rest of WPORM's
+	 * mass-assignment behavior), rather than throwing.
+	 *
+	 * Usage:
+	 *   $user = User::create(['name' => 'Jane', 'email' => 'jane@example.com']);
+	 *
+	 * @param array $attributes
+	 * @return static The newly created (and already-saved) model instance.
+	 */
+	public static function create(array $attributes = []) {
+		$instance = new static($attributes);
+		$instance->save();
+		return $instance;
+	}
+
     /**
      * Insert a record, ignoring duplicate key errors (Eloquent-style).
      * Usage: Model::insertOrIgnore(['col' => 'val', ...])
