@@ -17,6 +17,7 @@ class QueryBuilder {
     protected $joins = [];
     protected $groups = [];
     protected $havings = [];
+    protected $unions = [];
     protected $with = [];
     protected $applyGlobalScopes = true;
     protected $relationContext = [];
@@ -838,12 +839,19 @@ class QueryBuilder {
     public function count() {
         $this->applySoftDeleteScope();
         $sql = $this->buildCountQuery();
+        // When unions are present, buildCountQuery() wraps the combined
+        // SELECT (minus its outer SELECT-list, which is blanked to '*' for
+        // counting) as a derived table, so it needs the matching binding
+        // set from getUnionWrappedBindings() — not the plain $this->bindings,
+        // and not the full getBindings() (which would include orphaned
+        // selectRaw() bindings for a SELECT list that isn't actually used).
+        $bindings = !empty($this->unions) ? $this->getUnionWrappedBindings() : $this->bindings;
         if ($this->debug) {
             error_log('[WPORM][count] SQL: ' . $sql);
-            error_log('[WPORM][count] Bindings: ' . print_r($this->bindings, true));
+            error_log('[WPORM][count] Bindings: ' . print_r($bindings, true));
         }
-        if (!empty($this->bindings)) {
-            return (int) $this->wpdb->get_var($this->wpdb->prepare($sql, ...$this->bindings));
+        if (!empty($bindings)) {
+            return (int) $this->wpdb->get_var($this->wpdb->prepare($sql, ...$bindings));
         } else {
             return (int) $this->wpdb->get_var($sql);
         }
@@ -1247,8 +1255,11 @@ class QueryBuilder {
      *
      * Bindings must be returned in the same left-to-right order their
      * placeholders appear in the final SQL string (SELECT, then WHERE,
-     * then GROUP BY, then HAVING, then ORDER BY) so that $wpdb->prepare()
-     * substitutes them correctly.
+     * then GROUP BY, then HAVING, then each UNION/UNION ALL branch's own
+     * SELECT/WHERE/GROUP BY/HAVING/ORDER BY bindings in turn, then this
+     * query's own ORDER BY, which — when unions are present — applies to
+     * the combined result set) so that $wpdb->prepare() substitutes them
+     * correctly.
      */
     public function getBindings() {
         return array_merge(
@@ -1256,6 +1267,7 @@ class QueryBuilder {
             $this->bindings,
             $this->getGroupByBindings(),
             $this->getHavingBindings(),
+            $this->getUnionBindings(),
             $this->getOrderByBindings()
         );
     }
@@ -1393,6 +1405,108 @@ class QueryBuilder {
     }
 
     /**
+     * Combine this query with another query using SQL UNION (duplicates removed),
+     * Eloquent-style.
+     *
+     * Accepts either an already-built QueryBuilder instance (e.g. another
+     * model's query()) or a Closure that receives a fresh QueryBuilder for
+     * this same model to build the second query inline:
+     *
+     *   $first  = User::query()->where('votes', '>', 100);
+     *   $second = User::query()->where('votes', '<', 10);
+     *   $first->union($second)->get();
+     *
+     *   User::query()->where('votes', '>', 100)
+     *       ->union(function($q) { $q->where('votes', '<', 10); })
+     *       ->get();
+     *
+     * Any number of union()/unionAll() calls can be chained; each is applied
+     * in the order it was added. The outer query's own orderBy()/limit()/
+     * offset() (if any) apply to the *combined* result set, matching
+     * Eloquent/Laravel's query builder semantics — each individual
+     * branch's own ORDER BY/LIMIT (if set) is preserved by wrapping that
+     * branch in parentheses.
+     *
+     * @param QueryBuilder|\Closure $query
+     * @return $this
+     */
+    public function union($query) {
+        $this->unions[] = ['query' => $this->resolveUnionQuery($query), 'all' => false];
+        return $this;
+    }
+
+    /**
+     * Combine this query with another query using SQL UNION ALL (duplicates
+     * kept), Eloquent-style. See union() for usage — identical except
+     * duplicate rows across the combined result sets are not removed.
+     *
+     * @param QueryBuilder|\Closure $query
+     * @return $this
+     */
+    public function unionAll($query) {
+        $this->unions[] = ['query' => $this->resolveUnionQuery($query), 'all' => true];
+        return $this;
+    }
+
+    /**
+     * Normalize the argument passed to union()/unionAll() into a QueryBuilder
+     * instance. A Closure is invoked with a fresh builder for this model
+     * (mirroring whereExists()/where() closure handling elsewhere in this
+     * class); a QueryBuilder instance is used as-is.
+     *
+     * @param QueryBuilder|\Closure $query
+     * @return QueryBuilder
+     */
+    protected function resolveUnionQuery($query) {
+        if ($query instanceof \Closure) {
+            $sub = new self($this->model);
+            $query($sub);
+            return $sub;
+        }
+        if (!($query instanceof self)) {
+            throw new \InvalidArgumentException(
+                'union()/unionAll() expects a QueryBuilder instance or a Closure, got ' . gettype($query)
+            );
+        }
+        return $query;
+    }
+
+    /**
+     * Build the SQL for a single union branch, wrapped in parentheses when it
+     * carries its own ORDER BY/LIMIT/OFFSET (required by MySQL so the
+     * branch's own ordering/limiting isn't ambiguously merged with the
+     * outer query's), exactly as Eloquent does.
+     *
+     * @param QueryBuilder $branch
+     * @return string
+     */
+    protected function buildUnionBranchSql(QueryBuilder $branch) {
+        $branch->applySoftDeleteScope();
+        $sql = $branch->buildSelectQuery();
+        if (isset($branch->limit) || isset($branch->offset) || !empty($branch->orders)) {
+            return "($sql)";
+        }
+        return $sql;
+    }
+
+    /**
+     * Bindings contributed by all union()/unionAll() branches, in the order
+     * the UNION clauses appear in the final SQL (each branch's own SELECT,
+     * WHERE, GROUP BY, HAVING, ORDER BY bindings, in that order).
+     *
+     * @return array
+     */
+    protected function getUnionBindings() {
+        $bindings = [];
+        foreach ($this->unions as $union) {
+            foreach ($union['query']->getBindings() as $value) {
+                $bindings[] = $value;
+            }
+        }
+        return $bindings;
+    }
+
+    /**
      * Build the WHERE clause string from $this->wheres, correctly handling OR prefixes.
      * Returns the clause WITHOUT the leading "WHERE" keyword, or empty string if no conditions.
      * Also quotes dot-notation identifiers (table.column).
@@ -1476,6 +1590,20 @@ class QueryBuilder {
             }
             $sql .= " HAVING " . implode(' AND ', $havingParts);
         }
+        // UNION / UNION ALL — combine with each registered branch. If this
+        // query itself carries an ORDER BY/LIMIT/OFFSET, those apply to the
+        // *combined* result set (added after the UNION clauses below), so
+        // wrap the base query in parens too whenever unions are present and
+        // it has its own ordering/limiting, exactly as Eloquent does.
+        if (!empty($this->unions)) {
+            if (isset($this->limit) || isset($this->offset) || !empty($this->orders)) {
+                $sql = "($sql)";
+            }
+            foreach ($this->unions as $union) {
+                $sql .= ($union['all'] ? ' UNION ALL ' : ' UNION ')
+                      . $this->buildUnionBranchSql($union['query']);
+            }
+        }
         if (!empty($this->orders)) {
             $orderParts = [];
             foreach ($this->orders as $order) {
@@ -1504,7 +1632,60 @@ class QueryBuilder {
         return $sql;
     }
 
+    /**
+     * Build a SELECT * wrapping the full unioned query as a derived table.
+     * Used by buildCountQuery() and aggregate() (sum/avg/min/max) when
+     * union()/unionAll() branches are present, since both need to operate
+     * on the *combined* result set rather than just the base query's rows.
+     *
+     * Temporarily swaps the outer query's SELECT list to a single '*'
+     * (the actual column list is irrelevant once wrapped in COUNT(*)/
+     * SUM(*)/etc., and leaving selectRaw() entries in place would otherwise
+     * orphan their bindings — present in getBindings() but absent from the
+     * generated SQL). The original select list is always restored before
+     * returning, even if buildSelectQuery() throws.
+     *
+     * @return string
+     */
+    protected function buildUnionWrappedSubquery() {
+        $selects = $this->selects;
+        $this->selects = ['*'];
+        try {
+            return $this->buildSelectQuery();
+        } finally {
+            $this->selects = $selects;
+        }
+    }
+
+    /**
+     * Bindings matching buildUnionWrappedSubquery()'s SQL exactly: the outer
+     * query's own WHERE/GROUP BY/HAVING bindings (no SELECT bindings, since
+     * the select list is blanked to '*' while wrapped), followed by every
+     * union branch's own bindings, followed by the outer ORDER BY bindings
+     * (relevant only if a branch's own LIMIT/ORDER forced the base query to
+     * be parenthesized; included for correctness/parity with getBindings()).
+     *
+     * @return array
+     */
+    protected function getUnionWrappedBindings() {
+        return array_merge(
+            $this->bindings,
+            $this->getGroupByBindings(),
+            $this->getHavingBindings(),
+            $this->getUnionBindings(),
+            $this->getOrderByBindings()
+        );
+    }
+
     protected function buildCountQuery() {
+        // When union()/unionAll() branches are registered, COUNT(*) must
+        // count rows in the *combined* result set (Eloquent's behavior),
+        // which requires wrapping the full unioned SELECT as a derived table
+        // rather than using the simple "SELECT COUNT(*) FROM table" form.
+        if (!empty($this->unions)) {
+            return "SELECT COUNT(*) FROM (" . $this->buildUnionWrappedSubquery() . ") AS wporm_union_count";
+        }
+
     $sql = "SELECT COUNT(*) FROM " . Helpers::quoteIdentifier($this->table);
         $where = $this->buildWhereClause();
         if (!empty($where)) {
@@ -2475,14 +2656,25 @@ class QueryBuilder {
         $this->applySoftDeleteScope();
 
         $quotedColumn = $column === '*' ? '*' : Helpers::quoteIdentifier($column);
-        $selects = $this->selects;
-        $this->selects = ["$function($quotedColumn) as aggregate"];
 
-        $sql = $this->buildSelectQuery();
-        $bindings = $this->getBindings();
+        if (!empty($this->unions)) {
+            // Aggregating over a unioned query means aggregating over the
+            // *combined* result set (Eloquent's behavior), so wrap the full
+            // unioned SELECT as a derived table rather than aggregating only
+            // the base query's rows.
+            $innerSql = $this->buildUnionWrappedSubquery();
+            $sql = "SELECT $function($quotedColumn) as aggregate FROM ($innerSql) AS wporm_union_aggregate";
+            $bindings = $this->getUnionWrappedBindings();
+        } else {
+            $selects = $this->selects;
+            $this->selects = ["$function($quotedColumn) as aggregate"];
 
-        // Restore selects so the builder remains reusable.
-        $this->selects = $selects;
+            $sql = $this->buildSelectQuery();
+            $bindings = $this->getBindings();
+
+            // Restore selects so the builder remains reusable.
+            $this->selects = $selects;
+        }
 
         if ($this->debug) {
             error_log("[WPORM][$function] SQL: " . $sql);
@@ -2578,13 +2770,33 @@ class QueryBuilder {
         $this->applySoftDeleteScope();
 
         $columns = $key !== null ? [$column, $key] : [$column];
-        $selects = $this->selects;
-        $this->selects = $columns;
 
-        $sql = $this->buildSelectQuery();
-        $bindings = $this->getBindings();
+        if (!empty($this->unions)) {
+            // Swapping just the outer query's SELECT list to $columns would
+            // create a column-count mismatch against each union branch's
+            // own (unmodified) SELECT list, which MySQL rejects. Wrap the
+            // whole combined query as a derived table and select only the
+            // requested column(s) from that, so pluck() reflects values
+            // from the *combined* result set, matching get()/first().
+            //
+            // The derived table only exposes flattened result columns (no
+            // table qualifiers survive a UNION), so reference each column
+            // by its resolved result name rather than the raw $column/$key
+            // (which may be table-qualified or carry its own "AS alias").
+            $innerSql = $this->buildUnionWrappedSubquery();
+            $resultNames = array_map([$this, 'resultColumnName'], $columns);
+            $quotedColumns = array_map([Helpers::class, 'quoteIdentifier'], array_unique($resultNames));
+            $sql = "SELECT " . implode(', ', $quotedColumns) . " FROM ($innerSql) AS wporm_union_pluck";
+            $bindings = $this->getUnionWrappedBindings();
+        } else {
+            $selects = $this->selects;
+            $this->selects = $columns;
 
-        $this->selects = $selects;
+            $sql = $this->buildSelectQuery();
+            $bindings = $this->getBindings();
+
+            $this->selects = $selects;
+        }
 
         if ($this->debug) {
             error_log('[WPORM][pluck] SQL: ' . $sql);
@@ -2643,15 +2855,27 @@ class QueryBuilder {
     public function exists() {
         $this->applySoftDeleteScope();
 
-        $selects = $this->selects;
-        $this->selects = ['1 as exists_flag'];
+        if (!empty($this->unions)) {
+            // Swapping just the outer query's SELECT list to a constant
+            // would create a column-count mismatch against each union
+            // branch's own (unmodified) SELECT list, which MySQL rejects.
+            // Wrap the whole combined query as a derived table instead, so
+            // the column counts inside the UNION stay consistent and we
+            // only need a single row to exist anywhere in the combined set.
+            $innerSql = $this->buildUnionWrappedSubquery();
+            $sql = "SELECT 1 as exists_flag FROM ($innerSql) AS wporm_union_exists LIMIT 1";
+            $bindings = $this->getUnionWrappedBindings();
+        } else {
+            $selects = $this->selects;
+            $this->selects = ['1 as exists_flag'];
 
-        // We only need to know whether at least one row matches.
-        $this->limit(1);
-        $sql = $this->buildSelectQuery();
-        $bindings = $this->getBindings();
+            // We only need to know whether at least one row matches.
+            $this->limit(1);
+            $sql = $this->buildSelectQuery();
+            $bindings = $this->getBindings();
 
-        $this->selects = $selects;
+            $this->selects = $selects;
+        }
 
         if ($this->debug) {
             error_log('[WPORM][exists] SQL: ' . $sql);

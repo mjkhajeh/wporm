@@ -8,6 +8,7 @@ This document describes all public and static methods of the `MJ\WPORM\Model` cl
 - [Global Scopes](#global-scopes)
 - [Constructor](#constructor)
 - [Query Methods](#query-methods)
+- [Combining Queries](#combining-queries)
 - [Raw SQL Expressions](#raw-sql-expressions)
 - [Retrieval Methods](#retrieval-methods)
 - [Aggregates & Utility Methods](#aggregates--utility-methods)
@@ -393,6 +394,64 @@ $users = User::query()
     ->orHavingBetween('count(*)', [50, 100])
     ->get();
 ```
+
+---
+
+## Combining Queries
+
+### union($query)
+**Description:** Combine this query with another query using SQL `UNION` (duplicate rows across the combined result sets are removed), Eloquent-style. Accepts either an already-built `QueryBuilder` instance — e.g. another query, possibly on a different model/table, as long as both sides select the same number of columns — or a `Closure` that receives a fresh query builder for the **same model** to build the second branch inline. Any number of `union()`/`unionAll()` calls can be chained; each is appended in the order it was added.
+
+The outer query's own `orderBy()`/`latest()`/`oldest()`/`limit()`/`offset()` (if set) apply to the **combined** result set, exactly like Eloquent/Laravel's query builder — not to either branch individually. If a branch itself carries its own `orderBy()`/`limit()`/`offset()`, that branch is automatically wrapped in parentheses so its own ordering/limiting is preserved rather than being ambiguously merged into the outer query.
+
+`get()`, `first()`, `paginate()`, `simplePaginate()`, `count()`, `exists()`/`doesntExist()`, `pluck()`, and the aggregates (`sum()`/`avg()`/`average()`/`min()`/`max()`) all operate on the combined result set when union branches are present.
+
+**Examples:**
+```php
+// Combine with another already-built query
+$highVotes = User::query()->where('votes', '>', 100);
+$lowVotes  = User::query()->where('votes', '<', 10);
+$users = $highVotes->union($lowVotes)->get();
+
+// Combine using a closure (builds a fresh query for the same model)
+$users = User::query()
+    ->where('votes', '>', 100)
+    ->union(function ($query) {
+        $query->where('votes', '<', 10);
+    })
+    ->get();
+
+// Chain multiple unions
+$users = User::query()->where('role', 'admin')
+    ->union(User::query()->where('role', 'editor'))
+    ->union(User::query()->where('role', 'owner'))
+    ->orderBy('name') // applies to the combined result set
+    ->get();
+
+// Works with aggregates, pagination, and existence checks too
+$total = User::query()->where('votes', '>', 100)
+    ->union(User::query()->where('votes', '<', 10))
+    ->count(); // counts rows in the combined result set
+
+$page = User::query()->where('votes', '>', 100)
+    ->union(User::query()->where('votes', '<', 10))
+    ->paginate(15);
+```
+
+### unionAll($query)
+**Description:** Same as `union()`, but combines using SQL `UNION ALL` — duplicate rows across the combined result sets are **kept** rather than removed. Identical method signature and usage to `union()`.
+
+**Example:**
+```php
+$users = User::query()->where('votes', '>', 100)
+    ->unionAll(User::query()->where('country', 'US'))
+    ->get(); // a user matching both conditions appears twice
+```
+
+**Notes:**
+- Both sides of a `UNION`/`UNION ALL` must select the same number of columns — this is a SQL requirement, not specific to WPORM. When using the closure form, WPORM builds the second branch against the same model's default `*` selection unless you call `select()` inside the closure, so column counts match automatically in the common case.
+- `union()`/`unionAll()` apply only to read queries (`get()`, `first()`, `count()`, `pluck()`, `exists()`, aggregates, pagination). They are not meaningful for, and are not applied to, `update()`/`delete()`.
+- Soft-delete scoping (`withTrashed()`/`onlyTrashed()`, or the default "exclude soft-deleted rows" behavior) is applied independently to the outer query and to each union branch, exactly as if `get()` had been called on each one separately.
 
 ---
 

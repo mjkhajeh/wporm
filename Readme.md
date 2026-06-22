@@ -23,6 +23,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Batch processing**: `chunk()` and `each()` for iterating large result sets in pages without loading everything into memory at once.
 - **Serialization**: `toArray()`/`toJson()`/`__toString()` on both models and collections, with `$hidden`/`$visible` support and safe (exception-on-failure) JSON encoding.
 - **Raw SQL expressions**: `selectRaw()`, `whereRaw()`/`orWhereRaw()`, `groupByRaw()`, `havingRaw()`/`orHavingRaw()`, and `orderByRaw()` for dropping down to raw SQL with safe, bound placeholders.
+- **Combining queries**: `union()`/`unionAll()` to combine two or more queries' result sets, Eloquent-style.
 - **Events**: Hooks for model lifecycle events (creating, updating, deleting).
 - **Global scopes**: Add global query constraints to models.
 
@@ -1069,6 +1070,42 @@ $bigSpenders = Order::query()
 ```
 
 See [Methods.md](./Methods.md#raw-sql-expressions) for the full list with signatures.
+
+## Combining Queries: union() / unionAll()
+
+WPORM supports Eloquent-style query unions via `union()` and `unionAll()` on the query builder. `union()` combines this query's result set with another query's, removing duplicate rows (SQL `UNION`); `unionAll()` does the same but keeps duplicates (SQL `UNION ALL`). Both accept either an already-built query (your own, or another model's) or a closure that builds the second branch inline against the same model.
+
+```php
+// Combine with another already-built query
+$highVotes = User::query()->where('votes', '>', 100);
+$lowVotes  = User::query()->where('votes', '<', 10);
+$users = $highVotes->union($lowVotes)->get();
+
+// Combine using a closure
+$users = User::query()
+    ->where('votes', '>', 100)
+    ->union(function ($query) {
+        $query->where('votes', '<', 10);
+    })
+    ->get();
+
+// Chain as many union()/unionAll() calls as you need
+$users = User::query()->where('role', 'admin')
+    ->union(User::query()->where('role', 'editor'))
+    ->unionAll(User::query()->where('role', 'owner'))
+    ->orderBy('name')
+    ->get();
+```
+
+A few things to know:
+
+- The outer query's own `orderBy()`/`latest()`/`oldest()`/`limit()`/`offset()` (if set) apply to the **combined** result set — not to either branch individually — exactly like Eloquent/Laravel. If a branch itself has its own ordering or limiting, WPORM automatically wraps that branch in parentheses so its ordering/limiting is preserved rather than ambiguously merged into the outer query.
+- `get()`, `first()`, `paginate()`/`simplePaginate()`, `count()`, `exists()`/`doesntExist()`, `pluck()`, and the aggregates (`sum()`, `avg()`/`average()`, `min()`, `max()`) all correctly operate on the **combined** result set when unions are present — not just the base query's rows.
+- Both sides of a union must select the same number of columns (a SQL requirement). With the closure form, the second branch defaults to the same model's `*` selection, so column counts line up automatically unless you call `select()` inside the closure.
+- Soft-delete scoping is applied independently to the outer query and to every union branch, just as if you had called `get()` on each one separately.
+- `union()`/`unionAll()` apply to read queries only; they have no effect on `update()`/`delete()`.
+
+See [Methods.md](./Methods.md#combining-queries) for the full method signatures.
 
 ## Raw Table Queries with DB::table()
 
