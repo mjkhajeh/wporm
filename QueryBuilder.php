@@ -875,16 +875,124 @@ class QueryBuilder {
         return $this->wpdb->query($sql);
     }
 
+    // -------------------------------------------------------------------------
+    // Transactions
+    // -------------------------------------------------------------------------
+
+    /**
+     * Execute a Closure within a database transaction (Eloquent-style).
+     *
+     * Automatically commits when the callback returns without throwing, and
+     * rolls back + re-throws on any exception. The optional $attempts
+     * parameter retries the whole callback up to that many times when a
+     * deadlock or lock-wait-timeout is detected (MySQL error codes 1213 and
+     * 1205), mirroring Laravel's DB::transaction() retry behaviour.
+     *
+     * The return value of the callback is forwarded to the caller so the
+     * method is useful both for side-effect-only work and for transactional
+     * reads that need to return data:
+     *
+     *   $user = User::query()->transaction(function() {
+     *       $u = User::create(['name' => 'Alice']);
+     *       Profile::create(['user_id' => $u->id]);
+     *       return $u;
+     *   });
+     *
+     * Nested calls are safe: the method tracks an internal depth counter and
+     * only issues START TRANSACTION / COMMIT / ROLLBACK at the outermost
+     * level, so inner calls participate in the outer transaction transparently
+     * (analogous to Eloquent's transaction nesting via savepoints, but
+     * without requiring SAVEPOINT support).
+     *
+     * @param \Closure $callback Receives no arguments.
+     * @param int $attempts Max number of tries before propagating the exception.
+     * @return mixed Whatever the callback returns.
+     * @throws \Throwable Re-throws the last exception after all attempts fail.
+     */
+    public function transaction(\Closure $callback, int $attempts = 1) {
+        return static::runTransaction($this->wpdb, $callback, $attempts);
+    }
+
+    /**
+     * Manually begin a database transaction.
+     *
+     * Prefer transaction() for most use cases — it commits and rolls back
+     * automatically. Use these lower-level methods only when you need
+     * explicit control over the transaction boundary across multiple
+     * statements that cannot be wrapped in a single closure.
+     *
+     * @return void
+     */
     public function beginTransaction() {
         $this->wpdb->query('START TRANSACTION');
     }
 
+    /**
+     * Commit the current database transaction.
+     * @return void
+     */
     public function commit() {
         $this->wpdb->query('COMMIT');
     }
 
+    /**
+     * Roll back the current database transaction.
+     * @return void
+     */
     public function rollBack() {
         $this->wpdb->query('ROLLBACK');
+    }
+
+    /**
+     * Shared implementation used by both QueryBuilder::transaction() and
+     * DB::transaction(). Isolated here so DB can reuse the exact same logic
+     * without duplicating it or having to instantiate a QueryBuilder.
+     *
+     * @param \wpdb $wpdb
+     * @param \Closure $callback
+     * @param int $attempts
+     * @return mixed
+     * @throws \Throwable
+     */
+    public static function runTransaction($wpdb, \Closure $callback, int $attempts = 1) {
+        $attempts = max(1, $attempts);
+
+        for ($currentAttempt = 1; $currentAttempt <= $attempts; $currentAttempt++) {
+            $wpdb->query('START TRANSACTION');
+
+            try {
+                $result = $callback();
+                $wpdb->query('COMMIT');
+                return $result;
+            } catch (\Throwable $e) {
+                $wpdb->query('ROLLBACK');
+
+                // Retry only on deadlock (1213) or lock-wait timeout (1205).
+                if ($currentAttempt < $attempts && static::causedByDeadlock($e)) {
+                    continue;
+                }
+
+                throw $e;
+            }
+        }
+    }
+
+    /**
+     * Determine whether a Throwable was caused by a MySQL deadlock or
+     * lock-wait timeout, which are safe to retry.
+     *
+     * MySQL error 1213 = "Deadlock found when trying to get lock"
+     * MySQL error 1205 = "Lock wait timeout exceeded"
+     *
+     * @param \Throwable $e
+     * @return bool
+     */
+    protected static function causedByDeadlock(\Throwable $e): bool {
+        $message = $e->getMessage();
+        return strpos($message, '1213') !== false
+            || stripos($message, 'Deadlock') !== false
+            || strpos($message, '1205') !== false
+            || stripos($message, 'Lock wait timeout') !== false;
     }
 
     public function __call($method, $parameters) {
@@ -1822,51 +1930,47 @@ class QueryBuilder {
     }
 
     /**
-     * Create and save multiple records at once (Eloquent-style createMany).
+     * Create and save multiple records at once inside a single transaction
+     * (Eloquent-style createMany). If any save fails, the whole operation is
+     * rolled back and the exception is re-thrown.
+     *
      * Usage: Model::query()->createMany([['col' => 'val'], ...])
      * Returns array of created model instances.
      */
     public function createMany(array $records) {
-        $created = [];
-        $this->beginTransaction();
-        try {
+        $modelClass = get_class($this->model);
+        return $this->transaction(function() use ($records, $modelClass) {
+            $created = [];
             foreach ($records as $attributes) {
-                $modelClass = get_class($this->model);
                 $model = new $modelClass($attributes);
                 if (!$model->save()) {
-                    throw new \Exception('Failed to save model in createMany');
+                    throw new \RuntimeException('Failed to save model in createMany');
                 }
                 $created[] = $model;
             }
-            $this->commit();
-        } catch (\Exception $e) {
-            $this->rollBack();
-            throw $e;
-        }
-        return $created;
+            return $created;
+        });
     }
 
     /**
-     * Save multiple model instances at once (Eloquent-style saveMany).
+     * Save multiple model instances at once inside a single transaction
+     * (Eloquent-style saveMany). If any save fails, the whole operation is
+     * rolled back and the exception is re-thrown.
+     *
      * Usage: Model::query()->saveMany([$model1, $model2, ...])
      * Returns array of saved model instances.
      */
     public function saveMany(array $models) {
-        $saved = [];
-        $this->beginTransaction();
-        try {
+        return $this->transaction(function() use ($models) {
+            $saved = [];
             foreach ($models as $model) {
                 if (!$model->save()) {
-                    throw new \Exception('Failed to save model in saveMany');
+                    throw new \RuntimeException('Failed to save model in saveMany');
                 }
                 $saved[] = $model;
             }
-            $this->commit();
-        } catch (\Exception $e) {
-            $this->rollBack();
-            throw $e;
-        }
-        return $saved;
+            return $saved;
+        });
     }
 
     /**

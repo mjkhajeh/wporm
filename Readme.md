@@ -925,13 +925,74 @@ public function getUserAttribute() {
 - Do **not** set appended attributes in `retrieved()`; use accessors instead.
 
 ## Transactions
+
+WPORM provides an Eloquent-style `DB::transaction()` for safely wrapping multiple database operations in a single atomic transaction — no manual `beginTransaction()` / `commit()` / `rollBack()` calls required.
+
+### DB::transaction(Closure $callback, int $attempts = 1)
+
+The callback is executed inside a transaction. If it returns without throwing, the transaction is committed and the callback's return value is forwarded to the caller. If any exception or error is thrown, the transaction is rolled back and the exception is re-thrown automatically.
+
 ```php
-Parts::query()->beginTransaction();
-// ...
-Parts::query()->commit();
-// or
-Parts::query()->rollBack();
+use MJ\WPORM\DB;
+
+// Basic usage — commit on success, rollback on any exception
+$user = DB::transaction(function() {
+    $u = User::create(['name' => 'Alice', 'email' => 'alice@example.com']);
+    Profile::create(['user_id' => $u->id, 'bio' => 'Hello!']);
+    return $u; // returned value is forwarded to the caller
+});
+
+echo $user->id; // the newly created user
+
+// The transaction callback can return any value, or nothing at all
+DB::transaction(function() {
+    Order::query()->where('status', 'pending')->update(['status' => 'processing']);
+    // no return needed for side-effect-only work
+});
 ```
+
+### Automatic Deadlock Retry
+
+Pass a second argument to retry the entire callback automatically on MySQL deadlock (error 1213) or lock-wait timeout (error 1205) — the same behaviour as Laravel's `DB::transaction()`:
+
+```php
+// Try up to 3 times before giving up
+DB::transaction(function() {
+    Inventory::query()->where('product_id', 42)->decrement('stock');
+    Order::create(['product_id' => 42, 'qty' => 1]);
+}, 3);
+```
+
+On any non-retryable exception, or after all retry attempts are exhausted, the last exception is re-thrown to the caller unchanged.
+
+### Also Available on the Query Builder
+
+`transaction()` is available directly on a `QueryBuilder` instance for cases where you already have one:
+
+```php
+User::query()->transaction(function() {
+    User::create(['name' => 'Bob']);
+    // ...
+});
+```
+
+### Manual Transaction Control
+
+For situations where you need explicit control over the transaction boundary (e.g. across multiple request steps or within a class that manages state), the lower-level methods remain available:
+
+```php
+$query = Parts::query();
+$query->beginTransaction();
+try {
+    // ... multiple operations ...
+    $query->commit();
+} catch (\Throwable $e) {
+    $query->rollBack();
+    throw $e;
+}
+```
+
+Prefer `DB::transaction()` over the manual approach — it guarantees the transaction is always cleaned up, even when the callback throws a non-`\Exception` `\Throwable` (e.g. a PHP `Error`).
 
 ## Custom Queries
 You can execute custom SQL queries using the underlying `$wpdb` instance or by extending the model/query builder. For example:

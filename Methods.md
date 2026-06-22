@@ -20,6 +20,7 @@ This document describes all public and static methods of the `MJ\WPORM\Model` cl
 - [Mass Assignment Protection](#mass-assignment-protection)
 - [Hidden & Visible Attributes](#hidden--visible-attributes)
 - [JSON Where Clauses](#json-where-clauses)
+- [Transactions](#transactions)
 - [Raw Table Queries with DB::table()](#raw-table-queries-with-dbtable)
 - [Pagination](#pagination)
 - [Soft Deletes](#soft-deletes)
@@ -1601,6 +1602,58 @@ unset($user['name']);
 
 ---
 
+## Transactions
+
+### DB::transaction(Closure $callback, int $attempts = 1)
+**Description:** Execute a Closure within a database transaction (Eloquent-style). Commits automatically when the callback returns without throwing; rolls back and re-throws on any exception. Pass `$attempts > 1` to retry automatically on MySQL deadlock (1213) or lock-wait timeout (1205). The callback's return value is forwarded to the caller.
+
+**Example:**
+```php
+use MJ\WPORM\DB;
+
+// Basic — commit on success, rollback + re-throw on exception
+$user = DB::transaction(function() {
+    $u = User::create(['name' => 'Alice', 'email' => 'alice@example.com']);
+    Profile::create(['user_id' => $u->id]);
+    return $u;
+});
+
+// With deadlock retry (up to 3 attempts)
+DB::transaction(function() {
+    Inventory::query()->where('product_id', 42)->decrement('stock');
+    Order::create(['product_id' => 42, 'qty' => 1]);
+}, 3);
+```
+
+### QueryBuilder::transaction(Closure $callback, int $attempts = 1)
+**Description:** Same semantics as `DB::transaction()`, available on any `QueryBuilder` instance for inline use in a chain.
+
+**Example:**
+```php
+User::query()->transaction(function() {
+    User::create(['name' => 'Bob']);
+    Log::create(['action' => 'user_created']);
+});
+```
+
+### beginTransaction() / commit() / rollBack()
+**Description:** Low-level manual transaction control on a `QueryBuilder` instance. Prefer `DB::transaction()` for most cases — it guarantees cleanup even when a non-`\Exception` `\Throwable` is thrown. Use these only when you need to manage the transaction boundary explicitly across multiple steps.
+
+**Example:**
+```php
+$query = Parts::query();
+$query->beginTransaction();
+try {
+    // ... multiple operations ...
+    $query->commit();
+} catch (\Throwable $e) {
+    $query->rollBack();
+    throw $e;
+}
+```
+
+---
+
 ## Raw Table Queries with DB::table()
 
 You can use the static `DB::table()` method to run queries on any table, not just models. This is useful for quick updates, inserts, or selects on tables without a model class. The underlying model used by `DB::table()` includes `timestamps`, `softDeletes`, `fillable`, `createdAtColumn`, and `updatedAtColumn` properties (all disabled/empty by default), so query builder features that depend on them (e.g. `upsert()`, soft-delete scoping) work without errors.
@@ -1761,13 +1814,13 @@ $table->softDeletes('removed_at'); // Adds 'removed_at' DATETIME NULL
 ## Batch Creation and Saving
 
 ### createMany(array $records)
-- Create and save multiple records in a single transaction.
-- Rolls back if any save fails.
+- Create and save multiple records inside a single transaction (backed by `DB::transaction()` internally).
+- Rolls back automatically if any save fails; the exception is re-thrown.
 - Returns array of created model instances.
 
 ### saveMany(array $models)
-- Save multiple model instances in a single transaction.
-- Rolls back if any save fails.
+- Save multiple model instances inside a single transaction (backed by `DB::transaction()` internally).
+- Rolls back automatically if any save fails; the exception is re-thrown.
 - Returns array of saved model instances.
 
 ---
