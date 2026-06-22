@@ -24,7 +24,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Serialization**: `toArray()`/`toJson()`/`__toString()` on both models and collections, with `$hidden`/`$visible` support and safe (exception-on-failure) JSON encoding.
 - **Raw SQL expressions**: `selectRaw()`, `whereRaw()`/`orWhereRaw()`, `groupByRaw()`, `havingRaw()`/`orHavingRaw()`, and `orderByRaw()` for dropping down to raw SQL with safe, bound placeholders.
 - **Combining queries**: `union()`/`unionAll()` to combine two or more queries' result sets, Eloquent-style.
-- **Events**: Hooks for model lifecycle events (creating, updating, deleting).
+- **Events**: Model lifecycle event hooks (`creating`, `updating`, `deleting`, etc.) via overridable methods, Eloquent-style `$dispatchesEvents` property mapping, and a standalone `EventDispatcher` for global listeners — no Laravel dependency required.
 - **Global scopes**: Add global query constraints to models.
 
 ## Installation
@@ -48,6 +48,9 @@ require_once __DIR__ . '/vendor/autoload.php';
 
 ```php
 require_once __DIR__ . '/ORM/Helpers.php';
+require_once __DIR__ . '/ORM/Events/ModelEvent.php';
+require_once __DIR__ . '/ORM/Events/Events.php';
+require_once __DIR__ . '/ORM/EventDispatcher.php';
 require_once __DIR__ . '/ORM/Model.php';
 require_once __DIR__ . '/ORM/QueryBuilder.php';
 require_once __DIR__ . '/ORM/Blueprint.php';
@@ -898,6 +901,113 @@ This applies whether the relation was eager-loaded via `with()` or accessed lazi
 
 See [Per-relation global-scope control](#per-relation-global-scope-control-eager-loads) below — pass an options array instead of a plain closure to disable global scopes and/or apply a constraint together.
 
+## Model Events and $dispatchesEvents
+
+WPORM provides three complementary ways to respond to model lifecycle events.
+
+### 1. Method overrides (back-compat)
+
+Override `creating()`, `updating()`, `deleting()` (and the soft-delete variants) directly on the model:
+
+```php
+class User extends Model {
+    protected function creating() {
+        $this->name = sanitize_text_field($this->name);
+    }
+    protected function deleting() {
+        // clean up related data
+    }
+}
+```
+
+### 2. $dispatchesEvents (Eloquent-style class mapping)
+
+Map lifecycle event short-names to listener classes. The listener must expose a `handle(\MJ\WPORM\Events\ModelEvent $event)` method.
+
+```php
+use MJ\WPORM\Events\Creating;
+use MJ\WPORM\Events\Deleted;
+
+class LogUserCreating {
+    public function handle(Creating $event): void {
+        error_log('Creating user: ' . $event->model->email);
+    }
+}
+
+class CleanupUserData {
+    public function handle(Deleted $event): void {
+        wp_delete_user_meta($event->model->id, 'auth_token');
+    }
+}
+
+class User extends Model {
+    protected $fillable = ['name', 'email'];
+
+    public $dispatchesEvents = [
+        'creating' => LogUserCreating::class,
+        'deleted'  => CleanupUserData::class,
+    ];
+}
+```
+
+**Halting an operation:** Return `false` from any before-hook listener to cancel the operation. `save()`, `delete()`, and `restore()` return `false` when halted.
+
+```php
+class ValidateEmail {
+    public function handle(Creating $event) {
+        if (empty($event->model->email)) {
+            return false; // aborts save()
+        }
+    }
+}
+```
+
+### 3. Global listeners via EventDispatcher
+
+Register listeners that fire for every model that raises an event, regardless of model class:
+
+```php
+use MJ\WPORM\EventDispatcher;
+use MJ\WPORM\Events\Creating;
+use MJ\WPORM\Events\Saved;
+
+// Closure
+EventDispatcher::listen(Creating::class, function(Creating $event) {
+    error_log(get_class($event->model) . ' is being created');
+});
+
+// Class-string (must have handle() method)
+EventDispatcher::listen(Saved::class, \App\Listeners\AuditLog::class);
+
+// Remove listeners
+EventDispatcher::forget(Creating::class); // one event
+EventDispatcher::forget();                // all events
+```
+
+### Supported lifecycle events
+
+| Event class | Key in `$dispatchesEvents` | Fires when |
+|---|---|---|
+| `Events\Retrieved` | `retrieved` | after fetch from DB |
+| `Events\Saving` | `saving` | before INSERT or UPDATE |
+| `Events\Saved` | `saved` | after INSERT or UPDATE |
+| `Events\Creating` | `creating` | before INSERT |
+| `Events\Created` | `created` | after INSERT |
+| `Events\Updating` | `updating` | before UPDATE |
+| `Events\Updated` | `updated` | after UPDATE |
+| `Events\Deleting` | `deleting` | before hard DELETE |
+| `Events\Deleted` | `deleted` | after hard DELETE |
+| `Events\SoftDeleting` | `softDeleting` | before soft delete |
+| `Events\SoftDeleted` | `softDeleted` | after soft delete |
+| `Events\Restoring` | `restoring` | before restore |
+| `Events\Restored` | `restored` | after restore |
+
+All event objects extend `MJ\WPORM\Events\ModelEvent` and carry `$event->model`, the model instance that fired the event.
+
+See [Methods.md](./Methods.md#dispatchesevents-and-eventdispatcher) for the full API reference.
+
+---
+
 ## Custom Attribute Accessors/Mutators
 ```php
 public function getQtyAttribute() {
@@ -1425,7 +1535,7 @@ This method is available on both the query builder and as a static method on mod
 - **Schema Changes:** Your model's `up(Blueprint $blueprint)` method is the single source of truth for the table schema — WPORM reads it via `$blueprint->toSql()` automatically, so you no longer need to assign `$this->schema` yourself. If you change `up()`, you may need to drop and recreate the table or use the `SchemaBuilder`'s `table()` method for migrations.
 - **Reusing a Query Builder:** It's safe to call `toSql()`, `count()`, `get()`, etc. multiple times (or in combination, as `paginate()` does internally) on the same query instance — soft-delete constraints and HAVING bindings are only applied once per instance and won't duplicate or misalign bindings on repeat calls.
 - **Constructing Models:** `new Model(['id' => 5])` (or any attributes) only fills the model's attributes in memory — it does **not** query the database. Use `Model::find($id)` to load an existing record.
-- **Events:** You can add `creating`, `updating`, and `deleting` methods to your models for event hooks.
+- **Events:** WPORM supports three complementary event approaches. (1) Override `creating()`, `updating()`, `deleting()` etc. directly on the model. (2) Use `$dispatchesEvents` to map event names to listener classes — the listener must expose a `handle(\MJ\WPORM\Events\ModelEvent $event)` method. (3) Register global listeners via `EventDispatcher::listen(EventClass::class, $listener)` to respond to any model's events. All three fire in that order per event. Any before-hook listener can cancel an operation by returning `false`. See [Methods.md]($dispatchesEvents-and-eventdispatcher) for full API.
 - **Extending Casts:** Implement `MJ\WPORM\Casts\CastableInterface` for custom attribute casting logic.
 - **Testing:** Always test your queries and schema changes on a staging environment before deploying to production.
 

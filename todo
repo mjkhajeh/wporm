@@ -55,7 +55,7 @@ The latest task was not completed. (Moderate Issues: 1)
   | 31 | withCount() | User::withCount('posts')->get() — adds posts_count |
   | 32 | withSum() / withAvg() / withMin() / withMax() | Aggregate sub-selects |
   | 33 | Observer / Event dispatcher system | Beyond hardcoded method hooks |
-  | 34 | $dispatchesEvents property | Map events to classes |
+  | ✅ 34 | $dispatchesEvents property | Map events to classes |
   | 35 | replicate() | Clone a model without PK |
   | 36 | fresh() / refresh() | Re-fetch model from DB |
   | 37 | wasRecentlyCreated property | Know if model was just inserted |

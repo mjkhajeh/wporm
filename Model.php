@@ -47,6 +47,26 @@ abstract class Model implements \ArrayAccess {
 	protected $appends = [];
 
     /**
+     * Maps model lifecycle event names to listener classes (Eloquent-style
+     * $dispatchesEvents). Each key is the lowercase event short-name; the
+     * value is a fully-qualified listener class that exposes a handle() method,
+     * or any callable understood by EventDispatcher.
+     *
+     * Supported keys: retrieved, creating, created, updating, updated,
+     *                 saving, saved, deleting, deleted,
+     *                 softDeleting, softDeleted, restoring, restored.
+     *
+     * Example:
+     *   protected $dispatchesEvents = [
+     *       'creating' => \App\Listeners\LogUserCreating::class,
+     *       'deleted'  => \App\Listeners\CleanupUserData::class,
+     *   ];
+     *
+     * @var array<string, class-string|callable>
+     */
+    public $dispatchesEvents = [];
+
+    /**
      * Attributes that should be hidden from toArray()/toJson() output
      * (e.g. passwords, tokens, secrets). Eloquent-style $hidden.
      *
@@ -398,11 +418,14 @@ protected function castSet($key, $value) {
 
 	/**
 	 * Called after a model is retrieved from the database (get/first/find).
-	 * Override in your model to add custom logic.
+	 * Override in your model to add custom logic. The base implementation fires
+	 * the 'retrieved' event via $dispatchesEvents / EventDispatcher automatically.
 	 *
 	 * @return void
 	 */
-	public function retrieved() {}
+	public function retrieved() {
+		$this->fireModelEvent('retrieved');
+	}
 
     /**
      * Called before a model is soft deleted (softDeletes only).
@@ -791,14 +814,43 @@ protected function castSet($key, $value) {
 		return new static(array_merge($attributes, $values));
 	}
 
+	/**
+	 * Persist the model. Fires saving/saved (always) plus creating/created
+	 * (insert) or updating/updated (update) events via $dispatchesEvents and
+	 * any globally-registered EventDispatcher listeners.
+	 *
+	 * Returns false if any before-hook halts the operation (by returning false).
+	 */
 	public function save() {
-		return $this->exists ? $this->update() : $this->insert();
+		// saving (before-hook — halts on false)
+		if ($this->fireModelEvent('saving') === false) {
+			return false;
+		}
+
+		$result = $this->exists ? $this->update() : $this->insert();
+
+		if ($result !== false) {
+			// saved (after-hook — result not used to halt)
+			$this->fireModelEvent('saved');
+		}
+
+		return $result;
 	}
 
 	protected function insert() {
-		if (method_exists($this, 'creating')) { // Event
+		// creating (before-hook — halts on false)
+		if ($this->fireModelEvent('creating') === false) {
+			return false;
+		}
+
+		// Legacy hook kept for back-compat — only fire if no dispatcher handles it
+		if (method_exists($this, 'creating')
+			&& empty($this->dispatchesEvents['creating'])
+			&& empty(EventDispatcher::getListeners(\MJ\WPORM\Events\Creating::class))
+		) {
 			$this->creating();
 		}
+
 		global $wpdb;
 		if ($this->timestamps) {
 			$now = current_time('mysql');
@@ -807,31 +859,46 @@ protected function castSet($key, $value) {
 		}
 		$wpdb->insert($this->getTable(), $this->attributes);
 		$this->exists = true;
-		// Set the correct primary key after insert
 		$pk = $this->primaryKey;
 		$this->attributes[$pk] = $wpdb->insert_id;
 		$this->$pk = $wpdb->insert_id;
+
+		// created (after-hook)
+		$this->fireModelEvent('created');
+
 		return true;
 	}
 
 	protected function update() {
-		if (method_exists($this, 'updating')) { // Event
+		// updating (before-hook — halts on false)
+		if ($this->fireModelEvent('updating') === false) {
+			return false;
+		}
+
+		// Legacy hook kept for back-compat — only fire if no dispatcher handles it
+		if (method_exists($this, 'updating')
+			&& empty($this->dispatchesEvents['updating'])
+			&& empty(EventDispatcher::getListeners(\MJ\WPORM\Events\Updating::class))
+		) {
 			$this->updating();
 		}
+
 		global $wpdb;
 		if ($this->timestamps) {
 			$this->attributes[$this->updatedAtColumn] = current_time('mysql');
 		}
 		$pk = $this->primaryKey;
-		// Prevent undefined array key warning by checking if PK is set
-        if (!isset($this->attributes[$pk]) && isset($this->$pk)) {
-            $this->attributes[$pk] = $this->$pk;
-        }
-        if (!isset($this->attributes[$pk])) {
-            // Cannot update without a primary key value
-            return false;
-        }
+		if (!isset($this->attributes[$pk]) && isset($this->$pk)) {
+			$this->attributes[$pk] = $this->$pk;
+		}
+		if (!isset($this->attributes[$pk])) {
+			return false;
+		}
 		$wpdb->update($this->getTable(), $this->attributes, [$pk => $this->attributes[$pk]]);
+
+		// updated (after-hook)
+		$this->fireModelEvent('updated');
+
 		return true;
 	}
 
@@ -914,50 +981,69 @@ protected function castSet($key, $value) {
 	}
 
 	public function delete() {
-        if ($this->softDeletes) {
-            if (method_exists($this, 'softDeleting')) {
-                $this->softDeleting();
-            }
-            global $wpdb;
-            $this->attributes[$this->deletedAtColumn] = $this->softDeleteType === 'boolean' ? 1 : current_time('mysql');
-            $pk = $this->primaryKey;
-            $wpdb->update($this->getTable(), [$this->deletedAtColumn => $this->attributes[$this->deletedAtColumn]], [$pk => $this->attributes[$pk]]);
-            $this->exists = true;
-            if (method_exists($this, 'softDeleted')) {
-                $this->softDeleted();
-            }
-            return true;
-        }
-		if (method_exists($this, 'deleting')) { // Event
+		if ($this->softDeletes) {
+			// softDeleting before-hook
+			if ($this->fireModelEvent('softDeleting') === false) {
+				return false;
+			}
+			if (method_exists($this, 'softDeleting')) {
+				$this->softDeleting();
+			}
+			global $wpdb;
+			$this->attributes[$this->deletedAtColumn] = $this->softDeleteType === 'boolean' ? 1 : current_time('mysql');
+			$pk = $this->primaryKey;
+			$wpdb->update($this->getTable(), [$this->deletedAtColumn => $this->attributes[$this->deletedAtColumn]], [$pk => $this->attributes[$pk]]);
+			$this->exists = true;
+			// softDeleted after-hook
+			$this->fireModelEvent('softDeleted');
+			if (method_exists($this, 'softDeleted')) {
+				$this->softDeleted();
+			}
+			return true;
+		}
+
+		// deleting before-hook
+		if ($this->fireModelEvent('deleting') === false) {
+			return false;
+		}
+		if (method_exists($this, 'deleting')) {
 			$this->deleting();
 		}
 		global $wpdb;
 		$wpdb->delete($this->getTable(), [$this->primaryKey => $this->attributes[$this->primaryKey]]);
 		$this->exists = false;
+		// deleted after-hook
+		$this->fireModelEvent('deleted');
 		return true;
 	}
 
 	public function trashed() {
-    return $this->softDeletes && !empty($this->attributes[$this->deletedAtColumn]);
-}
+		return $this->softDeletes && !empty($this->attributes[$this->deletedAtColumn]);
+	}
 
-public function restore() {
-    if ($this->softDeletes && $this->trashed()) {
-        if (method_exists($this, 'restoring')) {
-            $this->restoring();
-        }
-        global $wpdb;
-        $pk = $this->primaryKey;
-        $this->attributes[$this->deletedAtColumn] = $this->softDeleteType === 'boolean' ? 0 : null;
-        $wpdb->update($this->getTable(), [$this->deletedAtColumn => $this->attributes[$this->deletedAtColumn]], [$pk => $this->attributes[$pk]]);
-        $this->exists = true;
-        if (method_exists($this, 'restored')) {
-            $this->restored();
-        }
-        return true;
-    }
-    return false;
-}
+	public function restore() {
+		if ($this->softDeletes && $this->trashed()) {
+			// restoring before-hook
+			if ($this->fireModelEvent('restoring') === false) {
+				return false;
+			}
+			if (method_exists($this, 'restoring')) {
+				$this->restoring();
+			}
+			global $wpdb;
+			$pk = $this->primaryKey;
+			$this->attributes[$this->deletedAtColumn] = $this->softDeleteType === 'boolean' ? 0 : null;
+			$wpdb->update($this->getTable(), [$this->deletedAtColumn => $this->attributes[$this->deletedAtColumn]], [$pk => $this->attributes[$pk]]);
+			$this->exists = true;
+			// restored after-hook
+			$this->fireModelEvent('restored');
+			if (method_exists($this, 'restored')) {
+				$this->restored();
+			}
+			return true;
+		}
+		return false;
+	}
 
 public function forceDelete() {
     if ($this->softDeletes) {
@@ -1415,6 +1501,58 @@ public function forceDelete() {
 
 	public function getOriginal($key = null) {
 		return $key ? ($this->original[$key] ?? null) : $this->original;
+	}
+
+	// -------------------------------------------------------------------------
+	// Event dispatching
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Fire a model lifecycle event via $dispatchesEvents + EventDispatcher.
+	 *
+	 * Maps event short-names to their event classes:
+	 *   retrieved, creating, created, updating, updated, saving, saved,
+	 *   deleting, deleted, softDeleting, softDeleted, restoring, restored.
+	 *
+	 * Returns false if any before-hook listener halted the event; returns the
+	 * event object (truthy) on success; returns null if no event class exists
+	 * for the given name.
+	 *
+	 * @param string $event  Lowercase event short-name.
+	 * @return mixed
+	 */
+	protected function fireModelEvent(string $event)
+	{
+		static $eventMap = [
+			'retrieved'    => \MJ\WPORM\Events\Retrieved::class,
+			'creating'     => \MJ\WPORM\Events\Creating::class,
+			'created'      => \MJ\WPORM\Events\Created::class,
+			'updating'     => \MJ\WPORM\Events\Updating::class,
+			'updated'      => \MJ\WPORM\Events\Updated::class,
+			'saving'       => \MJ\WPORM\Events\Saving::class,
+			'saved'        => \MJ\WPORM\Events\Saved::class,
+			'deleting'     => \MJ\WPORM\Events\Deleting::class,
+			'deleted'      => \MJ\WPORM\Events\Deleted::class,
+			'softDeleting' => \MJ\WPORM\Events\SoftDeleting::class,
+			'softDeleted'  => \MJ\WPORM\Events\SoftDeleted::class,
+			'restoring'    => \MJ\WPORM\Events\Restoring::class,
+			'restored'     => \MJ\WPORM\Events\Restored::class,
+		];
+
+		if (!isset($eventMap[$event])) {
+			return null;
+		}
+
+		$eventClass = $eventMap[$event];
+
+		// Fast-path: no $dispatchesEvents mapping and no global listeners registered.
+		if (empty($this->dispatchesEvents[$event])
+			&& empty(EventDispatcher::getListeners($eventClass))
+		) {
+			return null;
+		}
+
+		return EventDispatcher::dispatch(new $eventClass($this));
 	}
 
 	public function isDirty($attribute = null) {

@@ -1579,17 +1579,18 @@ $users = $query->orWhereJsonLength('options->languages', '>=', 3)->get();
 ## Event Hooks
 
 ### retrieved()
-**Description:** Called after a model is retrieved from the database (get/first/find). Override in your model to add custom logic.
+**Description:** Called after a model is retrieved from the database (get/first/find). Override in your model to add custom logic. The base implementation fires the `retrieved` event via `$dispatchesEvents` / `EventDispatcher` automatically.
 
 **Example:**
 ```php
 protected function retrieved() {
+    parent::retrieved(); // fires the event — call this if you override
     // Custom logic after retrieval
 }
 ```
 
 ### creating(), updating(), deleting()
-**Description:** Event hooks called before insert, update, or delete. Override in your model to add custom logic (e.g., data sanitization).
+**Description:** Event hooks called before insert, update, or delete. Override in your model to add custom logic (e.g., data sanitization). If you also use `$dispatchesEvents` or `EventDispatcher::listen()` for the same event, the override hook is skipped to avoid double-firing — use one approach per event.
 
 **Example:**
 ```php
@@ -1616,6 +1617,144 @@ protected function restored() {
     // Called after restore
 }
 ```
+
+---
+
+## $dispatchesEvents and EventDispatcher
+
+WPORM provides Eloquent-style `$dispatchesEvents` and a standalone `EventDispatcher` for wiring model lifecycle events to listener classes or callables — no Laravel/Illuminate dependency required.
+
+### $dispatchesEvents
+
+**Description:** Map model lifecycle event names (lowercase) to listener class-strings or callables. The listener class must expose a `handle(\MJ\WPORM\Events\ModelEvent $event)` method. Set on the model class.
+
+**Supported event names:**
+`retrieved`, `creating`, `created`, `updating`, `updated`, `saving`, `saved`, `deleting`, `deleted`, `softDeleting`, `softDeleted`, `restoring`, `restored`.
+
+**Before-hooks** (`saving`, `creating`, `updating`, `deleting`, `softDeleting`, `restoring`) halt the operation if a listener returns `false`. After-hooks (`saved`, `created`, `updated`, `deleted`, `softDeleted`, `restored`, `retrieved`) are informational only.
+
+**Example:**
+```php
+use MJ\WPORM\Events\Creating;
+use MJ\WPORM\Events\Deleted;
+
+class LogUserCreating {
+    public function handle(Creating $event) {
+        error_log('Creating user: ' . $event->model->email);
+    }
+}
+
+class CleanupUserData {
+    public function handle(Deleted $event) {
+        // e.g. delete related files, revoke tokens, etc.
+        wp_delete_user_meta($event->model->id, 'auth_token');
+    }
+}
+
+class User extends Model {
+    protected $fillable = ['name', 'email'];
+    protected $hidden   = ['password'];
+
+    public $dispatchesEvents = [
+        'creating' => LogUserCreating::class,
+        'deleted'  => CleanupUserData::class,
+    ];
+}
+```
+
+### EventDispatcher::listen($eventClass, $listener)
+
+**Description:** Register a global listener for an event class. Fires for every model that raises that event, regardless of which model class it is. Callable or class-string accepted.
+
+**Example:**
+```php
+use MJ\WPORM\EventDispatcher;
+use MJ\WPORM\Events\Creating;
+use MJ\WPORM\Events\Saved;
+
+// Closure listener
+EventDispatcher::listen(Creating::class, function(Creating $event) {
+    error_log(get_class($event->model) . ' is being created');
+});
+
+// Class-string listener (must have handle() method)
+EventDispatcher::listen(Saved::class, \App\Listeners\AuditLog::class);
+
+// [ClassName, 'method'] listener
+EventDispatcher::listen(Creating::class, [\App\Listeners\Validator::class, 'handle']);
+```
+
+### EventDispatcher::forget($eventClass = null)
+
+**Description:** Remove all global listeners for an event class, or all listeners when called with no argument.
+
+**Example:**
+```php
+EventDispatcher::forget(\MJ\WPORM\Events\Creating::class); // remove Creating listeners
+EventDispatcher::forget(); // remove all global listeners
+```
+
+### EventDispatcher::getListeners($eventClass)
+
+**Description:** Return all registered global listeners for an event class.
+
+**Example:**
+```php
+$listeners = EventDispatcher::getListeners(\MJ\WPORM\Events\Creating::class);
+```
+
+### Event classes
+
+All event classes live in the `MJ\WPORM\Events` namespace and extend `MJ\WPORM\Events\ModelEvent`. Each carries a `$model` property referencing the model instance that fired the event.
+
+| Event class | Short-name key | When fired |
+|---|---|---|
+| `Events\Retrieved` | `retrieved` | after fetch from DB |
+| `Events\Creating` | `creating` | before INSERT |
+| `Events\Created` | `created` | after INSERT |
+| `Events\Updating` | `updating` | before UPDATE |
+| `Events\Updated` | `updated` | after UPDATE |
+| `Events\Saving` | `saving` | before INSERT or UPDATE |
+| `Events\Saved` | `saved` | after INSERT or UPDATE |
+| `Events\Deleting` | `deleting` | before hard DELETE |
+| `Events\Deleted` | `deleted` | after hard DELETE |
+| `Events\SoftDeleting` | `softDeleting` | before soft delete |
+| `Events\SoftDeleted` | `softDeleted` | after soft delete |
+| `Events\Restoring` | `restoring` | before restore |
+| `Events\Restored` | `restored` | after restore |
+
+**Halting an operation from a listener:**
+
+Return `false` from any before-hook listener to cancel the operation. `save()`, `delete()`, and `restore()` return `false` when halted.
+
+```php
+// Cancel save if validation fails
+EventDispatcher::listen(\MJ\WPORM\Events\Saving::class, function($event) {
+    if (empty($event->model->email)) {
+        return false; // aborts save()
+    }
+});
+```
+
+**Creating a custom event listener class:**
+```php
+use MJ\WPORM\Events\Creating;
+
+class ValidateBeforeCreate {
+    public function handle(Creating $event): void {
+        $model = $event->model;
+        if (empty($model->email)) {
+            throw new \InvalidArgumentException('Email required');
+        }
+    }
+}
+```
+
+**Combining $dispatchesEvents with global listeners:**
+
+Both fire on every event. `$dispatchesEvents` mapping fires first, then global listeners. Either can halt a before-hook by returning `false`.
+
+---
 
 ---
 
