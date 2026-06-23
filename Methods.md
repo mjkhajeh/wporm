@@ -8,6 +8,7 @@ This document describes all public and static methods of the `MJ\WPORM\Model` cl
 - [Global Scopes](#global-scopes)
 - [Constructor](#constructor)
 - [Query Methods](#query-methods)
+- [Subquery Support](#subquery-support)
 - [Combining Queries](#combining-queries)
 - [Raw SQL Expressions](#raw-sql-expressions)
 - [Retrieval Methods](#retrieval-methods)
@@ -392,6 +393,178 @@ $users = User::query()
     ->groupBy('country')
     ->havingBetween('count(*)', [5, 20])
     ->orHavingBetween('count(*)', [50, 100])
+    ->get();
+```
+
+---
+
+## Subquery Support
+
+WPORM supports Eloquent-style subqueries (subselects and derived tables) across SELECT, FROM, and WHERE clauses. Subqueries can be expressed as a `QueryBuilder` instance, a `Closure` that receives a fresh builder, or a raw SQL string.
+
+---
+
+### createSub($query): array
+**Description:** Compile a `QueryBuilder`, `Closure`, or raw SQL string into a `[$sql, $bindings]` pair. Used internally by all subquery methods; available publicly for advanced use.
+
+**Example:**
+```php
+[$sql, $bindings] = User::query()->createSub(function($q) {
+    $q->from('orders')->selectRaw('COUNT(*)')->whereColumn('user_id', 'users.id');
+});
+```
+
+---
+
+### fromSub($query, string $alias)
+**Description:** Use a subquery as the FROM table (derived table), Eloquent-style. All subsequent query builder calls on the same instance treat the alias as a real table. Works with `where()`, `orderBy()`, `limit()`, `count()`, `get()`, `first()`, etc.
+
+**Examples:**
+```php
+// Closure form
+$result = DB::table(function($q) {
+    $q->from('orders')
+      ->select(['user_id', 'SUM(total) as total'])
+      ->groupBy('user_id');
+}, 'order_totals')
+->where('total', '>', 100)
+->orderBy('total', 'desc')
+->get();
+
+// QueryBuilder form
+$sub = Order::query()
+    ->select(['user_id', 'SUM(total) as total'])
+    ->groupBy('user_id');
+
+$result = DB::table($sub, 'order_totals')
+    ->where('total', '>', 100)
+    ->get();
+
+// On an existing query
+$users = User::query()
+    ->fromSub(function($q) {
+        $q->from('users')->where('active', 1)->select('*');
+    }, 'active_users')
+    ->orderBy('name')
+    ->get();
+```
+
+---
+
+### selectSub($query, string $alias)
+**Description:** Add a subquery to the SELECT clause. The subquery result is aliased as a column on each returned row. Chainable with `select()` and `selectRaw()`.
+
+**Examples:**
+```php
+$users = User::query()
+    ->select(['id', 'name'])
+    ->selectSub(function($q) {
+        $q->from('posts')
+          ->selectRaw('COUNT(*)')
+          ->whereColumn('user_id', 'users.id');
+    }, 'post_count')
+    ->selectSub(function($q) {
+        $q->from('orders')
+          ->selectRaw('SUM(total)')
+          ->whereColumn('user_id', 'users.id');
+    }, 'order_total')
+    ->get();
+
+// Accessing the scalar values
+foreach ($users as $user) {
+    echo $user->post_count;   // number of posts
+    echo $user->order_total;  // sum of orders
+}
+```
+
+---
+
+### whereSub(string $column, string $operator, $query)
+**Description:** Add a `WHERE column OPERATOR (subquery)` clause. Works with any comparison operator: `=`, `!=`, `<`, `>`, `<=`, `>=`, `IN`, `NOT IN`, etc.
+
+**Examples:**
+```php
+// WHERE id IN (subquery)
+User::query()->whereSub('id', 'IN', function($q) {
+    $q->from('role_user')->select('user_id')->where('role_id', 1);
+})->get();
+
+// WHERE total > (SELECT AVG(total) FROM orders)
+Order::query()->whereSub('total', '>', function($q) {
+    $q->from('orders')->selectRaw('AVG(total)');
+})->get();
+
+// With an existing QueryBuilder
+$admins = DB::table('role_user')->select('user_id')->where('role_id', 1);
+User::query()->whereSub('id', 'IN', $admins)->get();
+```
+
+---
+
+### orWhereSub(string $column, string $operator, $query)
+**Description:** OR version of `whereSub`.
+
+**Example:**
+```php
+User::query()
+    ->where('is_superadmin', 1)
+    ->orWhereSub('id', 'IN', function($q) {
+        $q->from('role_user')->select('user_id')->where('role_id', 2);
+    })
+    ->get();
+```
+
+---
+
+### whereInSub(string $column, $query)
+**Description:** Shorthand for `whereSub($column, 'IN', $query)`.
+
+**Example:**
+```php
+User::query()->whereInSub('id', function($q) {
+    $q->from('role_user')->select('user_id')->where('role_id', 1);
+})->get();
+```
+
+---
+
+### whereNotInSub(string $column, $query)
+**Description:** Shorthand for `whereSub($column, 'NOT IN', $query)`.
+
+**Example:**
+```php
+User::query()->whereNotInSub('id', function($q) {
+    $q->from('banned_users')->select('user_id');
+})->get();
+```
+
+---
+
+### orWhereInSub(string $column, $query)
+**Description:** OR version of `whereInSub`.
+
+**Example:**
+```php
+User::query()
+    ->where('role', 'admin')
+    ->orWhereInSub('id', function($q) {
+        $q->from('role_user')->select('user_id')->where('role_id', 5);
+    })
+    ->get();
+```
+
+---
+
+### orWhereNotInSub(string $column, $query)
+**Description:** OR version of `whereNotInSub`.
+
+**Example:**
+```php
+User::query()
+    ->where('active', 1)
+    ->orWhereNotInSub('id', function($q) {
+        $q->from('suspended_users')->select('user_id');
+    })
     ->get();
 ```
 

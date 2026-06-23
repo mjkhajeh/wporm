@@ -23,6 +23,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Batch processing**: `chunk()` and `each()` for iterating large result sets in pages without loading everything into memory at once.
 - **Serialization**: `toArray()`/`toJson()`/`__toString()` on both models and collections, with `$hidden`/`$visible` support and safe (exception-on-failure) JSON encoding.
 - **Raw SQL expressions**: `selectRaw()`, `whereRaw()`/`orWhereRaw()`, `groupByRaw()`, `havingRaw()`/`orHavingRaw()`, and `orderByRaw()` for dropping down to raw SQL with safe, bound placeholders.
+- **Subqueries**: `fromSub()` for derived tables, `selectSub()` for scalar subselects in the SELECT list, and `whereSub()`/`whereInSub()`/`whereNotInSub()` (plus OR variants) for subqueries in WHERE — all accepting a `QueryBuilder`, `Closure`, or raw SQL string, Eloquent-style.
 - **Combining queries**: `union()`/`unionAll()` to combine two or more queries' result sets, Eloquent-style.
 - **Events**: Model lifecycle event hooks (`creating`, `updating`, `deleting`, etc.) via overridable methods, Eloquent-style `$dispatchesEvents` property mapping, and a standalone `EventDispatcher` for global listeners — no Laravel dependency required.
 - **Global scopes**: Add global query constraints to models.
@@ -1180,6 +1181,103 @@ $bigSpenders = Order::query()
 ```
 
 See [Methods.md](./Methods.md#raw-sql-expressions) for the full list with signatures.
+
+## Subqueries: fromSub(), selectSub(), whereSub() / whereInSub()
+
+WPORM supports Eloquent-style subqueries (subselects and derived tables) in the SELECT, FROM, and WHERE clauses. Every method accepts a `QueryBuilder` instance, a `Closure` that receives a fresh builder, or a raw SQL string. Bindings propagate automatically — you never need to manage them by hand.
+
+### fromSub() — Derived Tables
+
+Use a subquery as the `FROM` table. The derived table is aliased and treated like a real table by all subsequent query builder calls.
+
+```php
+// Closure form (inline)
+$result = DB::table(function($q) {
+    $q->from('orders')
+      ->select(['user_id', 'SUM(total) as revenue'])
+      ->groupBy('user_id');
+}, 'order_totals')
+->where('revenue', '>', 500)
+->orderBy('revenue', 'desc')
+->get();
+
+// QueryBuilder form
+$sub = Order::query()
+    ->select(['user_id', 'SUM(total) as revenue'])
+    ->groupBy('user_id');
+
+$result = DB::table($sub, 'order_totals')
+    ->where('revenue', '>', 500)
+    ->get();
+
+// On an existing model query
+$activeUsers = User::query()
+    ->fromSub(function($q) {
+        $q->from('users')->where('active', 1)->select('*');
+    }, 'active_users')
+    ->orderBy('name')
+    ->get();
+```
+
+### selectSub() — Scalar Subselects
+
+Add a subquery to the SELECT list, aliased as a virtual column on each returned row.
+
+```php
+$users = User::query()
+    ->select(['id', 'name'])
+    ->selectSub(function($q) {
+        $q->from('posts')
+          ->selectRaw('COUNT(*)')
+          ->whereColumn('user_id', 'users.id');
+    }, 'post_count')
+    ->selectSub(function($q) {
+        $q->from('orders')
+          ->selectRaw('SUM(total)')
+          ->whereColumn('user_id', 'users.id');
+    }, 'order_total')
+    ->get();
+
+foreach ($users as $user) {
+    echo $user->post_count;
+    echo $user->order_total;
+}
+```
+
+### whereSub() / whereInSub() — Subqueries in WHERE
+
+```php
+// WHERE id IN (subquery) — shorthand
+User::query()->whereInSub('id', function($q) {
+    $q->from('role_user')->select('user_id')->where('role_id', 1);
+})->get();
+
+// WHERE id NOT IN (subquery)
+User::query()->whereNotInSub('id', function($q) {
+    $q->from('banned_users')->select('user_id');
+})->get();
+
+// WHERE total > (SELECT AVG(total) FROM orders)
+Order::query()->whereSub('total', '>', function($q) {
+    $q->from('orders')->selectRaw('AVG(total)');
+})->get();
+
+// OR variants
+User::query()
+    ->where('is_superadmin', 1)
+    ->orWhereInSub('id', function($q) {
+        $q->from('role_user')->select('user_id')->where('role_id', 2);
+    })
+    ->get();
+
+// Mix with existing QueryBuilder
+$adminIds = DB::table('role_user')->select('user_id')->where('role_id', 1);
+User::query()->whereInSub('id', $adminIds)->get();
+```
+
+All subquery methods (`whereSub`, `orWhereSub`, `whereInSub`, `whereNotInSub`, `orWhereInSub`, `orWhereNotInSub`) fully participate in the same binding-order pipeline as the rest of WPORM — safe to combine with `whereRaw()`, `havingRaw()`, `selectRaw()`, and unions on the same query.
+
+See [Methods.md](./Methods.md#subquery-support) for the full method signatures.
 
 ## Combining Queries: union() / unionAll()
 

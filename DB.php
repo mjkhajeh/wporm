@@ -9,7 +9,26 @@ class DB {
      * @param string $table
      * @return QueryBuilder
      */
-    public static function table($table) {
+    /**
+     * Start a query on a table or a subquery (derived table).
+     *
+     * Plain table name:
+     *   DB::table('posts')->where('id', 1)->get();
+     *
+     * Derived table (subquery as FROM), Eloquent-style:
+     *   DB::table(function($q) {
+     *       $q->from('orders')->select(['user_id', 'SUM(total) as total'])->groupBy('user_id');
+     *   }, 'order_totals')->where('total', '>', 100)->get();
+     *
+     *   // or with an existing QueryBuilder:
+     *   $sub = Order::query()->select(['user_id', 'SUM(total) as total'])->groupBy('user_id');
+     *   DB::table($sub, 'order_totals')->where('total', '>', 100)->get();
+     *
+     * @param string|\Closure|\MJ\WPORM\QueryBuilder $table
+     * @param string|null $alias  Required when $table is a Closure or QueryBuilder
+     * @return QueryBuilder
+     */
+    public static function table($table, ?string $alias = null) {
         $model = new class {
             public $table;
             public $primaryKey = 'id';
@@ -24,6 +43,19 @@ class DB {
 
             public function getTable() { return $this->table; }
         };
+
+        if ($table instanceof \Closure || $table instanceof QueryBuilder) {
+            if ($alias === null) {
+                throw new \InvalidArgumentException(
+                    'DB::table() requires a string $alias as second argument when a Closure or QueryBuilder is passed as $table.'
+                );
+            }
+            $model->table = $alias;
+            $qb = new QueryBuilder($model);
+            $qb->fromSub($table, $alias);
+            return $qb;
+        }
+
         $model->table = $table;
         return new QueryBuilder($model);
     }

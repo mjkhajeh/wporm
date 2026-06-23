@@ -23,6 +23,19 @@ class QueryBuilder {
     protected $relationContext = [];
 
     /**
+     * When set, the FROM clause is a derived table (subquery) instead of a
+     * plain table name.  Shape: ['sql' => string, 'alias' => string, 'bindings' => array]
+     */
+    protected $fromSub = null;
+
+    /**
+     * Subquery bindings that appear in the SELECT list (from selectSub() calls),
+     * stored separately so getSelectBindings() can include them in the correct
+     * position before the WHERE bindings.
+     */
+    protected $selectSubBindings = [];
+
+    /**
      * If true, SQL and bindings will be logged before execution.
      * Set via QueryBuilder::setDebug(true) or $query->debug = true
      */
@@ -90,6 +103,186 @@ class QueryBuilder {
     public function from($table) {
         $this->table = $table;
         return $this;
+    }
+
+    // -------------------------------------------------------------------------
+    // Subquery support
+    // -------------------------------------------------------------------------
+
+    /**
+     * Compile a QueryBuilder instance or Closure into a [sql, bindings] pair.
+     * The sql string does NOT include surrounding parentheses — callers wrap it.
+     *
+     * Accepts:
+     *   - QueryBuilder instance  → compiled directly
+     *   - Closure                → invoked with a fresh QueryBuilder for this model,
+     *                              then compiled
+     *   - string (raw SQL)       → passed through as-is with empty bindings
+     *
+     * @param QueryBuilder|\Closure|string $query
+     * @return array{0: string, 1: array}  [$sql, $bindings]
+     */
+    public function createSub($query): array {
+        if ($query instanceof \Closure) {
+            $sub = new self($this->model, false);
+            $query($sub);
+            $query = $sub;
+        }
+
+        if ($query instanceof self) {
+            return [$query->buildSelectQuery(), $query->getBindings()];
+        }
+
+        if (is_string($query)) {
+            return [$query, []];
+        }
+
+        throw new \InvalidArgumentException(
+            'createSub() expects a QueryBuilder, Closure, or raw SQL string, got ' . gettype($query)
+        );
+    }
+
+    /**
+     * Use a subquery as the FROM table (Eloquent-style fromSub / from derived table).
+     *
+     * The subquery result set is aliased as $alias and can be treated exactly
+     * like a real table by all subsequent query builder calls on this instance.
+     *
+     * Usage:
+     *   // Closure form
+     *   DB::table(function($q) {
+     *       $q->from('orders')->select(['user_id', 'SUM(total) as total'])->groupBy('user_id');
+     *   }, 'order_totals')->where('total', '>', 100)->get();
+     *
+     *   // QueryBuilder form
+     *   $sub = Order::query()->select(['user_id', 'SUM(total) as total'])->groupBy('user_id');
+     *   User::query()->fromSub($sub, 'order_totals')->where('total', '>', 100)->get();
+     *
+     * @param QueryBuilder|\Closure|string $query
+     * @param string $alias  Alias for the derived table
+     * @return $this
+     */
+    public function fromSub($query, string $alias): self {
+        [$sql, $bindings] = $this->createSub($query);
+        $this->fromSub = ['sql' => $sql, 'alias' => $alias, 'bindings' => $bindings];
+        // Keep $this->table in sync so count/delete/update still work when possible.
+        $this->table = $alias;
+        return $this;
+    }
+
+    /**
+     * Add a subquery to the SELECT clause (Eloquent-style selectSub).
+     *
+     * Usage:
+     *   User::query()
+     *       ->select('id', 'name')
+     *       ->selectSub(function($q) {
+     *           $q->from('posts')->selectRaw('COUNT(*)')->whereColumn('user_id', 'users.id');
+     *       }, 'post_count')
+     *       ->get();
+     *
+     * @param QueryBuilder|\Closure|string $query
+     * @param string $alias  Column alias for the subquery result
+     * @return $this
+     */
+    public function selectSub($query, string $alias): self {
+        [$sql, $bindings] = $this->createSub($query);
+        // Store as a raw select entry so buildSelectQuery() renders it unquoted.
+        $this->selects[] = ['raw' => "($sql) AS " . Helpers::quoteIdentifier($alias), 'bindings' => $bindings];
+        return $this;
+    }
+
+    /**
+     * Add a WHERE column OP (subquery) clause (Eloquent-style whereSub).
+     *
+     * Usage:
+     *   User::query()->whereSub('id', 'IN', function($q) {
+     *       $q->from('role_user')->select('user_id')->where('role_id', 1);
+     *   })->get();
+     *
+     *   // Or with a comparison operator:
+     *   Order::query()->whereSub('total', '>', function($q) {
+     *       $q->from('orders')->selectRaw('AVG(total)');
+     *   })->get();
+     *
+     * @param string $column
+     * @param string $operator
+     * @param QueryBuilder|\Closure|string $query
+     * @return $this
+     */
+    public function whereSub(string $column, string $operator, $query): self {
+        [$sql, $bindings] = $this->createSub($query);
+        $this->wheres[] = Helpers::quoteIdentifier($column) . " $operator ($sql)";
+        foreach ($bindings as $b) {
+            $this->bindings[] = $b;
+        }
+        return $this;
+    }
+
+    /**
+     * OR version of whereSub.
+     *
+     * @param string $column
+     * @param string $operator
+     * @param QueryBuilder|\Closure|string $query
+     * @return $this
+     */
+    public function orWhereSub(string $column, string $operator, $query): self {
+        [$sql, $bindings] = $this->createSub($query);
+        $this->wheres[] = 'OR ' . Helpers::quoteIdentifier($column) . " $operator ($sql)";
+        foreach ($bindings as $b) {
+            $this->bindings[] = $b;
+        }
+        return $this;
+    }
+
+    /**
+     * Add a WHERE column IN (subquery) clause (Eloquent-style whereInSub).
+     *
+     * Usage:
+     *   User::query()->whereInSub('id', function($q) {
+     *       $q->from('role_user')->select('user_id')->where('role_id', 1);
+     *   })->get();
+     *
+     * @param string $column
+     * @param QueryBuilder|\Closure|string $query
+     * @return $this
+     */
+    public function whereInSub(string $column, $query): self {
+        return $this->whereSub($column, 'IN', $query);
+    }
+
+    /**
+     * Add a WHERE column NOT IN (subquery) clause.
+     *
+     * @param string $column
+     * @param QueryBuilder|\Closure|string $query
+     * @return $this
+     */
+    public function whereNotInSub(string $column, $query): self {
+        return $this->whereSub($column, 'NOT IN', $query);
+    }
+
+    /**
+     * Add an OR WHERE column IN (subquery) clause.
+     *
+     * @param string $column
+     * @param QueryBuilder|\Closure|string $query
+     * @return $this
+     */
+    public function orWhereInSub(string $column, $query): self {
+        return $this->orWhereSub($column, 'IN', $query);
+    }
+
+    /**
+     * Add an OR WHERE column NOT IN (subquery) clause.
+     *
+     * @param string $column
+     * @param QueryBuilder|\Closure|string $query
+     * @return $this
+     */
+    public function orWhereNotInSub(string $column, $query): self {
+        return $this->orWhereSub($column, 'NOT IN', $query);
     }
 
     public function where($column, $operator = null, $value = null) {
@@ -1263,6 +1456,7 @@ class QueryBuilder {
      */
     public function getBindings() {
         return array_merge(
+            $this->getFromSubBindings(),
             $this->getSelectBindings(),
             $this->bindings,
             $this->getGroupByBindings(),
@@ -1270,6 +1464,19 @@ class QueryBuilder {
             $this->getUnionBindings(),
             $this->getOrderByBindings()
         );
+    }
+
+    /**
+     * Bindings contributed by the fromSub() derived table, which must appear
+     * BEFORE SELECT and WHERE bindings in the final prepared statement because
+     * the derived table SQL is rendered first (inside the FROM clause SQL
+     * position doesn't matter for $wpdb->prepare — bindings are positional in
+     * the order placeholders appear left-to-right in the SQL string; the FROM
+     * derived-table subquery appears before WHERE in the SQL, so its bindings
+     * must come first).
+     */
+    protected function getFromSubBindings(): array {
+        return $this->fromSub ? $this->fromSub['bindings'] : [];
     }
 
     /**
@@ -1546,7 +1753,13 @@ class QueryBuilder {
         if ($this->isDistinct) {
             $sql .= "DISTINCT ";
         }
-    $sql .= implode(", ", $selects) . " FROM " . Helpers::quoteIdentifier($this->table);
+        // FROM: either a derived table (fromSub) or a plain table name
+        if ($this->fromSub !== null) {
+            $fromExpr = "({$this->fromSub['sql']}) AS " . Helpers::quoteIdentifier($this->fromSub['alias']);
+        } else {
+            $fromExpr = Helpers::quoteIdentifier($this->table);
+        }
+        $sql .= implode(", ", $selects) . " FROM " . $fromExpr;
         // Add JOIN clauses
         if (!empty($this->joins)) {
             foreach ($this->joins as $join) {
