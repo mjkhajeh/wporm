@@ -404,6 +404,45 @@ WPORM supports Eloquent-style subqueries (subselects and derived tables) across 
 
 ---
 
+### from($table, ?string $alias = null)
+**Description:** Overloaded Eloquent-style `from()`. Two modes:
+
+- **Plain string, no alias** — change the query's target table mid-chain. Clears any previously set `fromSub()` derived table and reverts to a plain `FROM` clause with the new table name.
+- **Subquery form (Closure, QueryBuilder, or raw SQL string) + alias** — identical to `fromSub()`. Uses the compiled subquery as a derived table aliased as `$alias`. Throws `\InvalidArgumentException` if alias is omitted for a non-string subquery.
+
+`from($rawSql, $alias)` (string + alias) treats the string as a raw SQL expression, matching Eloquent's behaviour.
+
+**Examples:**
+```php
+// Change table
+$query = User::query()->from('admins')->where('active', 1)->get();
+DB::table('orders')->from('invoices')->where('paid', 1)->get();
+
+// Derived table — Closure form
+User::query()
+    ->from(function($q) {
+        $q->from('orders')
+          ->select(['user_id', 'SUM(total) as revenue'])
+          ->groupBy('user_id');
+    }, 'order_totals')
+    ->where('revenue', '>', 500)
+    ->get();
+
+// Derived table — QueryBuilder form
+$sub = Order::query()
+    ->select(['user_id', 'SUM(total) as revenue'])
+    ->groupBy('user_id');
+User::query()->from($sub, 'order_totals')->where('revenue', '>', 500)->get();
+
+// Derived table — raw SQL string form
+DB::table(
+    'SELECT user_id, SUM(total) as revenue FROM orders GROUP BY user_id',
+    'order_totals'
+)->where('revenue', '>', 100)->get();
+```
+
+---
+
 ### createSub($query): array
 **Description:** Compile a `QueryBuilder`, `Closure`, or raw SQL string into a `[$sql, $bindings]` pair. Used internally by all subquery methods; available publicly for advanced use.
 
@@ -417,7 +456,7 @@ WPORM supports Eloquent-style subqueries (subselects and derived tables) across 
 ---
 
 ### fromSub($query, string $alias)
-**Description:** Use a subquery as the FROM table (derived table), Eloquent-style. All subsequent query builder calls on the same instance treat the alias as a real table. Works with `where()`, `orderBy()`, `limit()`, `count()`, `get()`, `first()`, etc.
+**Description:** Use a subquery as the FROM table (derived table), Eloquent-style. Equivalent to `from($query, $alias)` — kept for explicitness and API compatibility. All subsequent query builder calls on the same instance treat the alias as a real table. Works with `where()`, `orderBy()`, `limit()`, `count()`, `get()`, `first()`, etc.
 
 **Examples:**
 ```php

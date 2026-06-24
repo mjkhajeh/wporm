@@ -23,7 +23,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Batch processing**: `chunk()` and `each()` for iterating large result sets in pages without loading everything into memory at once.
 - **Serialization**: `toArray()`/`toJson()`/`__toString()` on both models and collections, with `$hidden`/`$visible` support and safe (exception-on-failure) JSON encoding.
 - **Raw SQL expressions**: `selectRaw()`, `whereRaw()`/`orWhereRaw()`, `groupByRaw()`, `havingRaw()`/`orHavingRaw()`, and `orderByRaw()` for dropping down to raw SQL with safe, bound placeholders.
-- **Subqueries**: `fromSub()` for derived tables, `selectSub()` for scalar subselects in the SELECT list, and `whereSub()`/`whereInSub()`/`whereNotInSub()` (plus OR variants) for subqueries in WHERE — all accepting a `QueryBuilder`, `Closure`, or raw SQL string, Eloquent-style.
+- **Subqueries**: `fromSub()` / `from()` for derived tables, `selectSub()` for scalar subselects in the SELECT list, and `whereSub()`/`whereInSub()`/`whereNotInSub()` (plus OR variants) for subqueries in WHERE — all accepting a `QueryBuilder`, `Closure`, or raw SQL string, Eloquent-style.
 - **Combining queries**: `union()`/`unionAll()` to combine two or more queries' result sets, Eloquent-style.
 - **Events**: Model lifecycle event hooks (`creating`, `updating`, `deleting`, etc.) via overridable methods, Eloquent-style `$dispatchesEvents` property mapping, and a standalone `EventDispatcher` for global listeners — no Laravel dependency required.
 - **Global scopes**: Add global query constraints to models.
@@ -1273,13 +1273,52 @@ $bigSpenders = Order::query()
 
 See [Methods.md](./Methods.md#raw-sql-expressions) for the full list with signatures.
 
-## Subqueries: fromSub(), selectSub(), whereSub() / whereInSub()
+## Subqueries: fromSub(), from(), selectSub(), whereSub() / whereInSub()
 
 WPORM supports Eloquent-style subqueries (subselects and derived tables) in the SELECT, FROM, and WHERE clauses. Every method accepts a `QueryBuilder` instance, a `Closure` that receives a fresh builder, or a raw SQL string. Bindings propagate automatically — you never need to manage them by hand.
 
+### from() — Change Table or Use a Derived Table
+
+`from()` is overloaded just like Eloquent's — it either changes the current query's target table (plain string, no alias) or uses a subquery as the `FROM` source (any subquery form + alias):
+
+```php
+// Plain table change — updates the query's FROM table
+$query = User::query()->from('admins')->where('active', 1)->get();
+
+// Or change mid-chain (useful in scopes / dynamic queries)
+$query = DB::table('orders')->from('invoices')->where('paid', 1)->get();
+
+// Subquery / derived-table form — identical to fromSub()
+// Closure form
+$result = User::query()
+    ->from(function($q) {
+        $q->from('orders')
+          ->select(['user_id', 'SUM(total) as revenue'])
+          ->groupBy('user_id');
+    }, 'order_totals')
+    ->where('revenue', '>', 500)
+    ->orderBy('revenue', 'desc')
+    ->get();
+
+// QueryBuilder form
+$sub = Order::query()
+    ->select(['user_id', 'SUM(total) as revenue'])
+    ->groupBy('user_id');
+
+$result = User::query()->from($sub, 'order_totals')->where('revenue', '>', 500)->get();
+
+// Raw SQL string form
+$result = DB::table(
+    'SELECT user_id, SUM(total) as revenue FROM orders GROUP BY user_id',
+    'order_totals'
+)->where('revenue', '>', 100)->get();
+```
+
+> **Note:** A string `$alias` is required when passing a `Closure`, `QueryBuilder`, or raw SQL string as the first argument. `from()` throws `\InvalidArgumentException` if a non-string subquery is passed without an alias. Providing an alias alongside a plain string table name makes `from()` treat that string as a raw SQL subquery expression — matching Eloquent's behaviour.
+
 ### fromSub() — Derived Tables
 
-Use a subquery as the `FROM` table. The derived table is aliased and treated like a real table by all subsequent query builder calls.
+`fromSub()` is the explicit derived-table form. It is equivalent to `from($query, $alias)` and is kept for API compatibility and explicitness:
 
 ```php
 // Closure form (inline)

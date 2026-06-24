@@ -50,7 +50,7 @@ The latest task was completed. (Moderate Issues: 0)
   | ✅ 26 | Polymorphic relationships (morphOne/morphMany/morphTo) | Comments on posts, pages, etc. |
   | ✅ 27 | subquery support in select() / where() / from() | Subselects, derived tables |
   | ✅ 28 | union() / unionAll() | Combining query results |
-  | 29 | fromSub() / from() | Query from subquery or change table |
+  | ✅ 29 | fromSub() / from() | Query from subquery or change table |
   | 30 | tap() / pipe() on QueryBuilder | Functional chaining |
   | 31 | withCount() | User::withCount('posts')->get() — adds posts_count |
   | 32 | withSum() / withAvg() / withMin() / withMax() | Aggregate sub-selects |

@@ -100,8 +100,50 @@ class QueryBuilder {
         return $this;
     }
 
-    public function from($table) {
+    /**
+     * Set the table for the query, or use a subquery as the FROM source
+     * (Eloquent-style overloaded from()).
+     *
+     * Plain string form — change the target table on an existing builder:
+     *   ->from('orders')
+     *   ->from($wpdb->prefix . 'custom_table')
+     *
+     * Subquery (derived table) form — identical to fromSub(), provided for
+     * Eloquent API parity. Requires a string $alias as second argument:
+     *   ->from(function($q) {
+     *       $q->from('orders')->select(['user_id', 'SUM(total) as revenue'])->groupBy('user_id');
+     *   }, 'order_totals')
+     *   ->from(Order::query()->select(['user_id', 'SUM(total) as revenue'])->groupBy('user_id'), 'order_totals')
+     *   ->from('SELECT user_id, SUM(total) as revenue FROM orders GROUP BY user_id', 'order_totals')
+     *
+     * When $alias is given alongside a plain string $table, $table is treated
+     * as a raw SQL subquery expression (consistent with Eloquent's behaviour).
+     *
+     * @param string|\Closure|\MJ\WPORM\QueryBuilder $table
+     * @param string|null $alias  Required when $table is a subquery
+     * @return $this
+     */
+    public function from($table, ?string $alias = null): self {
+        // Subquery / derived-table form
+        if ($table instanceof \Closure || $table instanceof self) {
+            if ($alias === null) {
+                throw new \InvalidArgumentException(
+                    'from() requires a string $alias as second argument when a Closure or QueryBuilder is passed.'
+                );
+            }
+            return $this->fromSub($table, $alias);
+        }
+
+        // Plain string with alias → treat as raw SQL subquery expression
+        if (is_string($table) && $alias !== null) {
+            return $this->fromSub($table, $alias);
+        }
+
+        // Plain string without alias → simple table change (original behaviour)
         $this->table = $table;
+        // Clear any previously set derived-table so the builder reverts to
+        // the plain FROM clause with the new table name.
+        $this->fromSub = null;
         return $this;
     }
 
