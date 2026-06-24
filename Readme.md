@@ -16,7 +16,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Schema management**: Create and modify tables using a fluent schema builder.
 - **Query builder**: Chainable query builder for flexible and safe SQL queries.
 - **Attribute casting**: Automatic type casting for model attributes.
-- **Relationships**: Define `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, and `hasManyThrough` relationships, with eager loading via `with()` and existence filtering via `whereHas()`/`has()`.
+- **Relationships**: Define `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, and `hasManyThrough` relationships, with eager loading via `with()` and existence filtering via `whereHas()`/`has()`. Polymorphic relationships (`morphOne`, `morphMany`, `morphTo`) are also supported, including an optional `morphMap()` for short type aliases.
 - **Convenient creation**: `create()` for a one-line insert + return model, plus `updateOrCreate()`, `firstOrCreate()`, and `firstOrNew()` for upsert-style lookups.
 - **Aggregates & utilities**: `sum()`, `avg()`, `min()`, `max()`, `value()`, `pluck()`, `exists()`/`doesntExist()`, and `increment()`/`decrement()`.
 - **Fail-fast lookups**: `findOrFail()`/`firstOrFail()` (including array-of-ids lookups, and `Collection::firstOrFail()`) throw a `ModelNotFoundException` instead of silently returning `null`.
@@ -825,13 +825,92 @@ WPORM supports Eloquent-style relationships. You can define them in your model u
 
   In other words: `User` → (`Post.user_id`) → `Post` → (`Comment.post_id`) → `Comment`.
 
-All relationship methods (`hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`) return a lazy, chainable `QueryBuilder` when called directly — e.g. `$user->posts()->where('published', 1)->get()`. When accessed as a property instead (e.g. `$user->posts`, `$comment->user`), WPORM automatically resolves the query for you: `hasOne`/`belongsTo`-style relations resolve to a single model (or `null`), and `hasMany`/`belongsToMany`/`hasManyThrough`-style relations resolve to a `Collection`.
+### Polymorphic Relationships: morphOne, morphMany, morphTo
+
+A polymorphic relationship lets a model belong to more than one other model type using a single association — e.g. a `Comment` that can belong to either a `Post` or a `Video`, or an `Image` that can belong to a `Post` or a `User`. Instead of a single foreign key column, the related table carries **two** columns: a `*_type` column storing the owning model's class (or a short [morph map](#morph-map-short-type-aliases) alias), and a `*_id` column storing its primary key.
+
+- **morphOne**: One-to-one polymorphic, defined on the *owning* model.
+  ```php
+  // Post owns a single Image via imageable_type / imageable_id
+  class Post extends Model {
+      public function image() {
+          return $this->morphOne(Image::class, 'imageable');
+      }
+  }
+  ```
+- **morphMany**: One-to-many polymorphic, defined on the *owning* model.
+  ```php
+  // Post and Video both own many Comments via commentable_type / commentable_id
+  class Post extends Model {
+      public function comments() {
+          return $this->morphMany(Comment::class, 'commentable');
+      }
+  }
+  class Video extends Model {
+      public function comments() {
+          return $this->morphMany(Comment::class, 'commentable');
+      }
+  }
+  ```
+- **morphTo**: The inverse side, defined on the *related* (child) model. Resolves to whichever model class is actually named in this row's own `*_type` column.
+  ```php
+  class Comment extends Model {
+      protected $fillable = ['commentable_type', 'commentable_id', 'body'];
+
+      public function commentable() {
+          return $this->morphTo('commentable');
+      }
+  }
+
+  $comment = Comment::find(1);
+  $owner = $comment->commentable; // a Post or Video instance, depending on commentable_type
+  ```
+  > Unlike every other relationship method, `morphTo()` requires the morph **name** as its first argument (e.g. `'commentable'`) — PHP has no cheap, reliable way to recover the calling method's own name at runtime, so it can't be inferred automatically the way Eloquent's reflection-based version does.
+
+**Column naming:** By default, `morphOne($related, $name)` / `morphMany($related, $name)` / `morphTo($name)` use `{$name}_type` and `{$name}_id` (e.g. `'imageable'` → `imageable_type` / `imageable_id`). Pass explicit `$type`/`$id` arguments to override either column name:
+```php
+$this->morphOne(Image::class, 'imageable', 'img_type', 'img_id');
+```
+
+**Schema:** Add both columns wherever you store the polymorphic relation — typically a string/varchar `*_type` column and an unsigned-integer `*_id` column, usually indexed together:
+```php
+public function up(Blueprint $table) {
+    $table->id();
+    $table->text('body');
+    $table->string('commentable_type');
+    $table->unsignedBigInteger('commentable_id');
+    $table->index(['commentable_type', 'commentable_id']);
+}
+```
+
+#### Morph Map: Short Type Aliases
+
+By default, the `*_type` column stores the fully-qualified class name (e.g. `App\Models\Post`). Register a `morphMap()` to store a short string instead (e.g. `post`) — this keeps stored values stable even if you rename or move a class later:
+
+```php
+use MJ\WPORM\Model;
+
+Model::morphMap([
+    'post'  => Post::class,
+    'video' => Video::class,
+]);
+```
+
+Call this once during plugin bootstrap, before any polymorphic relations are queried or saved. Once registered:
+- **Writing**: `morphOne()`/`morphMany()` automatically store the alias (`'post'`) instead of the FQCN when building their query, via `getMorphClass()`.
+- **Reading**: `morphTo()` automatically resolves the alias back to the real class via `getMorphedModel()`.
+
+`morphMap()` merges into the existing map by default; pass `true` as the second argument to replace it entirely: `Model::morphMap([...], true)`. `Model::getMorphMap()` returns the currently registered map.
+
+> If a `*_type` value doesn't match any registered alias, it's treated as a literal class name automatically (Eloquent's default, un-mapped behavior) — so `morphMap()` is entirely optional and safe to add or skip per-model.
+
+All relationship methods (`hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`, `morphOne`, `morphMany`, `morphTo`) return a lazy, chainable `QueryBuilder` when called directly — e.g. `$user->posts()->where('published', 1)->get()`. When accessed as a property instead (e.g. `$user->posts`, `$comment->user`, `$post->comments`, `$comment->commentable`), WPORM automatically resolves the query for you: `hasOne`/`belongsTo`/`morphOne`/`morphTo`-style relations resolve to a single model (or `null`), and `hasMany`/`belongsToMany`/`hasManyThrough`/`morphMany`-style relations resolve to a `Collection`.
 
 > **Note:** Every relationship method embeds metadata about its type and keys on the returned
 > `QueryBuilder` (its "relation context"). This is what powers property-access resolution,
 > `with()` eager loading, and `whereHas()`/`has()` — there's no reflection or guesswork involved,
-> so eager loading and existence filtering work correctly for all five relationship types,
-> including `belongsToMany` and `hasManyThrough`.
+> so eager loading and existence filtering work correctly for all relationship types,
+> including `belongsToMany`, `hasManyThrough`, and the polymorphic relations.
 
 ### Relationship Existence Filtering: whereHas, orWhereHas, has
 
@@ -859,11 +938,19 @@ User::query()->whereHas('posts', function($q) {
 User::query()->whereHas('roles', function($q) {
     $q->where('name', 'admin');
 })->get();
+
+// Works for morphOne/morphMany too — posts that have at least one comment:
+Post::query()->has('comments')->get();
+Post::query()->whereHas('comments', function($q) {
+    $q->where('approved', 1);
+})->get();
 ```
+
+> **Note on `whereHas()`/`has()` with `morphTo`:** these filter from the "many" side (`morphOne`/`morphMany`, e.g. filtering `Post`s by their `comments()`), which is fully supported. Filtering from the `morphTo` side itself (e.g. `Comment::query()->whereHas('commentable', ...)`) is inherently ambiguous for polymorphic relations — the related table isn't known until each row is read — so, matching Eloquent's own constraints in this area, it resolves against a single row's own currently-loaded type and is best avoided in bulk query construction; eager-load with `with('commentable')` and filter in PHP instead if you need to inspect the resolved related model across many rows.
 
 ## Eager Loading: with()
 
-To avoid N+1 query problems, load relations up front with `with()` instead of accessing them lazily per-model. All five relationship types (`hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`) are supported.
+To avoid N+1 query problems, load relations up front with `with()` instead of accessing them lazily per-model. All relationship types (`hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`, `morphOne`, `morphMany`, `morphTo`) are supported.
 
 ```php
 // Eager load a single relation
@@ -877,9 +964,13 @@ $users = User::query()->where('active', true)->with('posts')->get();
 
 // And with first()
 $user = User::with('posts')->where('id', 1)->first();
+
+// Polymorphic relations work the same way
+$posts = Post::with('comments')->get();
+$comments = Comment::with('commentable')->get(); // resolves Post/Video per row
 ```
 
-`with()` runs exactly **one extra query per relation** (not one per model), regardless of how many parent rows were fetched — it batches all parent keys into a single `WHERE ... IN (...)` (or, for `belongsToMany`/`hasManyThrough`, a single joined query), then distributes results back onto each parent model in memory.
+`with()` runs exactly **one extra query per relation** for `hasOne`/`hasMany`/`belongsTo`/`belongsToMany`/`hasManyThrough`/`morphOne`/`morphMany` (not one per model), regardless of how many parent rows were fetched — it batches all parent keys into a single `WHERE ... IN (...)` (or, for `belongsToMany`/`hasManyThrough`, a single joined query), then distributes results back onto each parent model in memory. `morphTo()` is the one exception: since different rows may point to *different* related model classes, it runs one batched query **per distinct type** present in the result set (still no N+1 — typically just 1–2 extra queries even with mixed types).
 
 ### Constraining an eager-loaded relation
 
@@ -893,8 +984,8 @@ $users = User::with(['posts' => function($q) {
 
 ### Result shape
 
-- `hasOne` / `belongsTo` relations resolve to a single model instance (or `null` if none matched).
-- `hasMany` / `belongsToMany` / `hasManyThrough` relations resolve to a `Collection` (empty if none matched).
+- `hasOne` / `belongsTo` / `morphOne` / `morphTo` relations resolve to a single model instance (or `null` if none matched).
+- `hasMany` / `belongsToMany` / `hasManyThrough` / `morphMany` relations resolve to a `Collection` (empty if none matched).
 
 This applies whether the relation was eager-loaded via `with()` or accessed lazily as a property (e.g. `$user->posts`, `$post->user`).
 

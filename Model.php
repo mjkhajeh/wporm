@@ -287,10 +287,10 @@ abstract class Model implements \ArrayAccess {
                 $context = $result->getRelationContext();
                 $type = $context['type'] ?? null;
                 // Single-result relations
-                if ($type === 'belongsTo' || $type === 'hasOne') {
+                if ($type === 'belongsTo' || $type === 'hasOne' || $type === 'morphOne' || $type === 'morphTo') {
                     return $result->first();
                 }
-                // Collection relations (hasMany, belongsToMany, hasManyThrough)
+                // Collection relations (hasMany, belongsToMany, hasManyThrough, morphMany)
 				return $result->get();
 			}
 			return $result;
@@ -1075,7 +1075,7 @@ public function forceDelete() {
             if ($related instanceof \MJ\WPORM\QueryBuilder) {
                 $context = $related->getRelationContext();
                 $type = $context['type'] ?? null;
-                if ($type === 'belongsTo' || $type === 'hasOne') {
+                if ($type === 'belongsTo' || $type === 'hasOne' || $type === 'morphOne' || $type === 'morphTo') {
                     $resolved = $related->first();
                     if ($resolved instanceof \MJ\WPORM\Model) {
                         $resolved->forceDelete();
@@ -1308,6 +1308,208 @@ public function forceDelete() {
             'baseWhereCount' => $query->getWhereCount(),
         ]);
     }
+
+	/**
+	 * Define a polymorphic one-to-one relationship.
+	 *
+	 * The related table carries two columns: a "type" column storing the
+	 * owning model's morph class (its morph-map alias if registered via
+	 * morphMap(), otherwise its fully-qualified class name), and an "id"
+	 * column storing its primary key. Defaults follow Eloquent's convention:
+	 * "{name}_type" / "{name}_id", e.g. morphOne(Image::class, 'imageable')
+	 * -> imageable_type / imageable_id.
+	 *
+	 * Returns a lazy, chainable QueryBuilder — call ->first() to resolve it,
+	 * or access it as a property (e.g. $post->image) to resolve automatically.
+	 *
+	 * @template T of Model
+	 * @param class-string<T> $related
+	 * @param string $name        The morph name, e.g. 'imageable'
+	 * @param string|null $type   Override for the "type" column (default: "{name}_type")
+	 * @param string|null $id     Override for the "id" column (default: "{name}_id")
+	 * @param string|null $localKey PK on this model (default: $primaryKey)
+	 * @return QueryBuilder<T>
+	 */
+	public function morphOne($related, $name, $type = null, $id = null, $localKey = null) {
+		$type = $type ?: $name . '_type';
+		$id   = $id   ?: $name . '_id';
+		$localKey = $localKey ?: $this->primaryKey;
+
+		$morphClass = $this->getMorphClass();
+
+		$query = $related::query()
+			->where($type, $morphClass)
+			->where($id, $this->$localKey);
+
+		return $query->setRelationContext('morphOne', [
+			'morphType'  => $type,
+			'morphId'    => $id,
+			'morphClass' => $morphClass,
+			'localKey'   => $localKey,
+			'related'    => $related,
+		]);
+	}
+
+	/**
+	 * Define a polymorphic one-to-many relationship.
+	 *
+	 * Same column conventions as morphOne() ("{name}_type" / "{name}_id"),
+	 * but resolves to a Collection instead of a single model.
+	 *
+	 * @template T of Model
+	 * @param class-string<T> $related
+	 * @param string $name
+	 * @param string|null $type
+	 * @param string|null $id
+	 * @param string|null $localKey
+	 * @return QueryBuilder<T>
+	 */
+	public function morphMany($related, $name, $type = null, $id = null, $localKey = null) {
+		$type = $type ?: $name . '_type';
+		$id   = $id   ?: $name . '_id';
+		$localKey = $localKey ?: $this->primaryKey;
+
+		$morphClass = $this->getMorphClass();
+
+		$query = $related::query()
+			->where($type, $morphClass)
+			->where($id, $this->$localKey);
+
+		return $query->setRelationContext('morphMany', [
+			'morphType'  => $type,
+			'morphId'    => $id,
+			'morphClass' => $morphClass,
+			'localKey'   => $localKey,
+			'related'    => $related,
+		]);
+	}
+
+	/**
+	 * Define the inverse of a polymorphic relationship.
+	 *
+	 * Unlike morphOne()/morphMany() (defined on the "owning" model, e.g.
+	 * Post), morphTo() is defined on the "child" model (e.g. Comment) and
+	 * resolves to whichever model class is named in its own "{name}_type"
+	 * column. The related model class is not known until the row's data
+	 * has been read, so — unlike every other relationship type — $name
+	 * must be passed explicitly (PHP has no cheap, reliable way to recover
+	 * the calling relationship method's own name at runtime).
+	 *
+	 * Returns a lazy, chainable QueryBuilder scoped to the concrete related
+	 * model class and id stored on this row — call ->first() to resolve it,
+	 * or access it as a property (e.g. $comment->commentable).
+	 *
+	 * Usage:
+	 *   class Comment extends Model {
+	 *       public function commentable() {
+	 *           return $this->morphTo('commentable');
+	 *       }
+	 *   }
+	 *
+	 * @param string $name        The morph name, e.g. 'commentable'.
+	 * @param string|null $type   Override for the "type" column (default: "{name}_type")
+	 * @param string|null $id     Override for the "id" column (default: "{name}_id")
+	 * @return QueryBuilder
+	 */
+	public function morphTo($name, $type = null, $id = null) {
+		$type = $type ?: $name . '_type';
+		$id   = $id   ?: $name . '_id';
+
+		$morphClass   = $this->attributes[$type] ?? null;
+		$foreignValue = $this->attributes[$id] ?? null;
+
+		// Resolve a morph map alias back to a real class, if one is registered.
+		$relatedClass = $morphClass !== null ? static::getMorphedModel($morphClass) : null;
+
+		if ($relatedClass === null || $foreignValue === null || !class_exists($relatedClass)) {
+			// No concrete type/id on this row (or an unmapped/unknown type) —
+			// return an always-empty, but still chainable, query so callers
+			// (including with()/whereHas()) get consistent behavior instead
+			// of a null/exception.
+			$query = static::query()->whereIn($this->primaryKey, []);
+			return $query->setRelationContext('morphTo', [
+				'morphType'    => $type,
+				'morphId'      => $id,
+				'morphClass'   => $morphClass,
+				'foreignValue' => $foreignValue,
+				'related'      => static::class,
+				'unresolved'   => true,
+			]);
+		}
+
+		$relatedInstance = new $relatedClass;
+		$ownerKey = $relatedInstance->primaryKey;
+
+		$query = $relatedClass::query()->where($ownerKey, $foreignValue);
+
+		return $query->setRelationContext('morphTo', [
+			'morphType'    => $type,
+			'morphId'      => $id,
+			'morphClass'   => $morphClass,
+			'ownerKey'     => $ownerKey,
+			'foreignValue' => $foreignValue,
+			'related'      => $relatedClass,
+		]);
+	}
+
+	/**
+	 * Morph map: aliases for morph "type" column values, so the database
+	 * stores a short string (e.g. "post") instead of a fully-qualified
+	 * class name (e.g. "App\\Models\\Post"). Eloquent-style Relation::morphMap().
+	 * Shared across all models (keyed globally, not per-model).
+	 *
+	 * @var array<string, class-string>
+	 */
+	protected static $morphMap = [];
+
+	/**
+	 * Register morph type aliases. Merges into the existing map by default;
+	 * pass $replace = true to overwrite it entirely.
+	 *
+	 * Usage:
+	 *   Model::morphMap(['post' => Post::class, 'video' => Video::class]);
+	 *
+	 * @param array<string, class-string> $map
+	 * @param bool $replace
+	 * @return void
+	 */
+	public static function morphMap(array $map, $replace = false) {
+		static::$morphMap = $replace ? $map : array_merge(static::$morphMap, $map);
+	}
+
+	/**
+	 * Get the currently registered morph map.
+	 * @return array<string, class-string>
+	 */
+	public static function getMorphMap() {
+		return static::$morphMap;
+	}
+
+	/**
+	 * Resolve a morph "type" column value to a concrete class name — either
+	 * a registered alias (via morphMap()) or, if not aliased, the value
+	 * itself (assumed to already be a fully-qualified class name, matching
+	 * Eloquent's default un-mapped behavior).
+	 *
+	 * @param string $morphClass
+	 * @return string
+	 */
+	public static function getMorphedModel($morphClass) {
+		return static::$morphMap[$morphClass] ?? $morphClass;
+	}
+
+	/**
+	 * Get the value this model should be stored as in a morph "type" column
+	 * when it is the owning side of a polymorphic relation — the morph map
+	 * alias if this class is registered, otherwise the fully-qualified class
+	 * name (Eloquent's default behavior).
+	 *
+	 * @return string
+	 */
+	public function getMorphClass() {
+		$flipped = array_flip(static::$morphMap);
+		return $flipped[static::class] ?? static::class;
+	}
 
 	public function newFromBuilder(array $attributes) {
 		$instance = new static;

@@ -1457,14 +1457,111 @@ $comments = $user->hasManyThrough(Comment::class, Post::class, 'user_id', 'post_
 // comments.post_id  -> $secondKey (FK on Comment, the related table, -> Post)
 ```
 
+### morphOne($related, $name, $type = null, $id = null, $localKey = null)
+**Description:** Define a polymorphic one-to-one relationship. Defined on the *owning* model (e.g. `Post`). The related table stores the owning model's class (or morph-map alias) in a `{$name}_type` column and its primary key in a `{$name}_id` column. Returns a lazy, chainable `QueryBuilder` — call `->first()` to resolve it, or access it as a property (e.g. `$post->image`) to resolve it automatically.
+
+**Parameters:**
+- `$name` — The morph name, e.g. `'imageable'`.
+- `$type` — (Optional) Override for the type column name. Defaults to `{$name}_type`.
+- `$id` — (Optional) Override for the id column name. Defaults to `{$name}_id`.
+- `$localKey` — (Optional) PK on *this* model. Defaults to `$primaryKey`.
+
+**Example:**
+```php
+class Post extends Model {
+    public function image() {
+        return $this->morphOne(Image::class, 'imageable');
+    }
+}
+
+$image = $post->image; // Image|null, via property access
+$image = $post->image()->first(); // equivalent
+```
+
+### morphMany($related, $name, $type = null, $id = null, $localKey = null)
+**Description:** Define a polymorphic one-to-many relationship. Same column conventions and parameters as `morphOne()`, but resolves to a `Collection` instead of a single model.
+
+**Example:**
+```php
+class Post extends Model {
+    public function comments() {
+        return $this->morphMany(Comment::class, 'commentable');
+    }
+}
+
+$comments = $post->comments; // Collection, via property access
+$comments = $post->comments()->get(); // equivalent
+```
+
+### morphTo($name, $type = null, $id = null)
+**Description:** Define the inverse of a polymorphic relationship. Defined on the *related* (child) model (e.g. `Comment`). Resolves to whichever model class is named in this row's own `{$name}_type` column, using its own `{$name}_id` as the lookup key against that class's primary key. Unlike every other relationship method, `$name` is **required** — PHP cannot reliably recover the calling method's own name at runtime, so (unlike Eloquent's reflection-based version) it must be passed explicitly.
+
+**Parameters:**
+- `$name` — The morph name, e.g. `'commentable'`. Required.
+- `$type` — (Optional) Override for the type column name. Defaults to `{$name}_type`.
+- `$id` — (Optional) Override for the id column name. Defaults to `{$name}_id`.
+
+**Example:**
+```php
+class Comment extends Model {
+    public function commentable() {
+        return $this->morphTo('commentable');
+    }
+}
+
+$owner = $comment->commentable; // Post|Video|null, depending on commentable_type
+```
+
+If the row's `*_type` value is empty, unmapped, or names a non-existent class, the relation resolves to `null` (or an empty `Collection` if accidentally used where many results were expected) rather than throwing.
+
+---
+
+### Model::morphMap(array $map, $replace = false)
+**Description:** Register short string aliases for morph "type" column values, so the database stores e.g. `'post'` instead of the fully-qualified class name `App\Models\Post`. Static, shared globally across all models — call once during bootstrap. Merges into the existing map by default; pass `true` as the second argument to replace it entirely.
+
+**Example:**
+```php
+use MJ\WPORM\Model;
+
+Model::morphMap([
+    'post'  => Post::class,
+    'video' => Video::class,
+]);
+```
+
+### Model::getMorphMap()
+**Description:** Get the currently registered morph map as an associative array (`alias => class`).
+
+**Example:**
+```php
+$map = Model::getMorphMap();
+```
+
+### Model::getMorphedModel($morphClass)
+**Description:** Resolve a morph "type" column value to a concrete class name — the registered alias's target class if `$morphClass` is a known alias, otherwise `$morphClass` itself (treated as an already-fully-qualified class name). Used internally by `morphTo()` and `with()` eager loading; safe to call directly when working with raw `*_type` values.
+
+**Example:**
+```php
+$class = Model::getMorphedModel('post'); // Post::class, if mapped — otherwise 'post' unchanged
+```
+
+### $model->getMorphClass()
+**Description:** Get the value this model instance should be stored as in a morph "type" column when it is the owning side of a polymorphic relation — its registered morph-map alias if one exists, otherwise its fully-qualified class name. Used internally by `morphOne()`/`morphMany()`; rarely needed directly.
+
+**Example:**
+```php
+$type = $post->getMorphClass(); // 'post' if mapped, otherwise Post::class
+```
+
 ---
 
 ## Relationship Existence Filtering
 
 ### whereHas($relation, $constraint = null)
 - Filter models where the given relation exists and matches the constraint closure.
-- Supported for all relationship types: `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`.
+- Supported for all relationship types: `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`, `morphOne`, `morphMany`.
 - Example: `$query->whereHas('posts', function($q) { $q->where('published', 1); })`
+- `morphTo` relations are filterable from a single resolved row's context but are not meaningful to use in bulk `whereHas()`/`has()` query construction — see the note in the [Readme](./Readme.md#relationship-existence-filtering-wherehas-orwherehas-has).
 
 ### orWhereHas($relation, $constraint = null)
 - OR version of whereHas.
@@ -1474,13 +1571,14 @@ $comments = $user->hasManyThrough(Comment::class, Post::class, 'user_id', 'post_
 - Implemented as a correlated `COUNT(*)` subquery, so the comparison is enforced exactly (not just an existence check).
 - Example: `$query->has('posts', '>=', 5)`
 - Operator and count are optional (defaults to ">= 1").
+- Supported for `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`, `morphOne`, `morphMany`.
 
 ---
 
 ## Eager Loading
 
 ### with($relations)
-**Description:** Eager-load one or more relations alongside the main query, avoiding N+1 queries. Accepts a relation name, an array of relation names, or an associative array mapping relation names to constraint closures (or an options array — see below). Works for all five relationship types (`hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`) and runs exactly one extra query per relation, regardless of how many parent rows were loaded.
+**Description:** Eager-load one or more relations alongside the main query, avoiding N+1 queries. Accepts a relation name, an array of relation names, or an associative array mapping relation names to constraint closures (or an options array — see below). Works for all relationship types (`hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`, `morphOne`, `morphMany`, `morphTo`). Runs exactly one extra query per relation for every type except `morphTo`, regardless of how many parent rows were loaded; `morphTo` runs one batched query per distinct related class present in the result set (since different rows may point to different model types), which is still N+1-free in practice.
 
 **Example:**
 ```php
@@ -1489,10 +1587,14 @@ $users = User::with(['posts', 'profile'])->get();
 $users = User::with(['posts' => function($q) {
     $q->where('published', 1);
 }])->get();
+
+// Polymorphic relations work the same way
+$posts = Post::with('comments')->get();
+$comments = Comment::with('commentable')->get();
 ```
 
-- `hasOne`/`belongsTo` relations resolve to a single model (or `null`).
-- `hasMany`/`belongsToMany`/`hasManyThrough` relations resolve to a `Collection`.
+- `hasOne`/`belongsTo`/`morphOne`/`morphTo` relations resolve to a single model (or `null`).
+- `hasMany`/`belongsToMany`/`hasManyThrough`/`morphMany` relations resolve to a `Collection`.
 
 See [Per-relation global-scope control](./Readme.md#per-relation-global-scope-control-eager-loads) in the Readme for disabling global scopes on a specific eager-loaded relation.
 

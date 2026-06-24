@@ -1,6 +1,6 @@
 gapcode resume 019d01af-876a-7652-81ab-5cbe253ac54d
 
-The latest task was not completed. (Moderate Issues: 1)
+The latest task was completed. (Moderate Issues: 0)
 
  ## 🔴 Critical Bugs (Fix First)
 
@@ -47,9 +47,9 @@ The latest task was not completed. (Moderate Issues: 1)
 
   | # | Feature | Notes |
   |---|---------|-------|
-  | 26 | Polymorphic relationships (morphOne/morphMany/morphTo) | Comments on posts, pages, etc. |
-  | 27 | subquery support in select() / where() / from() | Subselects, derived tables |
-  | 28 | ✅ union() / unionAll() | Combining query results |
+  | ✅ 26 | Polymorphic relationships (morphOne/morphMany/morphTo) | Comments on posts, pages, etc. |
+  | ✅ 27 | subquery support in select() / where() / from() | Subselects, derived tables |
+  | ✅ 28 | union() / unionAll() | Combining query results |
   | 29 | fromSub() / from() | Query from subquery or change table |
   | 30 | tap() / pipe() on QueryBuilder | Functional chaining |
   | 31 | withCount() | User::withCount('posts')->get() — adds posts_count |

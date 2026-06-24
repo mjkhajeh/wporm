@@ -2124,6 +2124,117 @@ class QueryBuilder {
             return;
         }
 
+        // ══════════════════════════════════════════════════════════════════════
+        // morphOne — polymorphic one-to-one. Same shape as hasOne, plus a
+        // "type" column filter so only rows owned by *this* model class (or
+        // its morph-map alias) are matched.
+        // ══════════════════════════════════════════════════════════════════════
+        if ($type === 'morphOne') {
+            $morphType  = $ctx['morphType'];
+            $morphId    = $ctx['morphId'];
+            $morphClass = $ctx['morphClass'];
+            $localKey   = $ctx['localKey'];
+            $relClass   = $ctx['related'];
+
+            $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
+
+            $query = $relClass::query(!$disableGlobalScopes)
+                ->where($morphType, $morphClass)
+                ->whereIn($morphId, $ids);
+            if ($constraint) $constraint($query);
+
+            $map = [];
+            foreach ($query->get() as $rel) {
+                // Keep only the first match per parent (hasOne-style semantics).
+                if (!isset($map[$rel->$morphId])) {
+                    $map[$rel->$morphId] = $rel;
+                }
+            }
+            foreach ($models as $m) {
+                $m->setEagerLoaded($relation, $map[$m->$localKey] ?? null);
+            }
+            return;
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
+        // morphMany — polymorphic one-to-many. Same idea as morphOne but
+        // resolves to a Collection per parent.
+        // ══════════════════════════════════════════════════════════════════════
+        if ($type === 'morphMany') {
+            $morphType  = $ctx['morphType'];
+            $morphId    = $ctx['morphId'];
+            $morphClass = $ctx['morphClass'];
+            $localKey   = $ctx['localKey'];
+            $relClass   = $ctx['related'];
+
+            $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
+
+            $query = $relClass::query(!$disableGlobalScopes)
+                ->where($morphType, $morphClass)
+                ->whereIn($morphId, $ids);
+            if ($constraint) $constraint($query);
+
+            $grouped = [];
+            foreach ($query->get() as $rel) {
+                $grouped[$rel->$morphId][] = $rel;
+            }
+            foreach ($models as $m) {
+                $m->setEagerLoaded($relation, new \MJ\WPORM\Collection($grouped[$m->$localKey] ?? []));
+            }
+            return;
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
+        // morphTo — inverse polymorphic. Parent rows may point to *different*
+        // related model classes, so models are first grouped by their own
+        // "type" column value, then one batched whereIn() query runs per
+        // distinct related class found in the result set (still N+1-free:
+        // one query per distinct type present, not per row).
+        // ══════════════════════════════════════════════════════════════════════
+        if ($type === 'morphTo') {
+            $morphType = $ctx['morphType'];
+            $morphId   = $ctx['morphId'];
+
+            // Group this batch's rows by their own type-column value.
+            $byType = [];
+            foreach ($models as $m) {
+                $rawType = $m->$morphType ?? null;
+                $fk      = $m->$morphId ?? null;
+                if ($rawType === null || $fk === null) {
+                    $m->setEagerLoaded($relation, null);
+                    continue;
+                }
+                $byType[$rawType][] = $m;
+            }
+
+            foreach ($byType as $rawType => $group) {
+                $relClass = \MJ\WPORM\Model::getMorphedModel($rawType);
+                if (!class_exists($relClass)) {
+                    foreach ($group as $m) {
+                        $m->setEagerLoaded($relation, null);
+                    }
+                    continue;
+                }
+
+                $relatedInstance = new $relClass;
+                $ownerKey = $relatedInstance->primaryKey;
+
+                $ids = array_values(array_unique(array_map(fn($m) => $m->$morphId, $group)));
+
+                $query = $relClass::query(!$disableGlobalScopes)->whereIn($ownerKey, $ids);
+                if ($constraint) $constraint($query);
+
+                $map = [];
+                foreach ($query->get() as $rel) {
+                    $map[$rel->$ownerKey] = $rel;
+                }
+                foreach ($group as $m) {
+                    $m->setEagerLoaded($relation, $map[$m->$morphId] ?? null);
+                }
+            }
+            return;
+        }
+
         // ── Unknown / unsupported relation type: no-op (fail silently) ───────
     }
 
@@ -2640,6 +2751,54 @@ class QueryBuilder {
             return;
         }
 
+        // ── morphOne / morphMany ─────────────────────────────────────────────
+        // EXISTS (SELECT 1 FROM related WHERE related.morphId = outer.localKey
+        //         AND related.morphType = ownerMorphClass [AND ...])
+        if ($type === 'morphOne' || $type === 'morphMany') {
+            $morphId    = $ctx['morphId'];
+            $morphType  = $ctx['morphType'];
+            $morphClass = $ctx['morphClass'];
+            $localKey   = $ctx['localKey'];
+            $relatedTable = $relQuery->table;
+
+            $this->$existsMethod(function($q) use (
+                $relatedTable, $morphId, $morphType, $morphClass,
+                $localKey, $outerTable, $constraint
+            ) {
+                $q->from($relatedTable)
+                  ->whereColumn("$relatedTable.$morphId", '=', "$outerTable.$localKey")
+                  ->where("$relatedTable.$morphType", $morphClass);
+                if ($constraint) $constraint($q);
+            });
+            return;
+        }
+
+        // ── morphTo ──────────────────────────────────────────────────────────
+        // EXISTS (SELECT 1 FROM related WHERE related.ownerKey = outer.morphId)
+        // Like Eloquent, morphTo() existence filtering assumes the related
+        // class resolved from the *current* row context (a fresh model has
+        // no row data, so this only works meaningfully when called on a
+        // model instance that already carries a concrete type/id).
+        if ($type === 'morphTo') {
+            if (!empty($ctx['unresolved'])) {
+                // No concrete related class could be resolved — fail safe to "no match".
+                $this->wheres[] = ($existsMethod === 'orWhereExists' ? 'OR 0=1' : '0=1');
+                return;
+            }
+            $morphId  = $ctx['morphId'];
+            $ownerKey = $ctx['ownerKey'];
+            $relatedTable = $relQuery->table;
+
+            $this->$existsMethod(function($q) use (
+                $relatedTable, $ownerKey, $morphId, $outerTable, $constraint
+            ) {
+                $q->from($relatedTable)
+                  ->whereColumn("$relatedTable.$ownerKey", '=', "$outerTable.$morphId");
+                if ($constraint) $constraint($q);
+            });
+            return;
+        }
+
         // ── Unknown relation type: fall back to passing through existing wheres ──
         $this->$existsMethod(function($q) use ($relQuery, $constraint) {
             foreach ($relQuery->wheres   as $w) { $q->wheres[]   = $w; }
@@ -2753,6 +2912,51 @@ class QueryBuilder {
                 ->select(["COUNT(*)"])
                 ->join($throughTable, "$relatedTable.$secondKey", '=', "$throughTable.$throughPK")
                 ->whereColumn("$throughTable.$firstKey", '=', "$outerTable.$localKey");
+
+            $subSql = $sub->buildSelectQuery();
+            $this->wheres[]   = "($subSql) $operator %s";
+            $this->bindings[] = (int) $count;
+            return $this;
+        }
+
+        // ── morphOne / morphMany ─────────────────────────────────────────────
+        if ($type === 'morphOne' || $type === 'morphMany') {
+            $morphId    = $ctx['morphId'];
+            $morphType  = $ctx['morphType'];
+            $morphClass = $ctx['morphClass'];
+            $localKey   = $ctx['localKey'];
+            $relatedTable = $relQuery->table;
+
+            $sub = new self($this->model, false);
+            $sub->from($relatedTable)
+                ->select(["COUNT(*)"])
+                ->whereColumn("$relatedTable.$morphId", '=', "$outerTable.$localKey")
+                ->where("$relatedTable.$morphType", $morphClass);
+
+            $subSql = $sub->buildSelectQuery();
+            $this->wheres[] = "($subSql) $operator %s";
+            // $sub->bindings already holds the single binding contributed by
+            // ->where($morphType, $morphClass) inside the parenthesized
+            // subquery — it must precede the outer $count binding so
+            // wpdb->prepare() substitutes placeholders left-to-right correctly.
+            $this->bindings = array_merge($this->bindings, $sub->bindings, [(int) $count]);
+            return $this;
+        }
+
+        // ── morphTo ──────────────────────────────────────────────────────────
+        if ($type === 'morphTo') {
+            if (!empty($ctx['unresolved'])) {
+                $this->wheres[] = '0=1';
+                return $this;
+            }
+            $morphId  = $ctx['morphId'];
+            $ownerKey = $ctx['ownerKey'];
+            $relatedTable = $relQuery->table;
+
+            $sub = new self($this->model, false);
+            $sub->from($relatedTable)
+                ->select(["COUNT(*)"])
+                ->whereColumn("$relatedTable.$ownerKey", '=', "$outerTable.$morphId");
 
             $subSql = $sub->buildSelectQuery();
             $this->wheres[]   = "($subSql) $operator %s";
