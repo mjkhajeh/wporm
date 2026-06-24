@@ -1021,6 +1021,84 @@ protected function castSet($key, $value) {
 		return $this->softDeletes && !empty($this->attributes[$this->deletedAtColumn]);
 	}
 
+	/**
+	 * Re-fetch a fresh copy of the model from the database, returning a new
+	 * instance without modifying the current one (Eloquent-style fresh()).
+	 *
+	 * Queries by primary key only and bypasses global scopes — matching
+	 * Eloquent's newQueryWithoutScopes() — since refetching "this exact row"
+	 * should not be hidden by an unrelated global scope. Soft-delete scoping
+	 * still applies: if the row has since been soft-deleted (and $withTrashed
+	 * isn't used), it simply won't be found.
+	 *
+	 * Optionally eager-loads relations on the fresh instance, exactly like
+	 * Model::with() / QueryBuilder::with().
+	 *
+	 * Usage:
+	 *   $fresh = $user->fresh();             // new instance, $user untouched
+	 *   $fresh = $user->fresh('posts');       // with eager-loaded relation
+	 *   $fresh = $user->fresh(['posts', 'profile']);
+	 *
+	 * @param array|string $with Relation(s) to eager-load on the fresh instance.
+	 * @return static|null A new model instance, or null if the row no longer exists.
+	 */
+	public function fresh($with = []) {
+		$pk = $this->primaryKey;
+		if (!isset($this->attributes[$pk])) {
+			return null;
+		}
+
+		$query = static::query(false)->where($pk, $this->attributes[$pk]);
+
+		if (!empty($with)) {
+			$query->with($with);
+		}
+
+		return $query->first();
+	}
+
+	/**
+	 * Re-fetch the model's attributes from the database and overwrite them
+	 * onto the CURRENT instance in place (Eloquent-style refresh()). Unlike
+	 * fresh(), this mutates $this and returns it, rather than returning a
+	 * separate instance.
+	 *
+	 * Bypasses global scopes (same rationale as fresh()). Any previously
+	 * eager-loaded relations are cleared, since they may now be stale —
+	 * re-access them via property access or with() after refreshing.
+	 *
+	 * Throws ModelNotFoundException if the row no longer exists in the
+	 * database (e.g. it was deleted, or soft-deleted and excluded by the
+	 * default scope), mirroring Eloquent's refresh() behavior.
+	 *
+	 * Usage:
+	 *   $user->refresh(); // $user now reflects the current DB row
+	 *
+	 * @return $this
+	 * @throws ModelNotFoundException
+	 */
+	public function refresh() {
+		$pk = $this->primaryKey;
+		if (!isset($this->attributes[$pk])) {
+			throw (new ModelNotFoundException())->setModel(static::class);
+		}
+
+		$fresh = static::query(false)->where($pk, $this->attributes[$pk])->first();
+
+		if ($fresh === null) {
+			throw (new ModelNotFoundException())->setModel(static::class, $this->attributes[$pk]);
+		}
+
+		$this->attributes = $fresh->attributes;
+		$this->original = $fresh->attributes;
+		$this->exists = true;
+		// Eager-loaded relations may now be stale; clear them so accessing
+		// a relation property re-resolves it against the refreshed state.
+		$this->_eagerLoaded = [];
+
+		return $this;
+	}
+
 	public function restore() {
 		if ($this->softDeletes && $this->trashed()) {
 			// restoring before-hook

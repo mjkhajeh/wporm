@@ -1723,6 +1723,55 @@ $changes = $user->getChanges();
 $user->forgetAttribute('_pivot_fk');
 ```
 
+### fresh($with = [])
+**Description:** Re-fetch a fresh copy of the model from the database by primary key, returning a **new** instance — the current instance is left completely untouched (Eloquent-style). Bypasses global scopes (`newQueryWithoutScopes()`-equivalent), since refetching "this exact row" shouldn't be hidden by an unrelated global scope. Accepts an optional relation name or array of relation names to eager-load on the fresh instance, exactly like `with()`. Returns `null` if the row no longer exists (e.g. it was hard-deleted, or soft-deleted and excluded by the default scope).
+
+**Example:**
+```php
+$user = User::find(1);
+// ... another process updates this row ...
+
+$freshUser = $user->fresh();        // new instance with current DB values
+$freshUser = $user->fresh('posts'); // also eager-loads the posts relation
+$freshUser = $user->fresh(['posts', 'profile']);
+
+$user->name;      // still the OLD value — fresh() never mutates $user
+$freshUser->name; // the current value
+
+if ($user->fresh() === null) {
+    // the row has been deleted since $user was loaded
+}
+```
+
+**Notes:**
+- Issues exactly one query (`where($primaryKey, ...)->first()`), plus one additional query per eager-loaded relation, same cost as a normal `with()` call.
+- If the model has no primary key value set (e.g. a `new Model([...])` that was never saved), returns `null` without querying.
+
+### refresh()
+**Description:** Re-fetch the model's attributes from the database by primary key and overwrite them onto the **current** instance in place (Eloquent-style). Unlike `fresh()`, this mutates `$this` and returns it for chaining, rather than returning a separate instance. Bypasses global scopes for the same reason as `fresh()`. Any previously eager-loaded relations on the instance are cleared, since they may now be stale — re-access them via property access or `with()` after refreshing if you need them again. Throws `MJ\WPORM\ModelNotFoundException` if the row no longer exists.
+
+**Example:**
+```php
+$user = User::find(1);
+// ... another process updates this row, e.g. via increment() elsewhere ...
+
+$user->refresh();      // $user now reflects the current DB row
+echo $user->name;      // updated value
+$user === $user->refresh(); // true — returns $this, useful for chaining
+
+try {
+    $user->refresh();
+} catch (\MJ\WPORM\ModelNotFoundException $e) {
+    // the row was deleted (or soft-deleted) elsewhere
+}
+```
+
+**Notes (fresh() / refresh()):**
+- Both query strictly by primary key and ignore global scopes.
+- Neither applies `withTrashed()` — if the model is soft-deleted, `fresh()` returns `null` and `refresh()` throws, matching Eloquent's own `fresh()`/`refresh()` behavior.
+- `fresh()` is non-destructive (returns a new object, current instance untouched); `refresh()` is in-place (mutates `$this`).
+- If the model has no primary key value, `fresh()` returns `null` and `refresh()` throws `ModelNotFoundException` immediately, without querying.
+
 ---
 
 ## Mass Assignment Protection

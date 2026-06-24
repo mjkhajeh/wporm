@@ -20,6 +20,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Convenient creation**: `create()` for a one-line insert + return model, plus `updateOrCreate()`, `firstOrCreate()`, and `firstOrNew()` for upsert-style lookups.
 - **Aggregates & utilities**: `sum()`, `avg()`, `min()`, `max()`, `value()`, `pluck()`, `exists()`/`doesntExist()`, and `increment()`/`decrement()`.
 - **Fail-fast lookups**: `findOrFail()`/`firstOrFail()` (including array-of-ids lookups, and `Collection::firstOrFail()`) throw a `ModelNotFoundException` instead of silently returning `null`.
+- **Re-fetching**: `fresh()` returns a new instance with the current database state (optionally eager-loading relations); `refresh()` re-syncs the current instance in place — both Eloquent-style.
 - **Batch processing**: `chunk()` and `each()` for iterating large result sets in pages without loading everything into memory at once.
 - **Serialization**: `toArray()`/`toJson()`/`__toString()` on both models and collections, with `$hidden`/`$visible` support and safe (exception-on-failure) JSON encoding.
 - **Raw SQL expressions**: `selectRaw()`, `whereRaw()`/`orWhereRaw()`, `groupByRaw()`, `havingRaw()`/`orHavingRaw()`, and `orderByRaw()` for dropping down to raw SQL with safe, bound placeholders.
@@ -426,6 +427,26 @@ You can quickly remove all rows from a model's table using `truncate()` on the m
 // Remove all records from the table
 Parts::query()->truncate();
 ```
+
+### Refetching a Model: fresh() and refresh()
+
+When the underlying row may have changed since you loaded a model — another process updated it, you just ran an `increment()`/`update()` elsewhere, or you simply want to double-check the current state — use `fresh()` or `refresh()` to pull the current database state, Eloquent-style.
+
+```php
+$user = User::find(1);
+
+// fresh() — returns a NEW instance with current DB values; $user itself is untouched
+$freshUser = $user->fresh();
+$freshUser = $user->fresh('posts'); // optionally eager-load relations, like with()
+
+// refresh() — re-fetches and overwrites the CURRENT instance in place
+$user->refresh();
+echo $user->name; // now reflects whatever is in the database right now
+```
+
+- `fresh($with = [])` never mutates the original model — it returns a brand-new instance (or `null` if the row no longer exists). Pass a relation name or array of names to eager-load them on the fresh instance.
+- `refresh()` mutates `$this` and returns it for chaining, clearing any previously eager-loaded relations (they may now be stale). Throws `MJ\WPORM\ModelNotFoundException` if the row no longer exists.
+- Both query strictly by primary key and bypass global scopes, and neither includes soft-deleted rows — if the row has since been soft-deleted, `fresh()` returns `null` and `refresh()` throws, matching Eloquent's own behavior.
 
 ## Aggregates & Utility Methods
 
