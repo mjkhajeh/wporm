@@ -48,6 +48,31 @@ This document provides tips and built-in features to help you debug queries and 
   ```
 - When `$debug` is enabled, SQL and bindings are logged for `get()`, `first()`, `count()`, and `delete()` methods.
 
+## 6. Inline Debugging with tap()
+
+For one-off inspection without enabling full debug mode, use `tap()` to insert a side-effect callback at any point in the chain. The chain continues unchanged:
+
+```php
+$users = User::query()
+    ->where('active', true)
+    ->tap(function ($query) {
+        error_log('[Debug] SQL: ' . $query->toSql());
+        error_log('[Debug] Bindings: ' . print_r($query->getBindings(), true));
+    })
+    ->orderBy('name')
+    ->get();
+```
+
+`tap()` is the preferred pattern for transient, targeted debugging — add it anywhere in the chain and remove it when done, without restructuring the surrounding code. It also works on `Collection` for post-fetch inspection:
+
+```php
+$emails = User::query()->get()
+    ->tap(fn($c) => error_log('Result count: ' . $c->count()))
+    ->pluck('email');
+```
+
+`tap()` is safe in production (it only does what the callback does), whereas `dumpSql()` always echoes output.
+
 ## 6. General Tips
 
 - Use `var_dump()` or `print_r()` on model/query objects to inspect their state.

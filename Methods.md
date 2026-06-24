@@ -2353,6 +2353,8 @@ $users = User::query()->distinct()->get();
 ### tap($callback)
 **Description:** Pass the query builder instance to the given callback for side-effects, then return the builder unchanged (Eloquent-style). The callback's return value is always discarded. Designed for inline debugging, logging, conditional decoration, or applying a set of constraints from a helper method — without breaking the fluent chain.
 
+Also available on `Collection` — works identically, receiving the collection instead of the builder.
+
 **Example:**
 ```php
 $users = User::query()
@@ -2365,10 +2367,17 @@ $users = User::query()
 
 // Also accepts any callable (method reference, invokable class, etc.):
 $query->tap([$this, 'applyDefaultScopes'])->get();
+
+// On a Collection — inspect without breaking the chain:
+$emails = User::query()->get()
+    ->tap(fn($c) => error_log('Count: ' . $c->count()))
+    ->pluck('email');
 ```
 
 ### pipe($callback)
 **Description:** Pass the query builder instance to the given callback and return whatever the callback returns (Eloquent-style). Unlike `tap()`, the callback's return value IS used — `pipe()` terminates or transforms the fluent chain. Useful for handing the builder off to a repository-level function or a reusable scope object and returning its result inline, without leaving the chain.
+
+Also available on `Collection` — works identically, receiving the collection instead of the builder.
 
 **Example:**
 ```php
@@ -2383,10 +2392,15 @@ $users = User::query()
 $result = User::query()
     ->pipe([$userRepo, 'applySearchFilters'])
     ->paginate(20);
+
+// On a Collection — delegate to another layer:
+$dto = User::query()->get()
+    ->filter(fn($u) => $u->active)
+    ->pipe([$userPresenter, 'toDto']);
 ```
 
 **Key differences between `tap()` and `pipe()`:**
-- `tap($cb)` — always returns `$this` (the builder); callback return value is ignored. Use for side-effects.
-- `pipe($cb)` — returns whatever the callback returns. Use to produce a result or hand the builder to another layer.
+- `tap($cb)` — always returns `$this` (the builder or collection); callback return value is ignored. Use for side-effects.
+- `pipe($cb)` — returns whatever the callback returns. Use to produce a result or hand off to another layer.
 
 ---

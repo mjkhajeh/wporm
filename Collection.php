@@ -210,4 +210,48 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
     public function contains($value) {
         return in_array($value, $this->items, true);
     }
+
+    /**
+     * Pass the collection to the given callback for side-effects, then return
+     * the collection unchanged (Eloquent-style tap()). The callback's return
+     * value is always discarded. Designed for inline debugging, logging, or
+     * inspection without breaking a fluent chain.
+     *
+     * Usage:
+     *   $emails = User::query()->get()
+     *       ->filter(fn($u) => $u->active)
+     *       ->tap(fn($c) => error_log('Active count: ' . $c->count()))
+     *       ->pluck('email');
+     *
+     * @param callable $callback function(Collection $collection): void
+     * @return $this
+     */
+    public function tap(callable $callback): self {
+        $callback($this);
+        return $this;
+    }
+
+    /**
+     * Pass the collection to the given callback and return whatever the
+     * callback returns (Eloquent-style pipe()). Unlike tap(), the callback's
+     * return value IS used — pipe() terminates or transforms the chain.
+     * Useful for handing the collection off to another layer (e.g. a
+     * formatter, a presenter, or a further processing step) and returning
+     * its result inline without breaking the fluent style.
+     *
+     * Usage:
+     *   $result = User::query()->get()
+     *       ->filter(fn($u) => $u->active)
+     *       ->pipe(fn($c) => $c->pluck('email'));
+     *
+     *   // Hand off to a service/presenter:
+     *   $dto = User::query()->get()
+     *       ->pipe([$userPresenter, 'toDto']);
+     *
+     * @param callable $callback function(Collection $collection): mixed
+     * @return mixed Whatever the callback returns
+     */
+    public function pipe(callable $callback) {
+        return $callback($this);
+    }
 }

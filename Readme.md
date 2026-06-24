@@ -723,6 +723,8 @@ All multi-result queries (`get()`, `all()`, etc.) return a `Collection` instance
 | `filter(callable)` | `Collection` | Return a new filtered collection |
 | `map(callable)` | `Collection` | Return a new collection with transformed items |
 | `transform(callable)` | `$this` | Transform items **in-place** (mutating) |
+| `tap(callable)` | `$this` | Pass the collection to a callback for side-effects, return the collection unchanged |
+| `pipe(callable)` | `mixed` | Pass the collection to a callback, return whatever the callback returns |
 | `pluck($key, $indexKey)` | `array` | Extract a single column from each item |
 | `contains($value)` | `bool` | Check if a value exists (strict) |
 | `slice($offset, $length)` | `Collection` | Slice the collection |
@@ -747,6 +749,33 @@ $users->transform(function ($user) {
     return $user;
 });
 ```
+
+### tap() and pipe() on Collection
+
+`tap()` and `pipe()` work on `Collection` the same way they work on `QueryBuilder` — letting you insert side-effects or delegate to another layer anywhere in a fluent chain without restructuring it.
+
+```php
+// tap() — passes the collection to the callback, discards the return value,
+// and continues with the same collection. Ideal for logging/inspection.
+$emails = User::query()->get()
+    ->filter(fn($u) => $u->active)
+    ->tap(fn($c) => error_log('Active users: ' . $c->count()))
+    ->pluck('email');
+
+// pipe() — passes the collection to the callback and returns whatever
+// the callback returns. Terminates or transforms the chain.
+$result = User::query()->get()
+    ->filter(fn($u) => $u->active)
+    ->pipe(fn($c) => $c->pluck('email'));
+
+// Useful for handing off to a service or presenter:
+$dto = User::query()->get()
+    ->pipe([$userPresenter, 'toDto']);
+```
+
+**Key differences:**
+- `tap($cb)` — always returns `$this` (the collection); callback return value is ignored. Use for side-effects.
+- `pipe($cb)` — returns whatever the callback returns. Use to produce a final result or delegate to another layer.
 
 ### Other Examples
 

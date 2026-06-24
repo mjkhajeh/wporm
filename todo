@@ -65,8 +65,7 @@ The latest task was completed. (Moderate Issues: 0)
 
   | # | Feature | Notes |
   |---|---------|-------|
-  | 39 | Collection enrichment | Missing: each, reduce, flatMap, sortBy, groupBy, keyBy, unique, values, keys, sum, avg, min, max, chunk, diff, intersect, merge, push, pull, put, toJson,
-  implode, when, unless, firstWhere, mapToGroups |
+  | 39 | Collection enrichment | Missing: each, reduce, flatMap, sortBy, groupBy, keyBy, unique, values, keys, sum, avg, min, max, chunk, diff, intersect, merge, push, pull, put, toJson, implode, when, unless, firstWhere, mapToGroups |
   | 40 | Query scopes as classes | ScopeInterface instead of just scope*() methods |
   | 41 | Prunable / MassPrunable traits | Auto-cleanup old records |
   | 42 | $touches property | Auto-update parent timestamps |
