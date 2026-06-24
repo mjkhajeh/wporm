@@ -8,6 +8,7 @@ This document describes all public and static methods of the `MJ\WPORM\Model` cl
 - [Global Scopes](#global-scopes)
 - [Constructor](#constructor)
 - [Query Methods](#query-methods)
+- [Functional Chaining: tap() and pipe()](#functional-chaining-tap-and-pipe)
 - [Subquery Support](#subquery-support)
 - [Combining Queries](#combining-queries)
 - [Raw SQL Expressions](#raw-sql-expressions)
@@ -2346,5 +2347,46 @@ $users = User::query()->distinct()->get();
 ```
 - You can also disable it by passing `false`: `$query->distinct(false)`
 - Works with all other query builder methods.
+
+---
+
+### tap($callback)
+**Description:** Pass the query builder instance to the given callback for side-effects, then return the builder unchanged (Eloquent-style). The callback's return value is always discarded. Designed for inline debugging, logging, conditional decoration, or applying a set of constraints from a helper method — without breaking the fluent chain.
+
+**Example:**
+```php
+$users = User::query()
+    ->where('active', true)
+    ->tap(function($q) {
+        error_log('[Debug] SQL: ' . $q->toSql());
+    })
+    ->orderBy('name')
+    ->get();
+
+// Also accepts any callable (method reference, invokable class, etc.):
+$query->tap([$this, 'applyDefaultScopes'])->get();
+```
+
+### pipe($callback)
+**Description:** Pass the query builder instance to the given callback and return whatever the callback returns (Eloquent-style). Unlike `tap()`, the callback's return value IS used — `pipe()` terminates or transforms the fluent chain. Useful for handing the builder off to a repository-level function or a reusable scope object and returning its result inline, without leaving the chain.
+
+**Example:**
+```php
+// Execute a scope and return the Collection:
+$users = User::query()
+    ->where('active', true)
+    ->pipe(function($q) {
+        return $q->orderBy('name')->get();
+    });
+
+// Inject repository-level logic mid-chain:
+$result = User::query()
+    ->pipe([$userRepo, 'applySearchFilters'])
+    ->paginate(20);
+```
+
+**Key differences between `tap()` and `pipe()`:**
+- `tap($cb)` — always returns `$this` (the builder); callback return value is ignored. Use for side-effects.
+- `pipe($cb)` — returns whatever the callback returns. Use to produce a result or hand the builder to another layer.
 
 ---

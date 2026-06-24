@@ -26,6 +26,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Subqueries**: `fromSub()` / `from()` for derived tables, `selectSub()` for scalar subselects in the SELECT list, and `whereSub()`/`whereInSub()`/`whereNotInSub()` (plus OR variants) for subqueries in WHERE — all accepting a `QueryBuilder`, `Closure`, or raw SQL string, Eloquent-style.
 - **Combining queries**: `union()`/`unionAll()` to combine two or more queries' result sets, Eloquent-style.
 - **Events**: Model lifecycle event hooks (`creating`, `updating`, `deleting`, etc.) via overridable methods, Eloquent-style `$dispatchesEvents` property mapping, and a standalone `EventDispatcher` for global listeners — no Laravel dependency required.
+- **Functional chaining**: `tap()` for inline side-effects (logging, debugging) that leave the builder unchanged, and `pipe()` to hand the builder off to a callback and return its result — both Eloquent-style.
 - **Global scopes**: Add global query constraints to models.
 
 ## Installation
@@ -1754,6 +1755,50 @@ $users = User::query()
 - The optional third argument is a callback executed if the condition is falsy.
 
 This method is available on both the query builder and as a static method on models.
+
+
+## Functional Chaining: tap() and pipe()
+
+WPORM supports Eloquent-style `tap()` and `pipe()` on the query builder for functional, chainable patterns.
+
+### tap($callback)
+
+Passes the query builder to the given callback for side-effects, then returns the builder unchanged. The callback's return value is always discarded. Use this for logging, debugging, or applying a reusable decorator without breaking the fluent chain.
+
+```php
+$users = User::query()
+    ->where('active', true)
+    ->tap(function ($query) {
+        error_log('[Debug] SQL: ' . $query->toSql());
+    })
+    ->orderBy('name')
+    ->get();
+
+// Accepts any callable:
+$query->tap([$this, 'applyDefaultScopes'])->get();
+```
+
+### pipe($callback)
+
+Passes the query builder to the given callback and returns whatever the callback returns. Unlike `tap()`, `pipe()` terminates or transforms the fluent chain — the callback's return value replaces the builder. Use this to hand the builder off to a repository function or a reusable scope and return its result inline.
+
+```php
+// Execute a scope and return the Collection:
+$users = User::query()
+    ->where('active', true)
+    ->pipe(function ($query) {
+        return $query->orderBy('name')->get();
+    });
+
+// Inject repository logic mid-chain:
+$result = User::query()
+    ->pipe([$userRepo, 'applySearchFilters'])
+    ->paginate(20);
+```
+
+**Summary:**
+- `tap($cb)` — always returns `$this`; callback return value is ignored. Use for side-effects.
+- `pipe($cb)` — returns whatever the callback returns. Use to produce a result or delegate to another layer.
 
 
 ## Troubleshooting & Tips

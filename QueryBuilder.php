@@ -1654,6 +1654,61 @@ class QueryBuilder {
     }
 
     /**
+     * Pass the query builder to the given callback and return the builder
+     * (Eloquent-style tap()). Designed for side-effects — logging, debugging,
+     * conditional decoration — that should not change which builder is being
+     * used. The callback's return value is always discarded.
+     *
+     * Usage:
+     *   $users = User::query()
+     *       ->where('active', true)
+     *       ->tap(function($q) {
+     *           error_log('[Debug] SQL: ' . $q->toSql());
+     *       })
+     *       ->orderBy('name')
+     *       ->get();
+     *
+     *   // Also useful for applying a set of constraints without breaking
+     *   // out of a fluent chain (e.g. inside a helper function):
+     *   $query->tap([$this, 'applyDefaultScopes'])->get();
+     *
+     * @param callable $callback function(QueryBuilder $query): void
+     * @return $this
+     */
+    public function tap(callable $callback): self {
+        $callback($this);
+        return $this;
+    }
+
+    /**
+     * Pass the query builder to the given callback and return whatever the
+     * callback returns (Eloquent-style pipe()). Unlike tap(), the return
+     * value of the callback IS used — pipe() terminates (or transforms) the
+     * fluent chain, letting you hand the builder off to another layer and
+     * return its result inline.
+     *
+     * Usage:
+     *   // Execute a reusable "scope" function and return the Collection:
+     *   $users = User::query()
+     *       ->where('active', true)
+     *       ->pipe(function($q) {
+     *           return $q->orderBy('name')->get();
+     *       });
+     *
+     *   // Useful for injecting repository-level logic mid-chain without
+     *   // losing the fluent style:
+     *   $result = User::query()
+     *       ->pipe([$userRepo, 'applySearchFilters'])
+     *       ->paginate(20);
+     *
+     * @param callable $callback function(QueryBuilder $query): mixed
+     * @return mixed Whatever the callback returns
+     */
+    public function pipe(callable $callback) {
+        return $callback($this);
+    }
+
+    /**
      * Combine this query with another query using SQL UNION (duplicates removed),
      * Eloquent-style.
      *
