@@ -51,7 +51,7 @@ The latest task was completed. (Moderate Issues: 0)
   | ✅ 27 | subquery support in select() / where() / from() | Subselects, derived tables |
   | ✅ 28 | union() / unionAll() | Combining query results |
   | ✅ 29 | fromSub() / from() | Query from subquery or change table |
-  | ✅ 30 | tap() / pipe() on QueryBuilder | Functional chaining |
+  | ✅ 30 | tap() / pipe() on QueryBuilder, Collection, and Model | Functional chaining — Model previously had none (bug: __call() silently proxied to a fresh QueryBuilder instead of the model itself); now fixed with real instance methods |
   | 31 | withCount() | User::withCount('posts')->get() — adds posts_count |
   | 32 | withSum() / withAvg() / withMin() / withMax() | Aggregate sub-selects |
   | 33 | Observer / Event dispatcher system | Beyond hardcoded method hooks |
@@ -65,7 +65,7 @@ The latest task was completed. (Moderate Issues: 0)
 
   | # | Feature | Notes |
   |---|---------|-------|
-  | 39 | Collection enrichment | Missing: each, reduce, flatMap, sortBy, groupBy, keyBy, unique, values, keys, sum, avg, min, max, chunk, diff, intersect, merge, push, pull, put, toJson, implode, when, unless, firstWhere, mapToGroups |
+  | ✅ 39 | Collection enrichment | Added: each, reduce, flatMap, sortBy/sortByDesc, groupBy, keyBy, unique, values, keys, sum, avg/average, min, max, diff, intersect, merge, push, pull, put, implode, when, unless, firstWhere, mapToGroups. (toJson already existed — see ✅57; chunk()/each() at the query-builder level already existed — see ✅21; Collection::each() is the in-memory complement.) |
   | 40 | Query scopes as classes | ScopeInterface instead of just scope*() methods |
   | 41 | Prunable / MassPrunable traits | Auto-cleanup old records |
   | 42 | $touches property | Auto-update parent timestamps |
@@ -87,11 +87,11 @@ The latest task was completed. (Moderate Issues: 0)
   | 52 | Helpers::convert_to_pascal_case is over-engineered | Simplify to str_replace(' ', '', ucwords(str_replace(['_', '-'], ' ', $input))) |
   | 53 | No interfaces / contracts | Add ModelInterface, QueryBuilderInterface for testability |
   | 54 | No type hints on method params/returns | PHP 7.4+ type declarations would improve DX and catch bugs |
-  | 57 | No Stringable support on Collection | Can't echo a collection |
+  | ✅ 57 | No Stringable support on Collection | Collection::__toString() already implemented (returns toJson()) |
 
   ✅ 1. Fix the 8 critical bugs — These cause wrong query results and data corruption
   ✅ 2. Add $guarded enforcement + $hidden — Security essentials
   ✅ 3. Add increment/decrement/sum/avg/min/max/value/pluck/exists — Highest-use missing features
   ✅ 4. Add selectRaw/whereRaw/havingRaw — Completes the raw SQL story
   ✅ 5. Add create() — Common Eloquent pattern (toJson()/$hidden done — see ✅22/✅23; findOrFail()/firstOrFail() done — see ✅24)
-  6. Enrich Collection — Bring it closer to Eloquent's rich collection API
+  ✅ 6. Enrich Collection — Brought closer to Eloquent's rich collection API (see ✅39). Also fixed: Model lacked tap()/pipe() of its own, so __call() silently proxied those calls to a brand-new QueryBuilder instead of operating on the model instance — added real Model::tap()/Model::pipe() to close the gap (see ✅30).

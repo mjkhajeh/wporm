@@ -27,7 +27,8 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Subqueries**: `fromSub()` / `from()` for derived tables, `selectSub()` for scalar subselects in the SELECT list, and `whereSub()`/`whereInSub()`/`whereNotInSub()` (plus OR variants) for subqueries in WHERE — all accepting a `QueryBuilder`, `Closure`, or raw SQL string, Eloquent-style.
 - **Combining queries**: `union()`/`unionAll()` to combine two or more queries' result sets, Eloquent-style.
 - **Events**: Model lifecycle event hooks (`creating`, `updating`, `deleting`, etc.) via overridable methods, Eloquent-style `$dispatchesEvents` property mapping, and a standalone `EventDispatcher` for global listeners — no Laravel dependency required.
-- **Functional chaining**: `tap()` for inline side-effects (logging, debugging) that leave the builder unchanged, and `pipe()` to hand the builder off to a callback and return its result — both Eloquent-style.
+- **Functional chaining**: `tap()` for inline side-effects (logging, debugging) that leave the builder unchanged, and `pipe()` to hand the builder off to a callback and return its result — both Eloquent-style, and available on `QueryBuilder`, `Collection`, **and `Model`** instances.
+- **Rich Collections**: `Collection` supports Eloquent-style `sortBy()`/`sortByDesc()`, `groupBy()`, `keyBy()`, `unique()`, `flatMap()`, `mapToGroups()`, `each()`, `reduce()`, `values()`, `keys()`, `diff()`/`intersect()`/`merge()`, `push()`/`pull()`/`put()`, `implode()`, `when()`/`unless()`, `firstWhere()`, and in-memory `sum()`/`avg()`/`min()`/`max()`.
 - **Global scopes**: Add global query constraints to models.
 
 ## Installation
@@ -744,6 +745,30 @@ All multi-result queries (`get()`, `all()`, etc.) return a `Collection` instance
 | `filter(callable)` | `Collection` | Return a new filtered collection |
 | `map(callable)` | `Collection` | Return a new collection with transformed items |
 | `transform(callable)` | `$this` | Transform items **in-place** (mutating) |
+| `each(callable)` | `$this` | Iterate items; return `false` from the callback to stop early |
+| `reduce(callable, $initial)` | `mixed` | Reduce the collection to a single value |
+| `flatMap(callable)` | `Collection` | Map then flatten the result by one level |
+| `sortBy($key, $desc = false)` | `Collection` | Sort by column name or callback, preserving keys |
+| `sortByDesc($key)` | `Collection` | Shorthand for `sortBy($key, true)` |
+| `groupBy($key)` | `Collection` | Group into a `Collection` of `Collection`s, keyed by value |
+| `keyBy($key)` | `Collection` | Re-key items by column name or callback |
+| `unique($key = null)` | `Collection` | Get unique items, optionally by column name or callback |
+| `values()` | `Collection` | Reset keys to sequential integers |
+| `keys()` | `Collection` | Get a collection of the keys |
+| `diff($items)` | `Collection` | Items not present in the given array/Collection |
+| `intersect($items)` | `Collection` | Items present in the given array/Collection |
+| `merge($items)` | `Collection` | Merge another array/Collection in (`array_merge()` semantics) |
+| `push($value)` | `$this` | Append an item (mutating) |
+| `pull($key, $default)` | `mixed` | Remove and return an item by key (mutating) |
+| `put($key, $value)` | `$this` | Set an item by key (mutating) |
+| `implode($glue, $key = null)` | `string` | Join items into a string, optionally extracting a column first |
+| `when($value, callable, callable)` | `mixed` | Conditionally run a callback against the collection |
+| `unless($value, callable, callable)` | `mixed` | Inverse of `when()` |
+| `firstWhere($key, $op, $val)` | `mixed` | First item matching a simple condition |
+| `mapToGroups(callable)` | `Collection` | Map each item to a `[groupKey => value]` pair, then group |
+| `sum($key = null)` | `int\|float` | Sum of values (in-memory, over already-fetched items) |
+| `avg($key = null)` / `average($key = null)` | `int\|float\|null` | Average of values |
+| `min($key = null)` / `max($key = null)` | `mixed\|null` | Min/max of values |
 | `tap(callable)` | `$this` | Pass the collection to a callback for side-effects, return the collection unchanged |
 | `pipe(callable)` | `mixed` | Pass the collection to a callback, return whatever the callback returns |
 | `pluck($key, $indexKey)` | `array` | Extract a single column from each item |
@@ -751,6 +776,8 @@ All multi-result queries (`get()`, `all()`, etc.) return a `Collection` instance
 | `slice($offset, $length)` | `Collection` | Slice the collection |
 | `reverse()` | `Collection` | Reverse item order |
 | `after($value)` | `Collection` | Items after the first occurrence of a value |
+
+> Full signatures and examples for the newer methods (`each`, `reduce`, `flatMap`, `sortBy`/`sortByDesc`, `groupBy`, `keyBy`, `unique`, `values`, `keys`, `diff`, `intersect`, `merge`, `push`/`pull`/`put`, `implode`, `when`/`unless`, `firstWhere`, `mapToGroups`, `sum`/`avg`/`min`/`max`) are in [Methods.md](./Methods.md#collection-methods).
 
 ### map() vs transform()
 
@@ -771,9 +798,9 @@ $users->transform(function ($user) {
 });
 ```
 
-### tap() and pipe() on Collection
+### tap() and pipe() on Collection (and Model)
 
-`tap()` and `pipe()` work on `Collection` the same way they work on `QueryBuilder` — letting you insert side-effects or delegate to another layer anywhere in a fluent chain without restructuring it.
+`tap()` and `pipe()` work on `Collection` the same way they work on `QueryBuilder` — letting you insert side-effects or delegate to another layer anywhere in a fluent chain without restructuring it. They're also available directly on `Model` instances (e.g. `$user->tap(...)`), so a single model fetched via `find()`/`first()`/`create()` can be inspected or piped without breaking the chain either.
 
 ```php
 // tap() — passes the collection to the callback, discards the return value,
@@ -792,10 +819,16 @@ $result = User::query()->get()
 // Useful for handing off to a service or presenter:
 $dto = User::query()->get()
     ->pipe([$userPresenter, 'toDto']);
+
+// tap()/pipe() on a single Model instance — operates on the model itself:
+$user = User::create(['name' => 'Jane'])
+    ->tap(fn($u) => error_log("Created user #{$u->id}"));
+
+$dto = User::find(1)->pipe(fn($u) => $userPresenter->toDto($u));
 ```
 
 **Key differences:**
-- `tap($cb)` — always returns `$this` (the collection); callback return value is ignored. Use for side-effects.
+- `tap($cb)` — always returns `$this` (the collection, model, or query builder); callback return value is ignored. Use for side-effects.
 - `pipe($cb)` — returns whatever the callback returns. Use to produce a final result or delegate to another layer.
 
 ### Other Examples
@@ -824,6 +857,63 @@ if ($users->isEmpty()) {
 ```
 
 Collections also implement `ArrayAccess`, `Countable`, and `IteratorAggregate`, so you can use them in `foreach` loops, access items by index (`$users[0]`), and pass them to `count()`.
+
+### Grouping, Sorting, and Aggregating
+
+Collections support Eloquent-style grouping, sorting, deduplication, and in-memory aggregates over the items already fetched — useful when you've already loaded a result set and want to reorganize or summarize it without issuing another query.
+
+```php
+$users = User::query()->get();
+
+// Sort by a column (or callback), preserving keys
+$byName = $users->sortBy('name');
+$byVotesDesc = $users->sortByDesc('votes');
+
+// Group into a Collection of Collections, keyed by value
+$byRole = $users->groupBy('role');
+foreach ($byRole as $role => $group) {
+    echo "$role: " . $group->count();
+}
+
+// Re-key by a column — handy for fast lookups by id/email
+$byEmail = $users->keyBy('email');
+$jane = $byEmail['jane@example.com'] ?? null;
+
+// Deduplicate, optionally by a column
+$uniqueDomains = $users->unique(fn($u) => strstr($u->email, '@'));
+
+// flatMap — map then flatten one level
+$allTags = $posts->flatMap(fn($post) => $post->tags);
+
+// mapToGroups — compute both the group key and stored value in one pass
+$namesByRole = $users->mapToGroups(fn($u) => [$u->role => $u->name]);
+
+// In-memory aggregates over already-fetched items
+$totalVotes = $users->sum('votes');
+$avgVotes = $users->avg('votes');
+$mostVotes = $users->max('votes');
+
+// firstWhere — first match by a simple condition
+$admin = $users->firstWhere('role', 'admin');
+
+// when()/unless() — conditional chaining
+$result = $users->when($onlyActive, fn($c) => $c->filter(fn($u) => $u->active));
+
+// each() — iterate with early-stop support
+$users->each(function ($user) {
+    if ($user->banned) {
+        return false; // stops iteration
+    }
+});
+
+// reduce() — fold to a single value
+$totalLogins = $users->reduce(fn($carry, $u) => $carry + $u->login_count, 0);
+
+// implode() — join a column's values into a string
+$names = $users->implode(', ', 'name');
+```
+
+> See [Methods.md](./Methods.md#collection-methods) for the complete method list with full signatures.
 
 ## Relationships
 

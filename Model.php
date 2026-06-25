@@ -1855,6 +1855,46 @@ public function forceDelete() {
 		return $changes;
 	}    
 
+	/**
+	 * Pass the model instance to the given callback for side-effects, then
+	 * return the model unchanged (Eloquent-style tap()). The callback's
+	 * return value is always discarded. Designed for inline debugging,
+	 * logging, or inspection without breaking a fluent chain.
+	 *
+	 * Defined directly on Model (rather than relying on __call() to proxy
+	 * to the query builder) so it operates on THIS model instance — the
+	 * query-builder-level tap() (e.g. User::query()->tap(...)) remains
+	 * available separately and is unaffected.
+	 *
+	 * Usage:
+	 *   $user = User::create(['name' => 'Jane'])
+	 *       ->tap(fn($u) => error_log("Created user #{$u->id}"));
+	 *
+	 * @param callable $callback function(Model $model): void
+	 * @return $this
+	 */
+	public function tap(callable $callback) {
+		$callback($this);
+		return $this;
+	}
+
+	/**
+	 * Pass the model instance to the given callback and return whatever the
+	 * callback returns (Eloquent-style pipe()). Unlike tap(), the callback's
+	 * return value IS used — pipe() terminates or transforms the chain.
+	 * Useful for handing the model off to a presenter/transformer and
+	 * returning its result inline.
+	 *
+	 * Usage:
+	 *   $dto = User::find(1)->pipe(fn($u) => $userPresenter->toDto($u));
+	 *
+	 * @param callable $callback function(Model $model): mixed
+	 * @return mixed Whatever the callback returns
+	 */
+	public function pipe(callable $callback) {
+		return $callback($this);
+	}
+
 	public function offsetExists($offset): bool {
 		return isset($this->attributes[$offset]);
 	}
