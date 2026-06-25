@@ -466,13 +466,7 @@ protected function castSet($key, $value) {
 	}
 
 	public static function all() {
-		$results = static::query()->get();
-		foreach ($results as $instance) {
-			if (method_exists($instance, 'retrieved')) {
-				$instance->retrieved();
-			}
-		}
-		return $results;
+		return static::query()->get();
 	}
 
 	/**
@@ -488,22 +482,12 @@ protected function castSet($key, $value) {
 	 */
 	public static function find($id) {
 		if (is_array($id)) {
-			$results = static::query()->find($id);
-			foreach ($results as $instance) {
-				if (method_exists($instance, 'retrieved')) {
-					$instance->retrieved();
-				}
-			}
-			return $results;
+			return static::query()->find($id);
 		}
 
 		$instance = new static;
 		$pk = $instance->primaryKey;
-		$result = static::query()->where($pk, $id)->first();
-		if ($result && method_exists($result, 'retrieved')) {
-			$result->retrieved();
-		}
-		return $result;
+		return static::query()->where($pk, $id)->first();
 	}
 
 	/**
