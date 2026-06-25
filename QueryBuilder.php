@@ -2903,7 +2903,11 @@ class QueryBuilder {
         $perPage = (int)$perPage;
         $page = $page ?: (isset($_GET['page']) ? (int)$_GET['page'] : 1);
         $page = max($page, 1);
-        $total = $this->count();
+        // Clone the builder for the count sub-query so that applySoftDeleteScope()
+        // (and any LIMIT/OFFSET we set below) mutate only an independent copy and
+        // never bleed into the $this->wheres / $this->bindings that get() will use.
+        $countBuilder = clone $this;
+        $total = $countBuilder->count();
         $this->limit($perPage)->offset(($page - 1) * $perPage);
         $results = $this->get();
         $lastPage = (int) ceil($total / $perPage);

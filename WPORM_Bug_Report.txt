@@ -15,26 +15,6 @@ PRIORITY 1 — CRITICAL BUGS
 ================================================================================
 
 ------------------------------------------------------------------------
-1.4 — paginate() applies soft-delete scope to shared mutable builder state
-------------------------------------------------------------------------
-DESCRIPTION:
-  paginate() calls count() (which calls applySoftDeleteScope() and mutates
-  $this->bindings) and then calls get() on the same builder instance. Because
-  softDeleteScopeApplied is set to true after count(), get() skips reapplying
-  the scope — but both calls share the same $this->wheres and $this->bindings
-  arrays, which were mutated by count(). Any further WHERE conditions added
-  after count() but before get() will create binding-order mismatches. The
-  correct fix is to clone the builder for the count() sub-call so each
-  operation has independent mutable state.
-
-AFFECTED FILES:
-  - QueryBuilder.php → paginate()
-
-FIX:
-  Clone the QueryBuilder instance before calling count() inside paginate(),
-  so the count query and the data query each operate on separate state.
-
-------------------------------------------------------------------------
 1.5 — exists() permanently mutates $this->limit on the builder
 ------------------------------------------------------------------------
 DESCRIPTION:
