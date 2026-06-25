@@ -1926,24 +1926,7 @@ class QueryBuilder {
             $fromExpr = Helpers::quoteIdentifier($this->table);
         }
         $sql .= implode(", ", $selects) . " FROM " . $fromExpr;
-        // Add JOIN clauses
-        if (!empty($this->joins)) {
-            foreach ($this->joins as $join) {
-                $type = $join['type'];
-                $table = Helpers::quoteIdentifier($join['table']);
-                if ($type === 'CROSS') {
-                    $sql .= " CROSS JOIN $table";
-                } elseif ($join['clause']) {
-                    // Try to quote identifiers in ON clause
-                    $clause = preg_replace_callback('/([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)/', function($m) {
-                        return Helpers::quoteIdentifier($m[1]);
-                    }, $join['clause']);
-                    $sql .= " $type JOIN $table ON {$clause}";
-                } else {
-                    $sql .= " $type JOIN $table";
-                }
-            }
-        }
+        $sql .= $this->buildJoinClause();
         if (!empty($where)) {
             $sql .= " WHERE $where";
         }
@@ -2056,6 +2039,39 @@ class QueryBuilder {
         );
     }
 
+    /**
+     * Render all registered JOIN clauses to a SQL string fragment.
+     * Shared by buildSelectQuery(), buildCountQuery(), and buildDeleteQuery()
+     * so that JOIN-dependent WHERE conditions (e.g. "profiles.user_id = users.id")
+     * work correctly in every context.
+     *
+     * @return string  Empty string when no joins are registered.
+     */
+    protected function buildJoinClause(): string {
+        if (empty($this->joins)) {
+            return '';
+        }
+
+        $sql = '';
+        foreach ($this->joins as $join) {
+            $type  = $join['type'];
+            $table = Helpers::quoteIdentifier($join['table']);
+
+            if ($type === 'CROSS') {
+                $sql .= " CROSS JOIN $table";
+            } elseif ($join['clause']) {
+                $clause = preg_replace_callback('/([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)/', function ($m) {
+                    return Helpers::quoteIdentifier($m[1]);
+                }, $join['clause']);
+                $sql .= " $type JOIN $table ON {$clause}";
+            } else {
+                $sql .= " $type JOIN $table";
+            }
+        }
+
+        return $sql;
+    }
+
     protected function buildCountQuery() {
         // When union()/unionAll() branches are registered, COUNT(*) must
         // count rows in the *combined* result set (Eloquent's behavior),
@@ -2065,7 +2081,15 @@ class QueryBuilder {
             return "SELECT COUNT(*) FROM (" . $this->buildUnionWrappedSubquery() . ") AS wporm_union_count";
         }
 
-    $sql = "SELECT COUNT(*) FROM " . Helpers::quoteIdentifier($this->table);
+        // FROM clause — honour fromSub() derived tables exactly as buildSelectQuery() does.
+        if ($this->fromSub !== null) {
+            $fromExpr = "({$this->fromSub['sql']}) AS " . Helpers::quoteIdentifier($this->fromSub['alias']);
+        } else {
+            $fromExpr = Helpers::quoteIdentifier($this->table);
+        }
+
+        $sql   = "SELECT COUNT(*) FROM " . $fromExpr;
+        $sql  .= $this->buildJoinClause();
         $where = $this->buildWhereClause();
         if (!empty($where)) {
             $sql .= " WHERE $where";
@@ -2074,7 +2098,8 @@ class QueryBuilder {
     }
 
     protected function buildDeleteQuery() {
-    $sql = "DELETE FROM " . Helpers::quoteIdentifier($this->table);
+        $sql   = "DELETE FROM " . Helpers::quoteIdentifier($this->table);
+        $sql  .= $this->buildJoinClause();
         $where = $this->buildWhereClause();
         if (!empty($where)) {
             $sql .= " WHERE $where";

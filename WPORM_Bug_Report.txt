@@ -15,44 +15,6 @@ PRIORITY 1 — CRITICAL BUGS
 ================================================================================
 
 ------------------------------------------------------------------------
-1.2 — buildCountQuery() ignores JOIN clauses
-------------------------------------------------------------------------
-DESCRIPTION:
-  buildCountQuery() generates "SELECT COUNT(*) FROM table WHERE ..." but never
-  appends the JOIN clauses that are present on the builder. A paginate() or
-  count() call on any query that uses join(), leftJoin(), rightJoin(), etc.,
-  produces a wrong total count. When the WHERE clause references a column from
-  a joined table (e.g. "profiles.user_id = users.id"), MySQL will also return
-  a fatal "Unknown column" error because the joined table is absent from the
-  count query.
-
-AFFECTED FILES:
-  - QueryBuilder.php → buildCountQuery()
-
-FIX:
-  Replicate the JOIN rendering block from buildSelectQuery() into
-  buildCountQuery() so that JOINs present on the builder are included in the
-  COUNT(*) query.
-
-------------------------------------------------------------------------
-1.3 — buildDeleteQuery() ignores JOIN clauses
-------------------------------------------------------------------------
-DESCRIPTION:
-  Same root cause as 1.2 but for delete(). buildDeleteQuery() produces
-  "DELETE FROM table WHERE ..." without any JOIN clauses. A delete() call
-  whose WHERE clause references a joined-table column will either silently
-  affect unintended rows (if the column name happens to exist on the main
-  table) or produce a fatal MySQL "Unknown column" error.
-
-AFFECTED FILES:
-  - QueryBuilder.php → buildDeleteQuery()
-
-FIX:
-  For MySQL's multi-table DELETE syntax, include JOIN clauses in the DELETE
-  statement when they are present on the builder, or use a subquery-based
-  approach (DELETE FROM table WHERE id IN (SELECT id FROM ...)).
-
-------------------------------------------------------------------------
 1.4 — paginate() applies soft-delete scope to shared mutable builder state
 ------------------------------------------------------------------------
 DESCRIPTION:
@@ -522,8 +484,8 @@ SUMMARY TABLE
  #    | Severity     | File(s)                           | Issue
 ------+--------------+-----------------------------------+---------------------------
  1.1  | RESOLVED     | Model.php                         | retrieved() fires twice
- 1.2  | CRITICAL     | QueryBuilder.php                  | buildCountQuery() drops JOINs
- 1.3  | CRITICAL     | QueryBuilder.php                  | buildDeleteQuery() drops JOINs
+ 1.2  | RESOLVED     | QueryBuilder.php                  | buildCountQuery() drops JOINs
+ 1.3  | RESOLVED     | QueryBuilder.php                  | buildDeleteQuery() drops JOINs
  1.4  | CRITICAL     | QueryBuilder.php                  | paginate() shared mutable state
  1.5  | CRITICAL     | QueryBuilder.php                  | exists() mutates $this->limit
  1.6  | CRITICAL     | Model.php + QueryBuilder.php      | Protected property access (fatal)
