@@ -15,25 +15,6 @@ PRIORITY 1 — CRITICAL BUGS
 ================================================================================
 
 ------------------------------------------------------------------------
-1.5 — exists() permanently mutates $this->limit on the builder
-------------------------------------------------------------------------
-DESCRIPTION:
-  exists() calls $this->limit(1) (QueryBuilder.php) but never
-  restores the original limit value. Any code that calls exists() mid-chain
-  and then calls get(), count(), or paginate() on the same builder instance
-  will silently have LIMIT 1 applied to those subsequent queries too.
-
-  Note: aggregate(), value(), and pluck() correctly save and restore
-  $this->selects, but exists() does not do the equivalent for $this->limit.
-
-AFFECTED FILES:
-  - QueryBuilder.php → exists()
-
-FIX:
-  Save $this->limit before setting it to 1, build the SQL, then restore the
-  original value — without mutating builder state permanently.
-
-------------------------------------------------------------------------
 1.6 — QueryBuilder reads protected Model properties (PHP fatal error)
 ------------------------------------------------------------------------
 DESCRIPTION:
@@ -467,7 +448,7 @@ SUMMARY TABLE
  1.2  | RESOLVED     | QueryBuilder.php                  | buildCountQuery() drops JOINs
  1.3  | RESOLVED     | QueryBuilder.php                  | buildDeleteQuery() drops JOINs
  1.4  | CRITICAL     | QueryBuilder.php                  | paginate() shared mutable state
- 1.5  | CRITICAL     | QueryBuilder.php                  | exists() mutates $this->limit
+ 1.5  | RESOLVED     | QueryBuilder.php                  | exists() mutates $this->limit
  1.6  | CRITICAL     | Model.php + QueryBuilder.php      | Protected property access (fatal)
  1.7  | CRITICAL     | ColumnDefinition.php + Blueprint  | Double-backtick index quoting
  1.8  | CRITICAL     | Model.php                         | Legacy hooks always fire

@@ -83,6 +83,16 @@ $emails = User::query()->get()
 
 It's safe to inspect a query before executing it — e.g. calling `toSql()` or `dumpSql()` and then still calling `get()` afterward — or to call `get()`, `count()`, `toSql()` more than once on the same builder instance (as `paginate()` does internally, calling `count()` then `get()`). Soft-delete `WHERE` constraints and `HAVING` bindings are each applied only once per query builder instance, so they will not duplicate or misalign your bindings across repeated calls.
 
+`exists()` is also safe to call mid-chain: it temporarily applies `LIMIT 1` only for its own short-circuited query, then restores whatever limit (or no limit) the builder had beforehand. So `get()`, `count()`, or `paginate()` called afterward on the same instance are unaffected:
+
+```php
+$query = User::query()->where('active', true);
+
+if ($query->exists()) {
+    $users = $query->get(); // NOT limited to 1 row — exists() restores the original limit
+}
+```
+
 ## Note on Casting and toArray()
 
 - The `toArray()` method now uses proper casting for both built-in types and custom cast classes.

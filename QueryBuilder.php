@@ -3696,6 +3696,7 @@ class QueryBuilder {
             $bindings = $this->getUnionWrappedBindings();
         } else {
             $selects = $this->selects;
+            $originalLimit = $this->limit;
             $this->selects = ['1 as exists_flag'];
 
             // We only need to know whether at least one row matches.
@@ -3703,7 +3704,13 @@ class QueryBuilder {
             $sql = $this->buildSelectQuery();
             $bindings = $this->getBindings();
 
+            // Restore selects AND limit so the builder remains fully
+            // reusable afterward — mirrors the save/restore pattern
+            // aggregate()/value()/pluck() already use for $this->selects.
+            // Without this, exists() would permanently pin the builder's
+            // LIMIT to 1 for any later get()/count()/paginate() call.
             $this->selects = $selects;
+            $this->limit = $originalLimit;
         }
 
         if ($this->debug) {
