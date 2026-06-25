@@ -291,7 +291,7 @@ class Blueprint
 
     protected function wrapArray($columns)
     {
-        return implode(", ", array_map(fn($c) => "$c", (array) $columns));
+        return implode(", ", array_map(fn($c) => Helpers::quoteIdentifier($c), (array) $columns));
     }
 
     public function primary($columns)

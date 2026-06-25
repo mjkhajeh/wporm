@@ -11,9 +11,11 @@ class ColumnDefinition
     public bool $primary = false;
     public $default = null;
     protected $blueprint;
+    protected string $rawName;
 
     public function __construct(string $name, string $type)
     {
+        $this->rawName = $name;
         $this->name = Helpers::quoteIdentifier( $name );
         $this->type = $type;
     }
@@ -57,7 +59,7 @@ class ColumnDefinition
     public function unique($name = null)
     {
         if ($this->blueprint) {
-            $this->blueprint->unique($this->name, $name);
+            $this->blueprint->unique($this->rawName, $name);
         }
         return $this;
     }
