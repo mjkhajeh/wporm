@@ -16,7 +16,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Schema management**: Create and modify tables using a fluent schema builder.
 - **Query builder**: Chainable query builder for flexible and safe SQL queries.
 - **Attribute casting**: Automatic type casting for model attributes.
-- **Relationships**: Define `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, and `hasManyThrough` relationships, with eager loading via `with()` and existence filtering via `whereHas()`/`has()`. Polymorphic relationships (`morphOne`, `morphMany`, `morphTo`) are also supported, including an optional `morphMap()` for short type aliases.
+- **Relationships**: Define `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, and `hasManyThrough` relationships, with eager loading via `with()`, relationship-count eager loading via `withCount()`, and existence filtering via `whereHas()`/`has()`. Polymorphic relationships (`morphOne`, `morphMany`, `morphTo`) are also supported, including an optional `morphMap()` for short type aliases.
 - **Convenient creation**: `create()` for a one-line insert + return model, plus `updateOrCreate()`, `firstOrCreate()`, and `firstOrNew()` for upsert-style lookups.
 - **Aggregates & utilities**: `sum()`, `avg()`, `min()`, `max()`, `value()`, `pluck()`, `exists()`/`doesntExist()`, and `increment()`/`decrement()`.
 - **Fail-fast lookups**: `findOrFail()`/`firstOrFail()` (including array-of-ids lookups, and `Collection::firstOrFail()`) throw a `ModelNotFoundException` instead of silently returning `null`.
@@ -1133,6 +1133,59 @@ This applies whether the relation was eager-loaded via `with()` or accessed lazi
 ### Disabling global scopes for an eager-loaded relation
 
 See [Per-relation global-scope control](#per-relation-global-scope-control-eager-loads) below — pass an options array instead of a plain closure to disable global scopes and/or apply a constraint together.
+
+## Eager Loading Counts: withCount()
+
+When you only need to know *how many* related records each model has — not the records themselves — `withCount()` is far cheaper than `with()`: it adds a single `{relation}_count` integer attribute to every result, computed via one grouped `COUNT(*) ... GROUP BY` query per relation, rather than loading every related row.
+
+```php
+// Adds an integer `posts_count` attribute to every user
+$users = User::withCount('posts')->get();
+foreach ($users as $user) {
+    echo $user->posts_count;
+}
+
+// Multiple relations at once — one extra query per relation
+$users = User::withCount(['posts', 'comments'])->get();
+
+// Works the same on an instance query chain, and combines with with()
+$users = User::query()->where('active', true)->withCount('posts')->get();
+```
+
+### Constraining a count
+
+Pass a closure to add extra `WHERE` constraints to the count's underlying query, same as `with()`:
+
+```php
+// Only count published posts
+$users = User::withCount(['posts' => function($q) {
+    $q->where('published', 1);
+}])->get();
+```
+
+### Custom output name
+
+Use `"relation as alias"` to control the attribute name WPORM writes the count to — handy when calling `withCount()` more than once for the same relation with different constraints:
+
+```php
+$users = User::withCount([
+    'posts',
+    'posts as published_posts_count' => function($q) {
+        $q->where('published', 1);
+    },
+])->get();
+
+foreach ($users as $user) {
+    echo $user->posts_count;            // all posts
+    echo $user->published_posts_count;  // published posts only
+}
+```
+
+### Supported relationship types
+
+`hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`, `morphOne`, and `morphMany` are all supported, mirroring `with()`'s coverage. `morphTo` is not supported for counting (the related table isn't known until each row is read, the same limitation Eloquent has) — counted relations of that type always resolve to `0`.
+
+The resulting `{relation}_count` is a plain integer attribute, not an eager-loaded relation — it appears automatically in `toArray()`/`toJson()` output (subject to `$hidden`/`$visible`, same as any other attribute) and does not require accessing `$user->posts` to read it.
 
 ## Model Events and $dispatchesEvents
 

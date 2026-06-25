@@ -1617,6 +1617,27 @@ public function forceDelete() {
 		return $this;
 	}
 
+	/**
+	 * Set a computed/internal attribute directly into $attributes, bypassing
+	 * the $fillable/$guarded mass-assignment guard and any set{Attr}Attribute()
+	 * mutator. Used internally by QueryBuilder::loadRelationCount() (i.e.
+	 * withCount()) to attach a "{relation}_count" integer onto each model —
+	 * a value computed by WPORM itself, not user-supplied input, so the
+	 * mass-assignment protections that guard __set() do not apply here
+	 * (the same rationale newFromBuilder() uses for hydrating real columns).
+	 * Also mirrored into $original so isDirty()/getChanges() don't report
+	 * the count as a pending change.
+	 *
+	 * @param string $key
+	 * @param mixed $value
+	 * @return $this
+	 */
+	public function forceSetAttribute($key, $value) {
+		$this->attributes[$key] = $value;
+		$this->original[$key] = $value;
+		return $this;
+	}
+
 	public function toArray() {
         $attributes = [];
         foreach ($this->attributes as $key => $value) {
@@ -1966,6 +1987,16 @@ public function forceDelete() {
      */
     public static function with($relations) {
         return static::query()->with($relations);
+    }
+
+    /**
+     * Start a query with relationship counts (Eloquent-style static withCount()).
+     * Usage: User::withCount('posts')->get(); // each $user->posts_count
+     * @param array|string $relations
+     * @return \MJ\WPORM\QueryBuilder
+     */
+    public static function withCount($relations) {
+        return static::query()->withCount($relations);
     }
 
     public function __isset($key) {

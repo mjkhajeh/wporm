@@ -19,6 +19,7 @@ class QueryBuilder {
     protected $havings = [];
     protected $unions = [];
     protected $with = [];
+    protected $withCount = [];
     protected $applyGlobalScopes = true;
     protected $relationContext = [];
 
@@ -960,6 +961,67 @@ class QueryBuilder {
     }
 
     /**
+     * Eager load a relationship COUNT onto each result model, without
+     * loading the relation's actual records (Eloquent-style withCount()).
+     *
+     * Adds a `{relation}_count` integer attribute to every returned model
+     * (e.g. `posts_count` for `withCount('posts')`), computed via a single
+     * batched/grouped query per relation — never one query per row.
+     *
+     * Accepts the same shapes as with():
+     *   ->withCount('posts')
+     *   ->withCount(['posts', 'comments'])
+     *   ->withCount(['posts' => function($q) { $q->where('published', 1); }])
+     *
+     * A custom output column name is supported via "relation as alias",
+     * matching Eloquent:
+     *   ->withCount('posts as published_posts_count')
+     *   // combined with a constraint:
+     *   ->withCount(['posts as published_posts_count' => function($q) {
+     *       $q->where('published', 1);
+     *   }])
+     *
+     * Supported relation types: hasOne, hasMany, belongsTo, belongsToMany,
+     * hasManyThrough, morphOne, morphMany. (morphTo is not supported for
+     * counting — same as Eloquent — since the related type varies per row.)
+     *
+     * @param array|string $relations
+     * @return $this
+     */
+    public function withCount($relations) {
+        if (!is_array($relations)) {
+            $relations = func_get_args();
+        }
+        foreach ($relations as $key => $value) {
+            if (is_int($key)) {
+                // No constraint — $value is the relation name (optionally "rel as alias").
+                [$relation, $alias] = $this->parseWithCountName($value);
+                $this->withCount[$relation] = ['alias' => $alias, 'constraint' => null];
+            } else {
+                // $key is the relation name (optionally "rel as alias"), $value is the constraint.
+                [$relation, $alias] = $this->parseWithCountName($key);
+                $this->withCount[$relation] = ['alias' => $alias, 'constraint' => $value];
+            }
+        }
+        return $this;
+    }
+
+    /**
+     * Split a withCount() relation spec into [relationName, outputAlias].
+     * Supports "relation as alias" syntax; defaults the alias to
+     * "{relation}_count" when no explicit alias is given.
+     *
+     * @param string $name
+     * @return array{0: string, 1: string}
+     */
+    protected function parseWithCountName($name) {
+        if (preg_match('/^(.+?)\s+as\s+(.+)$/i', $name, $m)) {
+            return [trim($m[1]), trim($m[2])];
+        }
+        return [$name, $name . '_count'];
+    }
+
+    /**
      * Include soft-deleted records in results.
      */
     public $withTrashed = false;
@@ -1057,12 +1119,19 @@ class QueryBuilder {
                 $this->eagerLoadRelation($models, $relation, $constraint);
             }
         }
+        // Load relationship counts if requested (withCount())
+        if (!empty($this->withCount) && !empty($models)) {
+            foreach ($this->withCount as $relation => $spec) {
+                $this->loadRelationCount($models, $relation, $spec['alias'], $spec['constraint']);
+            }
+        }
         return new \MJ\WPORM\Collection($models);
     }
 
     public function first() {
         $this->limit(1);
-        // get() already handles eager loading and retrieved() for each model.
+        // get() already handles eager loading, relationship counts (withCount()),
+        // and retrieved() for each model.
         $results = $this->get();
         $model = $results[0] ?? null;
         if ($this->debug) {
@@ -2333,6 +2402,223 @@ class QueryBuilder {
         }
 
         // ── Unknown / unsupported relation type: no-op (fail silently) ───────
+    }
+
+    /**
+     * Resolve a single withCount() relation onto an array of already-hydrated
+     * models, setting `{alias}` (default "{relation}_count") as a plain
+     * integer attribute on each model — not an eager-loaded relation object.
+     *
+     * Driven by the same relationContext metadata as eagerLoadRelation(), and
+     * uses exactly one grouped `COUNT(*) ... GROUP BY <foreign key>` query
+     * per relation (or, for belongsToMany/hasManyThrough, one joined grouped
+     * query), regardless of how many parent models are in the batch — never
+     * one query per row.
+     *
+     * @param array  &$models     Array of model instances to populate (mutated in-place)
+     * @param string  $relation   Name of the relation method on the model
+     * @param string  $alias      Output attribute name (e.g. "posts_count")
+     * @param callable|null $constraint Additional query constraints for the count subquery
+     */
+    protected function loadRelationCount(array &$models, $relation, $alias, $constraint = null) {
+        if (empty($models)) return;
+
+        $firstModel = $models[0];
+        if (!method_exists($firstModel, $relation)) {
+            foreach ($models as $m) { $m->forceSetAttribute($alias, 0); }
+            return;
+        }
+
+        $sampleQuery = $firstModel->$relation();
+        if (!($sampleQuery instanceof \MJ\WPORM\QueryBuilder)) {
+            foreach ($models as $m) { $m->forceSetAttribute($alias, 0); }
+            return;
+        }
+
+        $ctx  = $sampleQuery->getRelationContext();
+        $type = $ctx['type'] ?? null;
+
+        // ══════════════════════════════════════════════════════════════════
+        // hasOne / hasMany — COUNT(*) GROUP BY foreignKey on the related table
+        // ══════════════════════════════════════════════════════════════════
+        if ($type === 'hasOne' || $type === 'hasMany') {
+            $foreignKey = $ctx['foreignKey'];
+            $localKey   = $ctx['localKey'];
+            $relClass   = $ctx['related'];
+
+            $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
+
+            $query = $relClass::query()
+                ->select(["$foreignKey as _wporm_count_key", "COUNT(*) as _wporm_count"])
+                ->whereIn($foreignKey, $ids)
+                ->groupBy($foreignKey);
+            if ($constraint) $constraint($query);
+
+            $counts = $this->fetchGroupedCounts($query);
+            foreach ($models as $m) {
+                $m->forceSetAttribute($alias, $counts[$m->$localKey] ?? 0);
+            }
+            return;
+        }
+
+        // ══════════════════════════════════════════════════════════════════
+        // belongsTo — COUNT(*) GROUP BY ownerKey on the related table
+        // ══════════════════════════════════════════════════════════════════
+        if ($type === 'belongsTo') {
+            $foreignKey = $ctx['foreignKey'];
+            $ownerKey   = $ctx['ownerKey'];
+            $relClass   = $ctx['related'];
+
+            $ids = array_values(array_unique(array_filter(
+                array_map(fn($m) => $m->$foreignKey, $models),
+                fn($id) => $id !== null
+            )));
+
+            if (empty($ids)) {
+                foreach ($models as $m) { $m->forceSetAttribute($alias, 0); }
+                return;
+            }
+
+            $query = $relClass::query()
+                ->select(["$ownerKey as _wporm_count_key", "COUNT(*) as _wporm_count"])
+                ->whereIn($ownerKey, $ids)
+                ->groupBy($ownerKey);
+            if ($constraint) $constraint($query);
+
+            $counts = $this->fetchGroupedCounts($query);
+            foreach ($models as $m) {
+                $m->forceSetAttribute($alias, $counts[$m->$foreignKey] ?? 0);
+            }
+            return;
+        }
+
+        // ══════════════════════════════════════════════════════════════════
+        // belongsToMany — COUNT(*) GROUP BY pivot foreign key, joined through
+        // the pivot table (no need to touch the related table's own columns).
+        // ══════════════════════════════════════════════════════════════════
+        if ($type === 'belongsToMany') {
+            $pivotTable      = $ctx['pivotTable'];
+            $foreignPivotKey = $ctx['foreignPivotKey'];
+            $relatedPivotKey = $ctx['relatedPivotKey'];
+            $localKey        = $ctx['localKey'];
+            $relatedTable    = $ctx['relatedTable'];
+            $relClass        = $ctx['related'];
+
+            $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
+
+            $relatedInstance = new $relClass;
+            $relatedPK       = $relatedInstance->primaryKey;
+
+            $query = $relClass::query()
+                ->select([
+                    "$pivotTable.$foreignPivotKey as _wporm_count_key",
+                    "COUNT(*) as _wporm_count",
+                ])
+                ->join($pivotTable, "$relatedTable.$relatedPK", '=', "$pivotTable.$relatedPivotKey")
+                ->whereIn("$pivotTable.$foreignPivotKey", $ids)
+                ->groupBy("$pivotTable.$foreignPivotKey");
+            if ($constraint) $constraint($query);
+
+            $counts = $this->fetchGroupedCounts($query);
+            foreach ($models as $m) {
+                $m->forceSetAttribute($alias, $counts[$m->$localKey] ?? 0);
+            }
+            return;
+        }
+
+        // ══════════════════════════════════════════════════════════════════
+        // hasManyThrough — COUNT(*) GROUP BY through-table foreign key,
+        // joined through the intermediate table.
+        // ══════════════════════════════════════════════════════════════════
+        if ($type === 'hasManyThrough') {
+            $firstKey     = $ctx['firstKey'];
+            $secondKey    = $ctx['secondKey'];
+            $localKey     = $ctx['localKey'];
+            $relatedTable = $ctx['relatedTable'];
+            $throughTable = $ctx['throughTable'];
+            $throughPK    = $ctx['throughPK'];
+            $relClass     = $ctx['related'];
+
+            $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
+
+            $query = $relClass::query()
+                ->select([
+                    "$throughTable.$firstKey as _wporm_count_key",
+                    "COUNT(*) as _wporm_count",
+                ])
+                ->join($throughTable, "$relatedTable.$secondKey", '=', "$throughTable.$throughPK")
+                ->whereIn("$throughTable.$firstKey", $ids)
+                ->groupBy("$throughTable.$firstKey");
+            if ($constraint) $constraint($query);
+
+            $counts = $this->fetchGroupedCounts($query);
+            foreach ($models as $m) {
+                $m->forceSetAttribute($alias, $counts[$m->$localKey] ?? 0);
+            }
+            return;
+        }
+
+        // ══════════════════════════════════════════════════════════════════
+        // morphOne / morphMany — COUNT(*) GROUP BY morphId, filtered to rows
+        // owned by this model's morph class.
+        // ══════════════════════════════════════════════════════════════════
+        if ($type === 'morphOne' || $type === 'morphMany') {
+            $morphId    = $ctx['morphId'];
+            $morphType  = $ctx['morphType'];
+            $morphClass = $ctx['morphClass'];
+            $localKey   = $ctx['localKey'];
+            $relClass   = $ctx['related'];
+
+            $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
+
+            $query = $relClass::query()
+                ->select(["$morphId as _wporm_count_key", "COUNT(*) as _wporm_count"])
+                ->where($morphType, $morphClass)
+                ->whereIn($morphId, $ids)
+                ->groupBy($morphId);
+            if ($constraint) $constraint($query);
+
+            $counts = $this->fetchGroupedCounts($query);
+            foreach ($models as $m) {
+                $m->forceSetAttribute($alias, $counts[$m->$localKey] ?? 0);
+            }
+            return;
+        }
+
+        // ── Unsupported relation type (e.g. morphTo): default to 0, matching
+        //    Eloquent's behavior of not supporting counts on morphTo. ───────
+        foreach ($models as $m) {
+            $m->forceSetAttribute($alias, 0);
+        }
+    }
+
+    /**
+     * Run a grouped "<key>, COUNT(*)" query built by loadRelationCount() and
+     * return a [groupKeyValue => count] map. Bypasses model hydration and
+     * Collection wrapping entirely (this is an aggregate row shape, not a
+     * row of the related model), reading directly via $wpdb.
+     *
+     * @param QueryBuilder $query
+     * @return array<int|string, int>
+     */
+    protected function fetchGroupedCounts(QueryBuilder $query): array {
+        $query->applySoftDeleteScope();
+        $sql = $query->buildSelectQuery();
+        $bindings = $query->getBindings();
+
+        if (!empty($bindings)) {
+            $rows = $this->wpdb->get_results($this->wpdb->prepare($sql, ...$bindings), ARRAY_A);
+        } else {
+            $rows = $this->wpdb->get_results($sql, ARRAY_A);
+        }
+
+        $counts = [];
+        if ($rows) {
+            foreach ($rows as $row) {
+                $counts[$row['_wporm_count_key']] = (int) $row['_wporm_count'];
+            }
+        }
+        return $counts;
     }
 
     // WHERE EXISTS / NOT EXISTS

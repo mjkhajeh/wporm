@@ -19,6 +19,7 @@ This document describes all public and static methods of the `MJ\WPORM\Model` cl
 - [Relationship Methods](#relationship-methods)
 - [Relationship Existence Filtering](#relationship-existence-filtering)
 - [Eager Loading](#eager-loading)
+- [Eager Loading Counts: withCount()](#eager-loading-counts-withcount)
 - [Utility Methods](#utility-methods)
 - [Mass Assignment Protection](#mass-assignment-protection)
 - [Hidden & Visible Attributes](#hidden--visible-attributes)
@@ -1638,6 +1639,64 @@ $comments = Comment::with('commentable')->get();
 - `hasMany`/`belongsToMany`/`hasManyThrough`/`morphMany` relations resolve to a `Collection`.
 
 See [Per-relation global-scope control](./Readme.md#per-relation-global-scope-control-eager-loads) in the Readme for disabling global scopes on a specific eager-loaded relation.
+
+---
+
+## Eager Loading Counts: withCount()
+
+### withCount($relations)
+**Description:** Eager-load the *count* of one or more relations onto every result, without loading the relation's actual records (Eloquent-style). Adds a `{relation}_count` integer attribute to each model (e.g. `posts_count` for `withCount('posts')`), computed via exactly one grouped `COUNT(*) ... GROUP BY` query per relation — never one query per row. Available both as a static method on the model and as a `QueryBuilder` instance method, so it works mid-chain alongside `where()`, `with()`, `withTrashed()`, etc.
+
+Accepts the same shapes as `with()`:
+- A single relation name: `withCount('posts')`
+- An array of relation names: `withCount(['posts', 'comments'])`
+- An associative array mapping a relation name to a constraint closure: `withCount(['posts' => function($q) { $q->where('published', 1); }])`
+
+A custom output attribute name is supported via `"relation as alias"` syntax (with or without a constraint), useful when counting the same relation more than once under different constraints:
+
+```php
+withCount('posts as published_posts_count')
+withCount(['posts as published_posts_count' => function($q) { $q->where('published', 1); }])
+```
+
+**Supported relationship types:** `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`, `morphOne`, `morphMany`. `morphTo` is not supported (the related model class varies per row, so a single grouped count query isn't possible — the same limitation Eloquent has); counts requested on a `morphTo` relation resolve to `0`.
+
+**Examples:**
+```php
+// Single relation
+$users = User::withCount('posts')->get();
+foreach ($users as $user) {
+    echo $user->posts_count;
+}
+
+// Multiple relations — one extra query per relation
+$users = User::withCount(['posts', 'comments'])->get();
+
+// Constrained count
+$users = User::withCount(['posts' => function($q) {
+    $q->where('published', 1);
+}])->get();
+
+// Same relation, multiple aliased counts
+$users = User::withCount([
+    'posts',
+    'posts as published_posts_count' => function($q) {
+        $q->where('published', 1);
+    },
+])->get();
+
+// Mid-chain, combined with where()/with()
+$users = User::query()
+    ->where('active', true)
+    ->withCount('posts')
+    ->with('profile')
+    ->get();
+```
+
+**Notes:**
+- The resulting count is a plain integer **attribute**, not a relation — it's present directly on `$model->{alias}` and included automatically in `toArray()`/`toJson()` output (subject to `$hidden`/`$visible`, like any other attribute). It does not populate or require accessing the relation itself (e.g. `$user->posts` is unaffected and, if also accessed, triggers its own separate query as usual).
+- Respects the related model's soft-delete scope (soft-deleted related rows are excluded from the count unless the constraint closure calls `withTrashed()` on the count subquery).
+- A relation with zero matches yields `0`, not `null`.
 
 ---
 
