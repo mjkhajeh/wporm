@@ -381,8 +381,9 @@ class QueryBuilder {
             $operator = '=';
         }
         // Cast DateTime for casted columns (handle nulls too)
-        if (isset($this->model->casts[$column])) {
-            $cast = $this->model->casts[$column];
+        $casts = $this->model->getCasts();
+        if (isset($casts[$column])) {
+            $cast = $casts[$column];
             if (($cast === 'datetime' || $cast === 'timestamp') && $value instanceof \DateTime) {
                 if ($cast === 'datetime') {
                     $value = $value->format('Y-m-d H:i:s');
@@ -1044,13 +1045,13 @@ class QueryBuilder {
             return;
         }
 
-        if (!isset($this->model->softDeletes) || !$this->model->softDeletes) {
+        if (!$this->model->getSoftDeletes()) {
             $this->softDeleteScopeApplied = true;
             return;
         }
 
-        $deletedAt = $this->model->deletedAtColumn;
-        $softDeleteType = isset($this->model->softDeleteType) ? $this->model->softDeleteType : 'timestamp';
+        $deletedAt = $this->model->getDeletedAtColumn();
+        $softDeleteType = $this->model->getSoftDeleteType();
 
         if ($softDeleteType === 'boolean') {
             if ($this->onlyTrashed) {
@@ -1075,10 +1076,10 @@ class QueryBuilder {
      */
     public function restore() {
         // Support both timestamp and boolean-flag soft deletes
-        if (isset($this->model->softDeletes) && $this->model->softDeletes) {
-            $deletedAt = $this->model->deletedAtColumn;
+        if ($this->model->getSoftDeletes()) {
+            $deletedAt = $this->model->getDeletedAtColumn();
             // If using boolean flag (e.g., deleted = 1/0)
-            if (isset($this->model->softDeleteType) && $this->model->softDeleteType === 'boolean') {
+            if ($this->model->getSoftDeleteType() === 'boolean') {
                 return $this->update([$deletedAt => 0]);
             }
             // Default: timestamp (e.g., deleted_at)
@@ -2253,7 +2254,7 @@ class QueryBuilder {
             // Load related rows joining through the pivot; also SELECT the pivot FK
             // so we can group results back to each parent.
             $relatedInstance = new $relClass;
-            $relatedPK       = $relatedInstance->primaryKey;
+            $relatedPK       = $relatedInstance->getPrimaryKey();
 
             $query = $relClass::query(!$disableGlobalScopes)
                 ->select(["$relatedTable.*", "$pivotTable.$foreignPivotKey as _pivot_fk"])
@@ -2408,7 +2409,7 @@ class QueryBuilder {
                 }
 
                 $relatedInstance = new $relClass;
-                $ownerKey = $relatedInstance->primaryKey;
+                $ownerKey = $relatedInstance->getPrimaryKey();
 
                 $ids = array_values(array_unique(array_map(fn($m) => $m->$morphId, $group)));
 
@@ -2532,7 +2533,7 @@ class QueryBuilder {
             $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
 
             $relatedInstance = new $relClass;
-            $relatedPK       = $relatedInstance->primaryKey;
+            $relatedPK       = $relatedInstance->getPrimaryKey();
 
             $query = $relClass::query()
                 ->select([
@@ -2756,9 +2757,9 @@ class QueryBuilder {
         $columns = array_keys($values[0]);
 
         // Add timestamps if the model supports them
-        $hasTimestamps = property_exists($this->model, 'timestamps') && $this->model->timestamps;
-        $createdAtColumn = $this->model->createdAtColumn ?? 'created_at';
-        $updatedAtColumn = $this->model->updatedAtColumn ?? 'updated_at';
+        $hasTimestamps = $this->model->getTimestamps();
+        $createdAtColumn = $this->model->getCreatedAtColumn();
+        $updatedAtColumn = $this->model->getUpdatedAtColumn();
 
         if ($hasTimestamps) {
             $now = current_time('mysql');
@@ -3394,7 +3395,7 @@ class QueryBuilder {
      *         omitted, same as Eloquent).
      */
     public function find($id) {
-        $primaryKey = $this->model->primaryKey ?? 'id';
+        $primaryKey = $this->model->getPrimaryKey();
         if (is_array($id)) {
             if (empty($id)) {
                 return new \MJ\WPORM\Collection([]);
@@ -3427,7 +3428,7 @@ class QueryBuilder {
         $result = $this->find($id);
 
         if (is_array($id)) {
-            $primaryKey = $this->model->primaryKey ?? 'id';
+            $primaryKey = $this->model->getPrimaryKey();
             $foundIds = [];
             foreach ($result as $model) {
                 $foundIds[] = $model->$primaryKey;
@@ -3786,8 +3787,8 @@ class QueryBuilder {
 
         // Auto-touch updated_at if the model supports timestamps, unless the
         // caller already provided a value for it via $extra.
-        $updatedAtColumn = $this->model->updatedAtColumn ?? null;
-        if (!empty($this->model->timestamps) && $updatedAtColumn && !array_key_exists($updatedAtColumn, $extra)) {
+        $updatedAtColumn = $this->model->getUpdatedAtColumn();
+        if ($this->model->getTimestamps() && $updatedAtColumn && !array_key_exists($updatedAtColumn, $extra)) {
             $extra[$updatedAtColumn] = current_time('mysql');
         }
 

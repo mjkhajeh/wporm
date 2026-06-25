@@ -25,6 +25,70 @@ abstract class Model implements \ArrayAccess {
     protected $_eagerLoaded = [];
 
     /**
+     * Get the casts array for this model.
+     * @return array
+     */
+    public function getCasts() {
+        return $this->casts;
+    }
+
+    /**
+     * Get whether soft deletes are enabled for this model.
+     * @return bool
+     */
+    public function getSoftDeletes() {
+        return $this->softDeletes;
+    }
+
+    /**
+     * Get the soft delete type ('timestamp' or 'boolean').
+     * @return string
+     */
+    public function getSoftDeleteType() {
+        return $this->softDeleteType;
+    }
+
+    /**
+     * Get the deleted_at column name.
+     * @return string
+     */
+    public function getDeletedAtColumn() {
+        return $this->deletedAtColumn;
+    }
+
+    /**
+     * Get whether timestamps are enabled for this model.
+     * @return bool
+     */
+    public function getTimestamps() {
+        return $this->timestamps;
+    }
+
+    /**
+     * Get the created_at column name.
+     * @return string
+     */
+    public function getCreatedAtColumn() {
+        return $this->createdAtColumn ?? 'created_at';
+    }
+
+    /**
+     * Get the updated_at column name.
+     * @return string
+     */
+    public function getUpdatedAtColumn() {
+        return $this->updatedAtColumn ?? 'updated_at';
+    }
+
+    /**
+     * Get the primary key column name.
+     * @return string
+     */
+    public function getPrimaryKey() {
+        return $this->primaryKey ?? 'id';
+    }
+
+    /**
      * Set a single eager loaded relation value.
      * @param string $relation
      * @param mixed $value
@@ -1271,7 +1335,7 @@ public function forceDelete() {
         $foreignPivotKey  = $foreignPivotKey  ?: strtolower(Helpers::class_basename(static::class)) . '_id';
         $relatedPivotKey  = $relatedPivotKey  ?: strtolower(Helpers::class_basename($related)) . '_id';
         $relatedTable     = $relatedInstance->getTable();
-        $relatedPrimaryKey = $relatedInstance->primaryKey;
+        $relatedPrimaryKey = $relatedInstance->getPrimaryKey();
         $localKey         = $this->primaryKey;
 
         $query = $related::query();
@@ -1321,7 +1385,7 @@ public function forceDelete() {
 
         $relatedTable  = $relatedInstance->getTable();
         $throughTable  = $throughInstance->getTable();
-        $throughPK     = $throughInstance->primaryKey;
+        $throughPK     = $throughInstance->getPrimaryKey();
 
         $query = $related::query();
         $query->join(
@@ -1354,7 +1418,7 @@ public function forceDelete() {
     public function belongsTo($related, $foreignKey = null, $ownerKey = null) {
         $instance = new $related;
         $foreignKey = $foreignKey ?: strtolower(Helpers::class_basename($related)) . '_id';
-        $ownerKey = $ownerKey ?: $instance->primaryKey;
+        $ownerKey = $ownerKey ?: $instance->getPrimaryKey();
         $foreignValue = $this->attributes[$foreignKey] ?? null;
         $query = $related::query();
         if ($foreignValue === null) {
@@ -1500,7 +1564,7 @@ public function forceDelete() {
 		}
 
 		$relatedInstance = new $relatedClass;
-		$ownerKey = $relatedInstance->primaryKey;
+		$ownerKey = $relatedInstance->getPrimaryKey();
 
 		$query = $relatedClass::query()->where($ownerKey, $foreignValue);
 
