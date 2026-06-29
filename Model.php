@@ -375,6 +375,10 @@ abstract class Model implements \ArrayAccess {
 			return;
 		}
 
+		$this->setAttributeDirectly($key, $value);
+	}
+
+	protected function setAttributeDirectly($key, $value) {
 		$method = 'set' . Helpers::convert_to_pascal_case($key) . 'Attribute';
 		if (method_exists($this, $method)) {
 			return $this->$method($value);
@@ -1974,7 +1978,7 @@ public function forceDelete() {
 	}
 
 	public function offsetSet($offset, $value): void {
-		$this->__set($offset, $value);
+		$this->setAttributeDirectly($offset, $value);
 	}
 
 	public function offsetUnset($offset): void {

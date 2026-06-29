@@ -45,26 +45,6 @@ PRIORITY 2 — SIGNIFICANT BUGS
 ================================================================================
 
 ------------------------------------------------------------------------
-2.3 — Model::offsetSet() silently ignores non-fillable attribute writes
-------------------------------------------------------------------------
-DESCRIPTION:
-  offsetSet() calls __set(), which enforces $fillable/$guarded mass-assignment
-  guards. This means $model['non_fillable_col'] = 'value' silently does
-  nothing if the column is not in $fillable (or is in $guarded). In Eloquent,
-  array-access offsetSet() goes through setAttribute() which bypasses fillable
-  guards for direct assignment contexts. The current behavior can surprise
-  users who expect $model['column'] = value to always work like direct property
-  assignment.
-
-AFFECTED FILES:
-  - Model.php → offsetSet()
-
-FIX (decision needed):
-  Confirm whether this is intentional. If direct array-access should bypass
-  mass-assignment guards (matching Eloquent's behavior), change offsetSet()
-  to call forceSetAttribute() instead of __set().
-
-------------------------------------------------------------------------
 2.4 — Model::insert() ignores $wpdb->insert() return value
 ------------------------------------------------------------------------
 DESCRIPTION:
