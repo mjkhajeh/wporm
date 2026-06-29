@@ -909,7 +909,10 @@ protected function castSet($key, $value) {
 			$this->attributes[$this->createdAtColumn] = $now;
 			$this->attributes[$this->updatedAtColumn] = $now;
 		}
-		$wpdb->insert($this->getTable(), $this->attributes);
+		$result = $wpdb->insert($this->getTable(), $this->attributes);
+		if ($result === false) {
+			return false;
+		}
 		$this->exists = true;
 		$pk = $this->primaryKey;
 		$this->attributes[$pk] = $wpdb->insert_id;

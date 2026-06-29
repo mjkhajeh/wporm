@@ -45,23 +45,6 @@ PRIORITY 2 — SIGNIFICANT BUGS
 ================================================================================
 
 ------------------------------------------------------------------------
-2.4 — Model::insert() ignores $wpdb->insert() return value
-------------------------------------------------------------------------
-DESCRIPTION:
-  $wpdb->insert() returns false on SQL failure (e.g., unique constraint
-  violation, connection error). Model::insert() ignores this return value and
-  unconditionally sets $this->exists = true and $this->attributes[$pk] =
-  $wpdb->insert_id. When insert fails, insert_id is 0, leaving the model
-  in an inconsistent exists=true state with a primary key of 0.
-
-AFFECTED FILES:
-  - Model.php → insert()
-
-FIX:
-  Check the return value of $wpdb->insert(). If it returns false, return false
-  from insert() without setting $this->exists = true or touching $this->$pk.
-
-------------------------------------------------------------------------
 2.5 — Model::update() ignores $wpdb->update() return value
 ------------------------------------------------------------------------
 DESCRIPTION:
