@@ -1187,6 +1187,59 @@ foreach ($users as $user) {
 
 The resulting `{relation}_count` is a plain integer attribute, not an eager-loaded relation — it appears automatically in `toArray()`/`toJson()` output (subject to `$hidden`/`$visible`, same as any other attribute) and does not require accessing `$user->posts` to read it.
 
+## Aggregate Sub-Selects: withSum(), withAvg(), withMin(), withMax()
+
+Similar to `withCount()`, these methods compute a single aggregate value across a related column and attach it as a plain attribute — without loading the related records themselves. Each uses one grouped query per relation (SUM/AVG/MIN/MAX ... GROUP BY), never one query per row.
+
+```php
+// Adds a `orders_sum_total` float attribute to every user
+$users = User::withSum('orders', 'total')->get();
+foreach ($users as $user) {
+    echo $user->orders_sum_total;
+}
+
+// Average, minimum, and maximum
+$users = User::withAvg('reviews', 'rating')->get();
+$users = User::withMin('orders', 'total')->get();
+$users = User::withMax('orders', 'total')->get();
+
+// Multiple relations at once
+$users = User::withSum(['orders', 'payments'], 'amount')->get();
+```
+
+### Constraining an aggregate
+
+Pass a closure to add extra `WHERE` constraints to the aggregate's underlying query:
+
+```php
+// Only sum completed orders
+$users = User::withSum(['orders' => function($q) {
+    $q->where('status', 'completed');
+}], 'total')->get();
+```
+
+### Custom output name
+
+Use `"relation as alias"` to control the attribute name:
+
+```php
+$users = User::withSum([
+    'orders',
+    'orders as completed_orders_sum' => function($q) {
+        $q->where('status', 'completed');
+    },
+], 'total')->get();
+
+foreach ($users as $user) {
+    echo $user->orders_sum;                // all orders
+    echo $user->completed_orders_sum;      // completed only
+}
+```
+
+### Supported relationship types
+
+Same as `withCount()`: `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`, `morphOne`, and `morphMany`. `morphTo` is not supported — the aggregate resolves to `null`.
+
 ## Model Events and $dispatchesEvents
 
 WPORM provides three complementary ways to respond to model lifecycle events.

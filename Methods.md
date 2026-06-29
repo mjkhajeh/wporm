@@ -20,6 +20,7 @@ This document describes all public and static methods of the `MJ\WPORM\Model` cl
 - [Relationship Existence Filtering](#relationship-existence-filtering)
 - [Eager Loading](#eager-loading)
 - [Eager Loading Counts: withCount()](#eager-loading-counts-withcount)
+- [Aggregate Sub-Selects: withSum(), withAvg(), withMin(), withMax()](#aggregate-sub-selects-withsum-withavg-withmin-withmax)
 - [Utility Methods](#utility-methods)
 - [Mass Assignment Protection](#mass-assignment-protection)
 - [Hidden & Visible Attributes](#hidden--visible-attributes)
@@ -1697,6 +1698,73 @@ $users = User::query()
 - The resulting count is a plain integer **attribute**, not a relation — it's present directly on `$model->{alias}` and included automatically in `toArray()`/`toJson()` output (subject to `$hidden`/`$visible`, like any other attribute). It does not populate or require accessing the relation itself (e.g. `$user->posts` is unaffected and, if also accessed, triggers its own separate query as usual).
 - Respects the related model's soft-delete scope (soft-deleted related rows are excluded from the count unless the constraint closure calls `withTrashed()` on the count subquery).
 - A relation with zero matches yields `0`, not `null`.
+
+---
+
+## Aggregate Sub-Selects: withSum(), withAvg(), withMin(), withMax()
+
+### withSum($relations, $column)
+### withAvg($relations, $column)
+### withMin($relations, $column)
+### withMax($relations, $column)
+
+**Description:** Eager-load a single aggregate value (SUM, AVG, MIN, or MAX) of a column from one or more relations onto every result, without loading the relation's actual records. Adds a `{relation}_{function}` float attribute to each model (e.g. `orders_sum_total` for `withSum('orders', 'total')`), computed via exactly one grouped query per relation — never one query per row. Available both as a static method on the model and as a `QueryBuilder` instance method.
+
+The second argument is the column on the related table to aggregate.
+
+Accepts the same shapes as `withCount()`:
+- A single relation name: `withSum('orders', 'total')`
+- An array of relation names: `withSum(['orders', 'payments'], 'amount')`
+- An associative array mapping a relation name to a constraint closure: `withSum(['orders' => function($q) { $q->where('status', 'completed'); }], 'total')`
+
+A custom output attribute name is supported via `"relation as alias"` syntax:
+
+```php
+withSum('orders as completed_total', 'total')
+withSum(['orders as completed_total' => function($q) { $q->where('status', 'completed'); }], 'total')
+```
+
+**Supported relationship types:** `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`, `morphOne`, `morphMany`. `morphTo` is not supported — aggregates resolve to `null`.
+
+**Examples:**
+```php
+// Single relation
+$users = User::withSum('orders', 'total')->get();
+foreach ($users as $user) {
+    echo $user->orders_sum_total;
+}
+
+// Multiple relations — one extra query per relation
+$users = User::withSum(['orders', 'payments'], 'amount')->get();
+
+// Average
+$users = User::withAvg('reviews', 'rating')->get();
+
+// Constrained aggregate
+$users = User::withSum(['orders' => function($q) {
+    $q->where('status', 'completed');
+}], 'total')->get();
+
+// Same relation, multiple aliased aggregates
+$users = User::withSum([
+    'orders',
+    'orders as completed_orders_sum' => function($q) {
+        $q->where('status', 'completed');
+    },
+], 'total')->get();
+
+// Mid-chain, combined with where()/with()
+$users = User::query()
+    ->where('active', true)
+    ->withSum('orders', 'total')
+    ->with('profile')
+    ->get();
+```
+
+**Notes:**
+- The resulting value is a plain float **attribute**, not a relation — it's present directly on `$model->{alias}` and included in `toArray()`/`toJson()` output (subject to `$hidden`/`$visible`).
+- Returns `null` when no related rows match (unlike `withCount()` which returns `0`).
+- Respects the related model's soft-delete scope.
 
 ---
 

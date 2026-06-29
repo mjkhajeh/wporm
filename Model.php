@@ -2045,6 +2045,22 @@ public function forceDelete() {
         return static::query()->withCount($relations);
     }
 
+    public static function withSum($relations, string $column) {
+        return static::query()->withSum($relations, $column);
+    }
+
+    public static function withAvg($relations, string $column) {
+        return static::query()->withAvg($relations, $column);
+    }
+
+    public static function withMin($relations, string $column) {
+        return static::query()->withMin($relations, $column);
+    }
+
+    public static function withMax($relations, string $column) {
+        return static::query()->withMax($relations, $column);
+    }
+
     public function __isset($key) {
         // Eager loaded relations (use array_key_exists so null values are considered "set")
         if (array_key_exists($key, $this->_eagerLoaded)) {

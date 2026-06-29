@@ -53,7 +53,7 @@ The latest task was completed. (Moderate Issues: 0)
   | ✅ 29 | fromSub() / from() | Query from subquery or change table |
   | ✅ 30 | tap() / pipe() on QueryBuilder, Collection, and Model | Functional chaining — Model previously had none (bug: __call() silently proxied to a fresh QueryBuilder instead of the model itself); now fixed with real instance methods |
   | ✅ 31 | withCount() | User::withCount('posts')->get() — adds posts_count |
-  | 32 | withSum() / withAvg() / withMin() / withMax() | Aggregate sub-selects |
+  | ✅ 32 | withSum() / withAvg() / withMin() / withMax() | Aggregate sub-selects |
   | 33 | Observer / Event dispatcher system | Beyond hardcoded method hooks |
   | ✅ 34 | $dispatchesEvents property | Map events to classes |
   | 35 | replicate() | Clone a model without PK |

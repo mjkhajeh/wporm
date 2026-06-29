@@ -20,6 +20,7 @@ class QueryBuilder {
     protected $unions = [];
     protected $with = [];
     protected $withCount = [];
+    protected $withAggregate = [];
     protected $applyGlobalScopes = true;
     protected $relationContext = [];
 
@@ -1039,6 +1040,80 @@ class QueryBuilder {
     }
 
     /**
+     * Parse an aggregate relation spec into [relationName, outputAlias].
+     * Supports "relation as alias" syntax; defaults the alias to
+     * "{relation}_{function}" when no explicit alias is given.
+     *
+     * @param string $name  e.g. "orders" or "orders as total_revenue"
+     * @param string $function  One of sum, avg, min, max
+     * @return array{0: string, 1: string}
+     */
+    protected function parseWithAggregateName($name, string $function): array {
+        if (preg_match('/^(.+?)\s+as\s+(.+)$/i', $name, $m)) {
+            return [trim($m[1]), trim($m[2])];
+        }
+        return [$name, $name . '_' . $function];
+    }
+
+    /**
+     * Register aggregate sub-selects for sum/avg/min/max on relations.
+     *
+     * Usage:
+     *   ->withSum('orders', 'total')
+     *   ->withAvg('reviews', 'rating')
+     *   ->withMin('orders', 'total')
+     *   ->withMax('orders', 'total')
+     *   ->withSum(['orders', 'payments as total_paid'], 'amount')
+     *   ->withSum(['orders' => function($q) { $q->where('status', 'completed'); }], 'total')
+     *
+     * @param string|array $relations
+     * @param string $column  The column to aggregate on the related table
+     * @return $this
+     */
+    public function withSum($relations, string $column) {
+        return $this->registerAggregate($relations, $column, 'sum');
+    }
+
+    public function withAvg($relations, string $column) {
+        return $this->registerAggregate($relations, $column, 'avg');
+    }
+
+    public function withMin($relations, string $column) {
+        return $this->registerAggregate($relations, $column, 'min');
+    }
+
+    public function withMax($relations, string $column) {
+        return $this->registerAggregate($relations, $column, 'max');
+    }
+
+    protected function registerAggregate($relations, string $column, string $function): self {
+        // Normalize to array
+        if (!is_array($relations)) {
+            $relations = [$relations];
+        }
+        foreach ($relations as $key => $value) {
+            if (is_int($key)) {
+                [$relation, $alias] = $this->parseWithAggregateName($value, $function);
+                $this->withAggregate[$relation] = [
+                    'column'     => $column,
+                    'function'   => $function,
+                    'alias'      => $alias,
+                    'constraint' => null,
+                ];
+            } else {
+                [$relation, $alias] = $this->parseWithAggregateName($key, $function);
+                $this->withAggregate[$relation] = [
+                    'column'     => $column,
+                    'function'   => $function,
+                    'alias'      => $alias,
+                    'constraint' => $value,
+                ];
+            }
+        }
+        return $this;
+    }
+
+    /**
      * Include soft-deleted records in results.
      */
     public $withTrashed = false;
@@ -1140,6 +1215,12 @@ class QueryBuilder {
         if (!empty($this->withCount) && !empty($models)) {
             foreach ($this->withCount as $relation => $spec) {
                 $this->loadRelationCount($models, $relation, $spec['alias'], $spec['constraint']);
+            }
+        }
+        // Load aggregate sub-selects (withSum/withAvg/withMin/withMax)
+        if (!empty($this->withAggregate) && !empty($models)) {
+            foreach ($this->withAggregate as $relation => $spec) {
+                $this->loadRelationAggregate($models, $relation, $spec['column'], $spec['function'], $spec['alias'], $spec['constraint']);
             }
         }
         return new \MJ\WPORM\Collection($models);
@@ -2664,6 +2745,198 @@ class QueryBuilder {
             }
         }
         return $counts;
+    }
+
+    /**
+     * Load an aggregate (SUM/AVG/MIN/MAX) of a related column onto each model.
+     *
+     * @param array   &$models
+     * @param string  $relation   Relation method name
+     * @param string  $column     Column on the related table to aggregate
+     * @param string  $function   One of sum, avg, min, max
+     * @param string  $alias      Attribute name to write on each model
+     * @param callable|null $constraint
+     */
+    protected function loadRelationAggregate(array &$models, $relation, string $column, string $function, string $alias, $constraint = null) {
+        if (empty($models)) return;
+
+        $firstModel = $models[0];
+        if (!method_exists($firstModel, $relation)) {
+            foreach ($models as $m) { $m->forceSetAttribute($alias, null); }
+            return;
+        }
+
+        $sampleQuery = $firstModel->$relation();
+        if (!($sampleQuery instanceof \MJ\WPORM\QueryBuilder)) {
+            foreach ($models as $m) { $m->forceSetAttribute($alias, null); }
+            return;
+        }
+
+        $ctx  = $sampleQuery->getRelationContext();
+        $type = $ctx['type'] ?? null;
+        $fn   = strtoupper($function);
+
+        // ── hasOne / hasMany ────────────────────────────────────────────
+        if ($type === 'hasOne' || $type === 'hasMany') {
+            $foreignKey = $ctx['foreignKey'];
+            $localKey   = $ctx['localKey'];
+            $relClass   = $ctx['related'];
+
+            $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
+
+            $query = $relClass::query()
+                ->select(["$foreignKey as _wporm_agg_key", "$fn($column) as _wporm_agg_value"])
+                ->whereIn($foreignKey, $ids)
+                ->groupBy($foreignKey);
+            if ($constraint) $constraint($query);
+
+            $map = $this->fetchGroupedAggregates($query);
+            foreach ($models as $m) {
+                $m->forceSetAttribute($alias, $map[$m->$localKey] ?? null);
+            }
+            return;
+        }
+
+        // ── belongsTo ──────────────────────────────────────────────────
+        if ($type === 'belongsTo') {
+            $foreignKey = $ctx['foreignKey'];
+            $ownerKey   = $ctx['ownerKey'];
+            $relClass   = $ctx['related'];
+
+            $ids = array_values(array_unique(array_filter(
+                array_map(fn($m) => $m->$foreignKey, $models),
+                fn($id) => $id !== null
+            )));
+
+            if (empty($ids)) {
+                foreach ($models as $m) { $m->forceSetAttribute($alias, null); }
+                return;
+            }
+
+            $query = $relClass::query()
+                ->select(["$ownerKey as _wporm_agg_key", "$fn($column) as _wporm_agg_value"])
+                ->whereIn($ownerKey, $ids)
+                ->groupBy($ownerKey);
+            if ($constraint) $constraint($query);
+
+            $map = $this->fetchGroupedAggregates($query);
+            foreach ($models as $m) {
+                $m->forceSetAttribute($alias, $map[$m->$foreignKey] ?? null);
+            }
+            return;
+        }
+
+        // ── belongsToMany ──────────────────────────────────────────────
+        if ($type === 'belongsToMany') {
+            $pivotTable      = $ctx['pivotTable'];
+            $foreignPivotKey = $ctx['foreignPivotKey'];
+            $relatedPivotKey = $ctx['relatedPivotKey'];
+            $localKey        = $ctx['localKey'];
+            $relatedTable    = $ctx['relatedTable'];
+            $relClass        = $ctx['related'];
+
+            $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
+
+            $relatedInstance = new $relClass;
+            $relatedPK       = $relatedInstance->getPrimaryKey();
+
+            $query = $relClass::query()
+                ->select([
+                    "$pivotTable.$foreignPivotKey as _wporm_agg_key",
+                    "$fn($relatedTable.$column) as _wporm_agg_value",
+                ])
+                ->join($pivotTable, "$relatedTable.$relatedPK", '=', "$pivotTable.$relatedPivotKey")
+                ->whereIn("$pivotTable.$foreignPivotKey", $ids)
+                ->groupBy("$pivotTable.$foreignPivotKey");
+            if ($constraint) $constraint($query);
+
+            $map = $this->fetchGroupedAggregates($query);
+            foreach ($models as $m) {
+                $m->forceSetAttribute($alias, $map[$m->$localKey] ?? null);
+            }
+            return;
+        }
+
+        // ── hasManyThrough ─────────────────────────────────────────────
+        if ($type === 'hasManyThrough') {
+            $firstKey     = $ctx['firstKey'];
+            $secondKey    = $ctx['secondKey'];
+            $localKey     = $ctx['localKey'];
+            $relatedTable = $ctx['relatedTable'];
+            $throughTable = $ctx['throughTable'];
+            $throughPK    = $ctx['throughPK'];
+            $relClass     = $ctx['related'];
+
+            $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
+
+            $query = $relClass::query()
+                ->select([
+                    "$throughTable.$firstKey as _wporm_agg_key",
+                    "$fn($relatedTable.$column) as _wporm_agg_value",
+                ])
+                ->join($throughTable, "$relatedTable.$secondKey", '=', "$throughTable.$throughPK")
+                ->whereIn("$throughTable.$firstKey", $ids)
+                ->groupBy("$throughTable.$firstKey");
+            if ($constraint) $constraint($query);
+
+            $map = $this->fetchGroupedAggregates($query);
+            foreach ($models as $m) {
+                $m->forceSetAttribute($alias, $map[$m->$localKey] ?? null);
+            }
+            return;
+        }
+
+        // ── morphOne / morphMany ───────────────────────────────────────
+        if ($type === 'morphOne' || $type === 'morphMany') {
+            $morphId    = $ctx['morphId'];
+            $morphType  = $ctx['morphType'];
+            $morphClass = $ctx['morphClass'];
+            $localKey   = $ctx['localKey'];
+            $relClass   = $ctx['related'];
+
+            $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
+
+            $query = $relClass::query()
+                ->select(["$morphId as _wporm_agg_key", "$fn($column) as _wporm_agg_value"])
+                ->where($morphType, $morphClass)
+                ->whereIn($morphId, $ids)
+                ->groupBy($morphId);
+            if ($constraint) $constraint($query);
+
+            $map = $this->fetchGroupedAggregates($query);
+            foreach ($models as $m) {
+                $m->forceSetAttribute($alias, $map[$m->$localKey] ?? null);
+            }
+            return;
+        }
+
+        // ── Unsupported (e.g. morphTo): default to null ────────────────
+        foreach ($models as $m) {
+            $m->forceSetAttribute($alias, null);
+        }
+    }
+
+    /**
+     * Run a grouped "<key>, <AGG>()" query and return a [groupKeyValue => value] map.
+     */
+    protected function fetchGroupedAggregates(QueryBuilder $query): array {
+        $query->applySoftDeleteScope();
+        $sql = $query->buildSelectQuery();
+        $bindings = $query->getBindings();
+
+        if (!empty($bindings)) {
+            $rows = $this->wpdb->get_results($this->wpdb->prepare($sql, ...$bindings), ARRAY_A);
+        } else {
+            $rows = $this->wpdb->get_results($sql, ARRAY_A);
+        }
+
+        $map = [];
+        if ($rows) {
+            foreach ($rows as $row) {
+                $map[$row['_wporm_agg_key']] = $row['_wporm_agg_value'] === null ? null : (float) $row['_wporm_agg_value'];
+            }
+        }
+        return $map;
     }
 
     // WHERE EXISTS / NOT EXISTS
