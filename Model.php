@@ -920,7 +920,6 @@ protected function castSet($key, $value) {
 		$this->exists = true;
 		$pk = $this->primaryKey;
 		$this->attributes[$pk] = $wpdb->insert_id;
-		$this->$pk = $wpdb->insert_id;
 
 		// created (after-hook)
 		$this->fireModelEvent('created');

@@ -44,44 +44,6 @@ PRIORITY 3 — MINOR BUGS / CODE QUALITY / COMPATIBILITY ISSUES
 ================================================================================
 
 ------------------------------------------------------------------------
-3.3 — Blueprint::wrapArray() does not quote column names in index definitions
-------------------------------------------------------------------------
-DESCRIPTION:
-  The wrapArray() helper produces unquoted column names in KEY, UNIQUE KEY,
-  FULLTEXT KEY, and SPATIAL KEY definitions:
-    KEY index_... (user_id, created_at)
-  If a column name is a MySQL reserved word (e.g., 'key', 'value', 'order'),
-  the index definition will produce a MySQL parse error. ColumnDefinition
-  quotes column names in CREATE TABLE column definitions, but that quoting
-  does not carry through to the index/key definitions built via wrapArray().
-
-AFFECTED FILES:
-  - Blueprint.php → wrapArray()
-
-FIX:
-  Quote each column name in wrapArray() using Helpers::quoteIdentifier().
-
-------------------------------------------------------------------------
-3.4 — Model::insert() uses dynamic property assignment (deprecated PHP 8.2)
-------------------------------------------------------------------------
-DESCRIPTION:
-  Model::insert() contains:
-    $this->$pk = $wpdb->insert_id;
-  where $pk is the string 'id' (or whatever primaryKey is). This dynamically
-  creates a public property $id on the model object, which is not declared.
-  PHP 8.2 deprecated dynamic (undeclared) property creation and PHP 9.0 will
-  make it a fatal error. The value is already set correctly on the line above
-  via $this->attributes[$pk] = $wpdb->insert_id, making this line redundant
-  and harmful.
-
-AFFECTED FILES:
-  - Model.php → insert()
-
-FIX:
-  Remove the line $this->$pk = $wpdb->insert_id. The primary key is already
-  correctly stored in $this->attributes[$pk].
-
-------------------------------------------------------------------------
 3.5 — Nested where/orWhere closures apply global scopes to the sub-builder
 ------------------------------------------------------------------------
 DESCRIPTION:
