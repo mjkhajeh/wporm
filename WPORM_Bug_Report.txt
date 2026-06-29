@@ -40,35 +40,6 @@ FIX:
   get_class($this) !== Model::class combined with method_exists.
 
 ================================================================================
-PRIORITY 2 — SIGNIFICANT BUGS
-(Wrong behavior, silent failures, or edge-case data loss)
-================================================================================
-
-------------------------------------------------------------------------
-2.8 — count() uses $this->bindings directly, missing fromSub/having/
-       groupByRaw bindings
-------------------------------------------------------------------------
-DESCRIPTION:
-  QueryBuilder::count() computes its bindings as:
-    $bindings = !empty($this->unions) ? getUnionWrappedBindings() : $this->bindings;
-  For the non-union path, it uses only $this->bindings (the raw WHERE
-  bindings), but the count query SQL (buildCountQuery()) does not include
-  GROUP BY, HAVING, or ORDER BY clauses, while buildCountQuery() for the
-  union path already handles this correctly. However, if a fromSub() derived
-  table is used, its bindings (returned by getFromSubBindings()) are not
-  included in the count bindings, causing a $wpdb->prepare() placeholder
-  mismatch that silently corrupts or fails the query.
-
-AFFECTED FILES:
-  - QueryBuilder.php → count()
-
-FIX:
-  For the non-union path, build the binding set to match exactly what
-  buildCountQuery() generates: include getFromSubBindings() before
-  $this->bindings, and omit groupByRaw/havingRaw bindings since those clauses
-  are absent from buildCountQuery().
-
-================================================================================
 PRIORITY 3 — MINOR BUGS / CODE QUALITY / COMPATIBILITY ISSUES
 ================================================================================
 

@@ -1150,7 +1150,9 @@ class QueryBuilder {
         // set from getUnionWrappedBindings() — not the plain $this->bindings,
         // and not the full getBindings() (which would include orphaned
         // selectRaw() bindings for a SELECT list that isn't actually used).
-        $bindings = !empty($this->unions) ? $this->getUnionWrappedBindings() : $this->bindings;
+        $bindings = !empty($this->unions)
+            ? $this->getUnionWrappedBindings()
+            : array_merge($this->getFromSubBindings(), $this->bindings);
         if ($this->debug) {
             error_log('[WPORM][count] SQL: ' . $sql);
             error_log('[WPORM][count] Bindings: ' . print_r($bindings, true));
