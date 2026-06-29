@@ -949,7 +949,10 @@ protected function castSet($key, $value) {
 		if (!isset($this->attributes[$pk])) {
 			return false;
 		}
-		$wpdb->update($this->getTable(), $this->attributes, [$pk => $this->attributes[$pk]]);
+		$result = $wpdb->update($this->getTable(), $this->attributes, [$pk => $this->attributes[$pk]]);
+		if ($result === false) {
+			return false;
+		}
 
 		// updated (after-hook)
 		$this->fireModelEvent('updated');

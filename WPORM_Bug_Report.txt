@@ -45,21 +45,6 @@ PRIORITY 2 — SIGNIFICANT BUGS
 ================================================================================
 
 ------------------------------------------------------------------------
-2.5 — Model::update() ignores $wpdb->update() return value
-------------------------------------------------------------------------
-DESCRIPTION:
-  $wpdb->update() can return false on SQL error. Model::update() ignores this
-  return value, always fires the 'updated' event, and always returns true.
-  A failed UPDATE is silently reported as success to the caller.
-
-AFFECTED FILES:
-  - Model.php → update()
-
-FIX:
-  Check the return value of $wpdb->update(). If it returns false, return false
-  without firing the 'updated' event.
-
-------------------------------------------------------------------------
 2.6 — Blueprint::softDeletesTz() documented but not implemented
 ------------------------------------------------------------------------
 DESCRIPTION:
