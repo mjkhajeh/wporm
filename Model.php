@@ -387,14 +387,15 @@ abstract class Model implements \ArrayAccess {
 	}
 
 	public function __call($method, $parameters) {
-        // Proxy query builder methods to QueryBuilder for fluent API
-        $query = static::query();
-        if (method_exists($query, $method)) {
-            return $query->$method(...$parameters);
-        }
-        // Handle dynamic scopes: scopeXyz()
+        // Handle dynamic scopes: scopeXyz() — cheap check before building a query
         if (strpos($method, 'scope') === 0 && method_exists($this, $method)) {
-            return $this->$method(...$parameters);
+            $query = static::query();
+            return $this->$method($query, ...$parameters);
+        }
+        // Proxy query builder methods to QueryBuilder for fluent API
+        if (method_exists(\MJ\WPORM\QueryBuilder::class, $method)) {
+            $query = static::query();
+            return $query->$method(...$parameters);
         }
         throw new \BadMethodCallException("Method {$method} does not exist.");
     }

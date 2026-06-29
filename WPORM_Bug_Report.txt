@@ -44,26 +44,6 @@ PRIORITY 3 — MINOR BUGS / CODE QUALITY / COMPATIBILITY ISSUES
 ================================================================================
 
 ------------------------------------------------------------------------
-3.1 — Model::__call() builds a full QueryBuilder before checking scope methods
-------------------------------------------------------------------------
-DESCRIPTION:
-  Every call to an undefined instance method on Model runs static::query()
-  (constructing a full QueryBuilder, applying global scopes) before checking
-  whether the method exists on the query or is a scope. If neither, it throws
-  BadMethodCallException — but only after paying the full construction cost.
-  Additionally, the scope detection check happens after the query construction,
-  so a dynamic scope method (scopeXyz) that expects $query as its first
-  argument does not receive it — it is called with only $parameters.
-
-AFFECTED FILES:
-  - Model.php → __call()
-
-FIX:
-  Check for scope methods before constructing the QueryBuilder. For proxy
-  calls, only build the query when the method is confirmed to exist on the
-  QueryBuilder.
-
-------------------------------------------------------------------------
 3.2 — Model::getTable() prefix check has a false-positive edge case
 ------------------------------------------------------------------------
 DESCRIPTION:
