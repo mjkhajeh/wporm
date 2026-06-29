@@ -44,25 +44,6 @@ PRIORITY 3 — MINOR BUGS / CODE QUALITY / COMPATIBILITY ISSUES
 ================================================================================
 
 ------------------------------------------------------------------------
-3.8 — SchemaBuilder::create() may double-prefix if called with a prefixed name
-------------------------------------------------------------------------
-DESCRIPTION:
-  SchemaBuilder::create() prefixes the table name:
-    $blueprint = new Blueprint($this->prefix . $table, ...)
-    $fullTable  = $this->prefix . $table
-  If a caller passes an already-prefixed name (e.g. 'wp_users' when
-  $this->prefix = 'wp_'), the result is 'wp_wp_users'. The Model constructor
-  is safe because it uses getTable() which handles this, but direct
-  SchemaBuilder::create() calls are vulnerable.
-
-AFFECTED FILES:
-  - SchemaBuilder.php → create()
-
-FIX:
-  Document that the $table argument must be a bare (un-prefixed) table name,
-  or strip the prefix if already present before applying it.
-
-------------------------------------------------------------------------
 3.9 — Blueprint::language() is documented but not implemented
 ------------------------------------------------------------------------
 DESCRIPTION:
