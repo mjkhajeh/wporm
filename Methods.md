@@ -1431,6 +1431,31 @@ $user->delete();
 User::query()->truncate();
 ```
 
+### getWasRecentlyCreated()
+**Description:** Check if this model was created by the most recent `save()` call (INSERT), not an update. Returns `true` only if the last save triggered an INSERT. The flag is automatically reset on the next `save()` call. Useful for distinguishing between creation and update logic in save hooks or after-save workflows.
+
+**Example:**
+```php
+$user = new User(['name' => 'John', 'email' => 'john@example.com']);
+$user->save();
+$user->wasRecentlyCreated; // true (or use $user->getWasRecentlyCreated())
+
+$user->name = 'Jane';
+$user->save();
+$user->wasRecentlyCreated; // false
+
+// Common use case: send welcome email only on creation
+$user->save();
+if ($user->wasRecentlyCreated) {
+    Mail::to($user)->send(new WelcomeEmail($user));
+}
+```
+
+**Notes:**
+- Resets to `false` at the start of every `save()` call.
+- Only set to `true` by `insert()` — updates, `forceSetAttribute()`, and direct attribute assignment do not affect it.
+- Works with `firstOrCreate()`, `updateOrCreate()`, and similar methods that call `save()` internally.
+
 ---
 
 ## Relationship Methods

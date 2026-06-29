@@ -467,6 +467,30 @@ $clone = $post->replicate(['slug', 'meta']);
 - Relations are not copied — only scalar attributes.
 - `$clone->exists` is `false`, so the next `save()` triggers an INSERT.
 
+### Checking Creation Status: wasRecentlyCreated
+
+After saving a model, use `wasRecentlyCreated` to check if the save triggered an INSERT (new record) or an UPDATE (existing record):
+
+```php
+$user = new User(['name' => 'John']);
+$user->save();
+$user->wasRecentlyCreated; // true
+
+$user->name = 'Jane';
+$user->save();
+$user->wasRecentlyCreated; // false
+```
+
+- `wasRecentlyCreated` is `true` only after `save()` triggers an INSERT.
+- Resets to `false` at the start of every `save()` call.
+- Useful in save hooks or after-save workflows:
+```php
+$user->save();
+if ($user->wasRecentlyCreated) {
+    Mail::to($user)->send(new WelcomeEmail($user));
+}
+```
+
 ## Aggregates & Utility Methods
 
 WPORM provides Eloquent-style aggregate and utility methods on the query builder for common lookups, so you don't always need to fetch full models just to compute a number or check a single value.

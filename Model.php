@@ -18,6 +18,14 @@ abstract class Model implements \ArrayAccess {
 	protected $attributes = [];
 	protected $original = [];
 	protected $exists = false;
+
+	/**
+	 * Whether this model was created by a recent insert (not an update).
+	 * Set to true after save() triggers an INSERT; false after UPDATE or load.
+	 *
+	 * @var bool
+	 */
+	protected $wasRecentlyCreated = false;
 	protected static $booted = [];
 	protected static $globalScopes = [];
 	protected $createdAtColumn = 'created_at';
@@ -86,6 +94,27 @@ abstract class Model implements \ArrayAccess {
      */
     public function getPrimaryKey() {
         return $this->primaryKey ?? 'id';
+    }
+
+    /**
+     * Check if this model was created by a recent save (INSERT) call.
+     *
+     * Returns true only if the most recent save() triggered an INSERT,
+     * not an UPDATE. The flag is reset on the next save() call.
+     *
+     * Usage:
+     *   $user = new User(['name' => 'John']);
+     *   $user->save();
+     *   $user->wasRecentlyCreated; // true
+     *
+     *   $user->name = 'Jane';
+     *   $user->save();
+     *   $user->wasRecentlyCreated; // false
+     *
+     * @return bool
+     */
+    public function getWasRecentlyCreated(): bool {
+        return $this->wasRecentlyCreated;
     }
 
     /**
@@ -868,6 +897,9 @@ protected function castSet($key, $value) {
 	 * Returns false if any before-hook halts the operation (by returning false).
 	 */
 	public function save() {
+		// Reset flag before save — it will be set to true only by insert()
+		$this->wasRecentlyCreated = false;
+
 		// saving (before-hook — halts on false)
 		if ($this->fireModelEvent('saving') === false) {
 			return false;
@@ -909,6 +941,7 @@ protected function castSet($key, $value) {
 			return false;
 		}
 		$this->exists = true;
+		$this->wasRecentlyCreated = true;
 		$pk = $this->primaryKey;
 		$this->attributes[$pk] = $wpdb->insert_id;
 
