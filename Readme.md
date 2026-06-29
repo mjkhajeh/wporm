@@ -1242,7 +1242,7 @@ Same as `withCount()`: `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasMa
 
 ## Model Events and $dispatchesEvents
 
-WPORM provides three complementary ways to respond to model lifecycle events.
+WPORM provides four complementary ways to respond to model lifecycle events.
 
 ### 1. Method overrides (back-compat)
 
@@ -1301,7 +1301,61 @@ class ValidateEmail {
 }
 ```
 
-### 3. Global listeners via EventDispatcher
+### 3. Observers (Eloquent-style)
+
+Observer classes contain lifecycle methods that fire automatically for a specific model. Register an observer with `Model::observe()` — the observer's methods receive the model directly (not the event object), matching Eloquent's API.
+
+```php
+class UserObserver {
+    public function creating(User $user) {
+        $user->slug = \sanitize_title($user->name);
+    }
+
+    public function created(User $user) {
+        // Send welcome email, create default profile, etc.
+        wp_mail($user->email, 'Welcome!', '...');
+    }
+
+    public function updated(User $user) {
+        if ($user->isDirty('email')) {
+            // Email changed — send verification
+        }
+    }
+
+    public function deleted(User $user) {
+        // Clean up related data
+        wp_delete_user_meta($user->id, 'auth_token');
+    }
+}
+
+// Register once (e.g. in a plugin bootstrap file)
+User::observe(UserObserver::class);
+
+// Also accepts an instance
+User::observe(new UserObserver());
+```
+
+**Halting from an observer:** Return `false` from a before-hook method (`creating`, `updating`, `saving`, `deleting`, etc.) to cancel the operation:
+
+```php
+class PreventDoublePost {
+    public function creating($model) {
+        if (session_status() === PHP_SESSION_ACTIVE && $_SESSION['just_saved'] ?? false) {
+            return false;
+        }
+    }
+}
+```
+
+**Observer API:**
+- `Model::observe($observer)` — register an observer (class name or instance)
+- `Model::getObservers()` — get all registered observers for this model
+- `Model::forgetObservers($class)` — remove one observer (or all if null)
+- `Model::flushAllObservers()` — remove all observers from all models (useful in tests)
+
+**Supported observer methods:** `retrieved`, `creating`, `created`, `updating`, `updated`, `saving`, `saved`, `deleting`, `deleted`, `softDeleting`, `softDeleted`, `restoring`, `restored`
+
+### 4. Global listeners via EventDispatcher
 
 Register listeners that fire for every model that raises an event, regardless of model class:
 

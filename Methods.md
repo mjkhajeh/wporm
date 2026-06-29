@@ -22,6 +22,8 @@ This document describes all public and static methods of the `MJ\WPORM\Model` cl
 - [Eager Loading Counts: withCount()](#eager-loading-counts-withcount)
 - [Aggregate Sub-Selects: withSum(), withAvg(), withMin(), withMax()](#aggregate-sub-selects-withsum-withavg-withmin-withmax)
 - [Utility Methods](#utility-methods)
+- [$dispatchesEvents and EventDispatcher](#dispatchesevents-and-eventdispatcher)
+- [Observers](#observers)
 - [Mass Assignment Protection](#mass-assignment-protection)
 - [Hidden & Visible Attributes](#hidden--visible-attributes)
 - [JSON Where Clauses](#json-where-clauses)
@@ -2247,6 +2249,113 @@ class ValidateBeforeCreate {
 Both fire on every event. `$dispatchesEvents` mapping fires first, then global listeners. Either can halt a before-hook by returning `false`.
 
 ---
+
+## Observers
+
+Observers provide an Eloquent-style way to listen for model lifecycle events. An observer class defines methods matching event names (`creating`, `created`, `updating`, `updated`, etc.) that receive the model directly as their first argument — not the event object. This keeps observer code clean and focused on the model.
+
+### Model::observe($observer)
+
+**Description:** Register an observer class or instance for this model. The observer's lifecycle methods will be called automatically when the corresponding event fires.
+
+Accepts:
+- A class name (instantiated once per event dispatch): `User::observe(UserObserver::class)`
+- An observer instance: `User::observe(new UserObserver())`
+
+**Example:**
+```php
+class UserObserver {
+    public function creating($user) {
+        $user->slug = sanitize_title($user->name);
+    }
+
+    public function created($user) {
+        wp_mail($user->email, 'Welcome!', 'Thanks for signing up.');
+    }
+
+    public function updated($user) {
+        if ($user->isDirty('email')) {
+            // Send verification email
+        }
+    }
+
+    public function deleted($user) {
+        wp_delete_user_meta($user->id, 'auth_token');
+    }
+}
+
+// Register in your plugin bootstrap or service provider
+User::observe(UserObserver::class);
+```
+
+**Halting from an observer:** Return `false` from a before-hook method to cancel the operation:
+
+```php
+class PreventDuplicate {
+    public function creating($model) {
+        // Check for duplicates
+        $exists = User::query()->where('email', $model->email)->exists();
+        if ($exists) {
+            return false; // aborts save()
+        }
+    }
+}
+```
+
+### Model::getObservers()
+
+**Description:** Return all registered observers for this model class.
+
+**Example:**
+```php
+$observers = User::getObservers();
+// ['App\Observers\UserObserver' => 'App\Observers\UserObserver']
+```
+
+### Model::forgetObservers($observerClass = null)
+
+**Description:** Remove a specific observer class, or all observers for this model when called with null.
+
+**Example:**
+```php
+User::forgetObservers(UserObserver::class); // remove one
+User::forgetObservers();                    // remove all for User
+```
+
+### Model::flushAllObservers()
+
+**Description:** Remove all observers from all model classes. Useful in test teardown.
+
+**Example:**
+```php
+// In PHPUnit tearDown()
+User::flushAllObservers();
+```
+
+**Supported observer methods:**
+
+| Method | Fires when |
+|---|---|
+| `retrieved` | after fetch from DB |
+| `saving` | before INSERT or UPDATE |
+| `saved` | after INSERT or UPDATE |
+| `creating` | before INSERT |
+| `created` | after INSERT |
+| `updating` | before UPDATE |
+| `updated` | after UPDATE |
+| `deleting` | before hard DELETE |
+| `deleted` | after hard DELETE |
+| `softDeleting` | before soft delete |
+| `softDeleted` | after soft delete |
+| `restoring` | before restore |
+| `restored` | after restore |
+
+**Dispatch order:** When multiple mechanisms are active for the same event, they fire in this order:
+1. `$dispatchesEvents` class mapping
+2. Global `EventDispatcher::listen()` listeners
+3. Registered observers
+
+Any before-hook can halt the operation by returning `false`.
 
 ---
 

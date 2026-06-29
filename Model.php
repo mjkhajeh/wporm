@@ -131,6 +131,15 @@ abstract class Model implements \ArrayAccess {
     public $dispatchesEvents = [];
 
     /**
+     * Registered observer classes for this model, keyed by model class name.
+     * Observers have lifecycle methods (creating, created, updating, updated,
+     * saving, saved, deleting, deleted, etc.) that are called automatically.
+     *
+     * @var array<string, array<string, string>>
+     */
+    protected static $observers = [];
+
+    /**
      * Attributes that should be hidden from toArray()/toJson() output
      * (e.g. passwords, tokens, secrets). Eloquent-style $hidden.
      *
@@ -1891,15 +1900,36 @@ public function forceDelete() {
 		}
 
 		$eventClass = $eventMap[$event];
+		$observers  = static::getObservers();
 
-		// Fast-path: no $dispatchesEvents mapping and no global listeners registered.
+		// Fast-path: no dispatchesEvents, no global listeners, no observers.
 		if (empty($this->dispatchesEvents[$event])
 			&& empty(EventDispatcher::getListeners($eventClass))
+			&& empty($observers)
 		) {
 			return null;
 		}
 
-		return EventDispatcher::dispatch(new $eventClass($this));
+		// 1. Fire event through dispatcher (dispatchesEvents + global listeners)
+		$result = EventDispatcher::dispatch(new $eventClass($this));
+		if ($result === false) {
+			return false;
+		}
+
+		// 2. Call observers — Eloquent-style: $observer->$event($model)
+		foreach ($observers as $observer) {
+			if (is_string($observer)) {
+				$observer = new $observer();
+			}
+			if (method_exists($observer, $event)) {
+				$observed = $observer->$event($this);
+				if ($observed === false) {
+					return false;
+				}
+			}
+		}
+
+		return $eventClass;
 	}
 
 	public function isDirty($attribute = null) {
@@ -2061,26 +2091,65 @@ public function forceDelete() {
         return static::query()->withMax($relations, $column);
     }
 
-    public function __isset($key) {
-        // Eager loaded relations (use array_key_exists so null values are considered "set")
-        if (array_key_exists($key, $this->_eagerLoaded)) {
-            return true;
+    /**
+     * Register an observer for this model class.
+     *
+     * The observer class should define methods matching lifecycle events:
+     *   creating, created, updating, updated, saving, saved,
+     *   deleting, deleted, softDeleting, softDeleted, restoring, restored
+     *
+     * Usage:
+     *   User::observe(UserObserver::class);
+     *   User::observe(new UserObserver());
+     *
+     * @param string|object $observer  Observer class name or instance
+     * @return void
+     */
+    public static function observe($observer): void
+    {
+        $class = static::class;
+        if (is_object($observer)) {
+            static::$observers[$class][get_class($observer)] = $observer;
+        } else {
+            static::$observers[$class][$observer] = $observer;
         }
-        $method = 'get' . Helpers::convert_to_pascal_case($key) . 'Attribute';
-        if (method_exists($this, $method)) {
-            return true;
+    }
+
+    /**
+     * Get all registered observers for this model class.
+     *
+     * @return array<string, string|object>
+     */
+    public static function getObservers(): array
+    {
+        return static::$observers[static::class] ?? [];
+    }
+
+    /**
+     * Remove all observers for this model class, or a specific one.
+     *
+     * @param string|null $observerClass  If null, removes all observers for this model.
+     * @return void
+     */
+    public static function forgetObservers(?string $observerClass = null): void
+    {
+        $class = static::class;
+        if ($observerClass === null) {
+            unset(static::$observers[$class]);
+        } else {
+            unset(static::$observers[$class][$observerClass]);
         }
-        if (method_exists($this, $key)) {
-            return true;
-        }
-        if (array_key_exists($key, $this->attributes)) {
-            // Allow empty values to be considered set
-            return true;
-        }
-        if (property_exists($this, $key)) {
-            return isset($this->$key);
-        }
-        return false;
+    }
+
+    /**
+     * Remove all observers from all model classes.
+     * Useful in testing.
+     *
+     * @return void
+     */
+    public static function flushAllObservers(): void
+    {
+        static::$observers = [];
     }
 
     /**
