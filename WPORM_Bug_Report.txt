@@ -38,25 +38,3 @@ FIX:
         !== Model::class
   Or use a simpler pattern: check if the subclass declares the method via
   get_class($this) !== Model::class combined with method_exists.
-
-================================================================================
-PRIORITY 3 — MINOR BUGS / CODE QUALITY / COMPATIBILITY ISSUES
-================================================================================
-
-------------------------------------------------------------------------
-3.9 — Blueprint::language() is documented but not implemented
-------------------------------------------------------------------------
-DESCRIPTION:
-  Blueprint.md documents:
-    language($columns, $language, $name = null)
-    "Adds a language-specific index (MySQL 8+; limited dbDelta support)."
-  No such method exists in Blueprint.php. Calling $table->language(...) falls
-  through to Blueprint::__call(), which silently does nothing.
-
-AFFECTED FILES:
-  - Blueprint.php (missing method)
-  - Blueprint.md (documents a non-existent method)
-
-FIX:
-  Add a language() stub method to Blueprint.php that generates the appropriate
-  KEY definition, or remove it from the documentation.

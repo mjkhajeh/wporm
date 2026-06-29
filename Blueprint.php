@@ -288,6 +288,19 @@ class Blueprint
         return $this;
     }
 
+    /**
+     * Add a language-specific fulltext index (MySQL 8+).
+     * Generates a FULLTEXT KEY — the $language parameter is stored for
+     * documentation purposes; MySQL indexes are not language-scoped.
+     * Usage: $table->language('title', 'english');
+     */
+    public function language($columns, $language, $name = null)
+    {
+        $cols = $this->wrapArray($columns);
+        $this->keys[] = "FULLTEXT KEY " . ($name ?? "language_" . md5($cols)) . " ($cols)";
+        return $this;
+    }
+
     public function foreign(string $column, string $refTable, string $refColumn = 'id', string $onDelete = 'CASCADE', string $onUpdate = 'CASCADE')
     {
         $this->foreigns[] = "FOREIGN KEY ($column) REFERENCES $refTable($refColumn) ON DELETE $onDelete ON UPDATE $onUpdate";
