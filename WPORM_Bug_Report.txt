@@ -45,24 +45,6 @@ PRIORITY 2 — SIGNIFICANT BUGS
 ================================================================================
 
 ------------------------------------------------------------------------
-2.2 — chunk()/each() permanently mutate the builder's limit and offset
-------------------------------------------------------------------------
-DESCRIPTION:
-  chunk() calls $this->limit($count)->offset(...) on the same builder instance
-  in a loop. After chunk() finishes or stops early, the builder retains the
-  limit and offset from the last iteration. Any subsequent use of the builder
-  (e.g. calling get() again or using it in a tap()/pipe() chain) will
-  silently have unexpected LIMIT/OFFSET applied, returning wrong results.
-
-AFFECTED FILES:
-  - QueryBuilder.php → chunk()
-
-FIX:
-  Save $this->limit and $this->offset before the loop, and restore them after
-  the loop completes (whether normally or via early return). Alternatively,
-  clone the builder for each page iteration.
-
-------------------------------------------------------------------------
 2.3 — Model::offsetSet() silently ignores non-fillable attribute writes
 ------------------------------------------------------------------------
 DESCRIPTION:

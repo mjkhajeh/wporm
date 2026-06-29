@@ -2975,27 +2975,35 @@ class QueryBuilder {
         $count = max((int) $count, 1);
         $page = 1;
 
-        while (true) {
-            $this->limit($count)->offset(($page - 1) * $count);
-            $results = $this->get();
+        $originalLimit  = $this->limit;
+        $originalOffset = $this->offset;
 
-            $numResults = count($results);
-            if ($numResults === 0) {
-                break;
+        try {
+            while (true) {
+                $this->limit($count)->offset(($page - 1) * $count);
+                $results = $this->get();
+
+                $numResults = count($results);
+                if ($numResults === 0) {
+                    break;
+                }
+
+                if ($callback($results, $page) === false) {
+                    return false;
+                }
+
+                if ($numResults < $count) {
+                    break;
+                }
+
+                $page++;
             }
 
-            if ($callback($results, $page) === false) {
-                return false;
-            }
-
-            if ($numResults < $count) {
-                break;
-            }
-
-            $page++;
+            return true;
+        } finally {
+            $this->limit  = $originalLimit;
+            $this->offset = $originalOffset;
         }
-
-        return true;
     }
 
     /**
