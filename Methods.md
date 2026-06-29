@@ -1902,6 +1902,35 @@ try {
 - `fresh()` is non-destructive (returns a new object, current instance untouched); `refresh()` is in-place (mutates `$this`).
 - If the model has no primary key value, `fresh()` returns `null` and `refresh()` throws `ModelNotFoundException` immediately, without querying.
 
+### replicate(array $except = [])
+**Description:** Create a new, unsaved copy of the model with all attributes carried over except the primary key, timestamp columns, and soft-delete column (Eloquent-style). This is the standard way to duplicate a record — modify the clone, then `save()`. Accepts an optional array of additional attribute names to exclude from the clone.
+
+**Example:**
+```php
+$post = Post::find(1);
+echo $post->title;  // "Original Post"
+echo $post->id;     // 1
+
+$clone = $post->replicate();
+echo $clone->title; // "Original Post"
+echo $clone->id;    // null
+echo $clone->exists; // false
+
+$clone->title = 'Cloned Post';
+$clone->save();
+
+// Exclude additional attributes
+$clone = $post->replicate(['slug', 'meta']);
+$clone->title = 'Clean Clone';
+$clone->save();
+```
+
+**Notes:**
+- The new instance is **not saved** — call `save()` to persist it.
+- The primary key, `created_at`, `updated_at`, and soft-delete column are always excluded, even if you don't pass `$except`.
+- Relations are **not** copied — only scalar attributes.
+- `$clone->exists` is `false` and `$clone->{$pk}` is `null`, so the next `save()` triggers an INSERT.
+
 ---
 
 ## Mass Assignment Protection

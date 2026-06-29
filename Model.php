@@ -1111,6 +1111,41 @@ protected function castSet($key, $value) {
 	}
 
 	/**
+	 * Clone a model without its primary key and timestamps (Eloquent-style).
+	 *
+	 * Creates a new, unsaved instance with all attributes copied except the
+	 * primary key and timestamp columns. Useful for duplicating a record:
+	 *
+	 *   $clone = $post->replicate();
+	 *   $clone->title = 'Updated Title';
+	 *   $clone->save();
+	 *
+	 * @param  array $except  Additional attribute names to exclude from the clone
+	 * @return static
+	 */
+	public function replicate(array $except = []) {
+		$instance = new static;
+
+		$except[] = $this->primaryKey;
+		if ($this->timestamps) {
+			$except[] = $this->createdAtColumn;
+			$except[] = $this->updatedAtColumn;
+		}
+		if ($this->getSoftDeletes()) {
+			$except[] = $this->deletedAtColumn;
+		}
+		$except = array_unique($except);
+
+		foreach ($this->attributes as $key => $value) {
+			if (!in_array($key, $except, true)) {
+				$instance->$key = $value;
+			}
+		}
+
+		return $instance;
+	}
+
+	/**
 	 * Re-fetch the model's attributes from the database and overwrite them
 	 * onto the CURRENT instance in place (Eloquent-style refresh()). Unlike
 	 * fresh(), this mutates $this and returns it, rather than returning a

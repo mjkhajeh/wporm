@@ -449,6 +449,24 @@ echo $user->name; // now reflects whatever is in the database right now
 - `refresh()` mutates `$this` and returns it for chaining, clearing any previously eager-loaded relations (they may now be stale). Throws `MJ\WPORM\ModelNotFoundException` if the row no longer exists.
 - Both query strictly by primary key and bypass global scopes, and neither includes soft-deleted rows — if the row has since been soft-deleted, `fresh()` returns `null` and `refresh()` throws, matching Eloquent's own behavior.
 
+### Cloning a Model: replicate()
+
+Duplicate an existing model without saving — the primary key, timestamps, and soft-delete column are excluded automatically. Modify the clone and call `save()` to create a new record:
+
+```php
+$post = Post::find(1);
+$clone = $post->replicate();
+$clone->title = 'Copy of ' . $post->title;
+$clone->save();
+
+// Exclude additional attributes
+$clone = $post->replicate(['slug', 'meta']);
+```
+
+- `replicate($except = [])` returns a new, **unsaved** instance with all attributes copied except the primary key, `created_at`, `updated_at`, soft-delete column, and any keys you pass in `$except`.
+- Relations are not copied — only scalar attributes.
+- `$clone->exists` is `false`, so the next `save()` triggers an INSERT.
+
 ## Aggregates & Utility Methods
 
 WPORM provides Eloquent-style aggregate and utility methods on the query builder for common lookups, so you don't always need to fetch full models just to compute a number or check a single value.
