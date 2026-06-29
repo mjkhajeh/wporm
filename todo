@@ -59,7 +59,7 @@ The latest task was completed. (Moderate Issues: 0)
   | ✅ 35 | replicate() | Clone a model without PK |
   | ✅ 36 | fresh() / refresh() | Re-fetch model from DB |
   | ✅ 37 | wasRecentlyCreated property | Know if model was just inserted |
-  | 38 | Lazy collections / cursor() | Generator-based for huge datasets |
+  | ✅ 38 | Lazy collections / cursor() | Generator-based for huge datasets |
 
   ### Lower Value — Nice to Have
 

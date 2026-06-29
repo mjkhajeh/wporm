@@ -629,6 +629,32 @@ Just like `chunk()`, returning `false` from the callback stops processing early.
 
 Both methods automatically respect any `where()`/`join()`/soft-delete scoping already applied to the query, since they're built on the same query builder instance.
 
+### cursor()
+
+Returns a **generator** that yields models one at a time — the query executes once, but models are hydrated lazily as you iterate. This is ideal for huge datasets where you want `foreach` simplicity without loading every model into memory upfront:
+
+```php
+foreach (User::query()->where('active', true)->cursor() as $user) {
+    // process $user one at a time — only one model in memory at a time
+}
+
+// Works with static method too
+foreach (User::cursor() as $user) {
+    // ...
+}
+```
+
+**cursor() vs chunk()/each():**
+
+| | `cursor()` | `chunk()` / `each()` |
+|---|---|---|
+| Query execution | Single query | Multiple paginated queries |
+| Memory model | One model at a time | One page at a time |
+| Early stop | Break out of `foreach` | Return `false` from callback |
+| Best for | Simple iteration over huge sets | Complex per-page logic or early-stop |
+
+Both approaches keep memory low — `cursor()` is simpler when you just need to loop through everything once.
+
 ## Attribute Casting
 Add a `$casts` property to your model:
 ```php

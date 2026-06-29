@@ -2139,6 +2139,10 @@ public function forceDelete() {
      * @param array|string $relations
      * @return \MJ\WPORM\QueryBuilder
      */
+    public static function cursor(): \Generator {
+        return static::query()->cursor();
+    }
+
     public static function withCount($relations) {
         return static::query()->withCount($relations);
     }

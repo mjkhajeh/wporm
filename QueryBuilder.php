@@ -1226,6 +1226,48 @@ class QueryBuilder {
         return new \MJ\WPORM\Collection($models);
     }
 
+    /**
+     * Execute the query and return a generator that yields models one at a time.
+     *
+     * Unlike get(), which hydrates all models into memory at once, cursor()
+     * uses a generator to yield models individually — reducing peak memory
+     * usage for large result sets. The underlying SQL query is executed once.
+     *
+     * Usage:
+     *   foreach (User::query()->cursor() as $user) {
+     *       // process $user one at a time
+     *   }
+     *
+     *   // Convert to LazyCollection for lazy higher-order methods
+     *   $lazy = User::query()->cursor()->map(fn($u) => $u->name);
+     *
+     * @return \Generator<int, \MJ\WPORM\Model>
+     */
+    public function cursor(): \Generator {
+        $this->applySoftDeleteScope();
+        $sql = $this->buildSelectQuery();
+        $bindings = $this->getBindings();
+        if (!empty($bindings)) {
+            $sql = $this->wpdb->prepare($sql, ...$bindings);
+        }
+        if ($this->debug) {
+            error_log('[WPORM][cursor] SQL: ' . $sql);
+            error_log('[WPORM][cursor] Bindings: ' . print_r($bindings, true));
+        }
+        $results = $this->wpdb->get_results($sql, ARRAY_A);
+        if (!$results) {
+            return;
+        }
+        $modelClass = get_class($this->model);
+        foreach ($results as $row) {
+            $instance = (new $modelClass)->newFromBuilder($row);
+            if (method_exists($instance, 'retrieved')) {
+                $instance->retrieved();
+            }
+            yield $instance;
+        }
+    }
+
     public function first() {
         $this->limit(1);
         // get() already handles eager loading, relationship counts (withCount()),

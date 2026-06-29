@@ -1400,6 +1400,48 @@ User::query()->each(function($user) {
 }, 500);
 ```
 
+### cursor()
+**Description:** Execute the query and return a `Generator` that yields models one at a time. The SQL query executes once, but models are hydrated lazily as you iterate — only one model is in memory at a time. This is ideal for huge result sets where you want `foreach` simplicity without the memory overhead of loading everything into a Collection upfront. Available as both a QueryBuilder instance method and a static Model method.
+
+**Example:**
+```php
+// QueryBuilder instance method
+foreach (User::query()->where('active', true)->cursor() as $user) {
+    // process $user one at a time
+}
+
+// Static method on Model
+foreach (User::cursor() as $user) {
+    // ...
+}
+
+// Combine with other query methods
+foreach (Post::query()->where('published', true)->orderBy('created_at')->cursor() as $post) {
+    // each $post is yielded individually
+}
+
+// Use with generator functions
+function processLargeExport(): \Generator {
+    foreach (User::cursor() as $user) {
+        yield $user->toArray();
+    }
+}
+```
+
+**cursor() vs chunk()/each():**
+
+| | `cursor()` | `chunk()` / `each()` |
+|---|---|---|
+| Query execution | Single query | Multiple paginated queries |
+| Memory model | One model at a time | One page at a time |
+| Early stop | `break` out of `foreach` | Return `false` from callback |
+| Best for | Simple iteration over huge sets | Complex per-page logic or early-stop |
+
+**Notes:**
+- The generator executes the full query upfront (one `SELECT`), then yields hydrated models lazily.
+- Does **not** support eager loading (`with()`) — relations are not loaded on cursor models.
+- Respects soft-delete scoping and `where()`/`join()` conditions on the query.
+
 ---
 
 ## Persistence Methods
