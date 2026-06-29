@@ -44,25 +44,6 @@ PRIORITY 3 — MINOR BUGS / CODE QUALITY / COMPATIBILITY ISSUES
 ================================================================================
 
 ------------------------------------------------------------------------
-3.2 — Model::getTable() prefix check has a false-positive edge case
-------------------------------------------------------------------------
-DESCRIPTION:
-  The check strpos($this->table, $wpdb->prefix) === 0 is intended to detect
-  whether the table name is already prefixed. However, it also matches table
-  names that legitimately begin with the prefix string for a different reason
-  (e.g., a table named 'wp_sales' when $wpdb->prefix is 'wp_' — correct; but
-  edge cases with multi-site or custom prefixes can result in double-prefixing
-  or missed prefixing). Low risk in standard WordPress installs.
-
-AFFECTED FILES:
-  - Model.php → getTable()
-
-FIX (low priority):
-  Document the behavior clearly in the docblock. For strictness, the $table
-  property should always be declared as a bare name (no prefix), and prefixing
-  should always be applied unconditionally in getTable().
-
-------------------------------------------------------------------------
 3.3 — Blueprint::wrapArray() does not quote column names in index definitions
 ------------------------------------------------------------------------
 DESCRIPTION:

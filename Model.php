@@ -1252,15 +1252,17 @@ public function forceDelete() {
 
 	/**
 	 * Get the table name for the model (instance context).
-	 * @return string
+	 *
+	 * The $table property should always be declared as a bare name (e.g.
+	 * 'users') without the WordPress prefix. This method applies
+	 * $wpdb->prefix unconditionally to avoid false-positive detection when
+	 * a table name coincidentally starts with the prefix string.
+	 *
+	 * @return string Fully qualified table name including the DB prefix.
 	 */
 	public function getTable()
 	{
 		global $wpdb;
-		// Only add prefix if not already present
-		if (isset($this->table) && strpos($this->table, $wpdb->prefix) === 0) {
-			return $this->table;
-		}
 		if (isset($this->table)) {
 			return $wpdb->prefix . $this->table;
 		}
