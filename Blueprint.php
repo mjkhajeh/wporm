@@ -214,6 +214,10 @@ class Blueprint
         return $this->datetime($column)->nullable();
     }
 
+    public function softDeletesTz(string $column = 'deleted_at') {
+        return $this->timestampTz($column)->nullable();
+    }
+
     public function dropColumn(string $column)
     {
         $this->commands[] = "DROP COLUMN $column";

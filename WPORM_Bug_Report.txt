@@ -45,27 +45,6 @@ PRIORITY 2 — SIGNIFICANT BUGS
 ================================================================================
 
 ------------------------------------------------------------------------
-2.6 — Blueprint::softDeletesTz() documented but not implemented
-------------------------------------------------------------------------
-DESCRIPTION:
-  Blueprint.md documents softDeletesTz() as:
-    "Adds a nullable deleted_at TIMESTAMP WITH TIME ZONE column for soft
-    deletes."
-  No such method exists in Blueprint.php. Calling $table->softDeletesTz()
-  falls through to Blueprint::__call(), which silently does nothing and returns
-  null instead of a ColumnDefinition. The schema is not modified.
-
-AFFECTED FILES:
-  - Blueprint.php (missing method)
-  - Blueprint.md (documents a non-existent method)
-
-FIX:
-  Add softDeletesTz(string $column = 'deleted_at') to Blueprint.php:
-    public function softDeletesTz(string $column = 'deleted_at') {
-        return $this->timestampTz($column)->nullable();
-    }
-
-------------------------------------------------------------------------
 2.7 — Model::firstOrFail([]) with empty array selects a random first row
 ------------------------------------------------------------------------
 DESCRIPTION:
