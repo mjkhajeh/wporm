@@ -77,8 +77,24 @@ class QueryBuilder {
 
     // Helper to quote identifiers (table/column names) with backticks
 
+    /**
+     * Set the SELECT columns for the query.
+     *
+     * Replaces all plain column entries but preserves any previously added
+     * selectRaw() entries, so both can be combined:
+     *   ->selectRaw('COUNT(*) as total')->select(['name'])
+     *   // SELECT COUNT(*) as total, `name` FROM ...
+     *
+     * @param array|string $columns
+     * @return $this
+     */
     public function select($columns = ['*']) {
-        $this->selects = is_array($columns) ? $columns : func_get_args();
+        $newColumns = is_array($columns) ? $columns : func_get_args();
+        // Keep existing raw entries, replace plain column entries
+        $this->selects = array_merge(
+            array_filter($this->selects, fn($s) => is_array($s) && isset($s['raw'])),
+            $newColumns
+        );
         return $this;
     }
 

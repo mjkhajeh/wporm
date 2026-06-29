@@ -44,29 +44,6 @@ PRIORITY 3 — MINOR BUGS / CODE QUALITY / COMPATIBILITY ISSUES
 ================================================================================
 
 ------------------------------------------------------------------------
-3.7 — select() silently clobbers prior selectRaw() calls
-------------------------------------------------------------------------
-DESCRIPTION:
-  QueryBuilder::select(['col1', 'col2']) sets $this->selects = [...], which
-  discards all previously added selectRaw() entries. The Readme.md and
-  docblocks state that select() and selectRaw() "can be combined", implying
-  select() should not clobber raw entries. However, calling:
-    ->selectRaw('COUNT(*) as total')->select(['name'])
-  silently drops the raw expression.
-
-  This matches Eloquent's actual behavior (select() does reset), but the
-  documentation is misleading.
-
-AFFECTED FILES:
-  - QueryBuilder.php → select()
-  - Readme.md, Methods.md (documentation)
-
-FIX:
-  Either update the documentation to clarify that select() resets all prior
-  select/selectRaw entries (matching Eloquent's actual behavior), or change
-  select() to only replace non-raw entries and keep existing selectRaw() ones.
-
-------------------------------------------------------------------------
 3.8 — SchemaBuilder::create() may double-prefix if called with a prefixed name
 ------------------------------------------------------------------------
 DESCRIPTION:
