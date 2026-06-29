@@ -45,25 +45,6 @@ PRIORITY 2 — SIGNIFICANT BUGS
 ================================================================================
 
 ------------------------------------------------------------------------
-2.7 — Model::firstOrFail([]) with empty array selects a random first row
-------------------------------------------------------------------------
-DESCRIPTION:
-  Model::firstOrFail(array $attributes = []) calls:
-    static::query()->where($attributes)->first()
-  When $attributes is empty, where([]) iterates zero times and adds no
-  conditions, so the query becomes "SELECT * FROM table LIMIT 1" — it returns
-  the first row in the table rather than throwing ModelNotFoundException.
-  Calling User::firstOrFail() without arguments silently returns a real user
-  instead of throwing, which is unexpected and potentially a security issue.
-
-AFFECTED FILES:
-  - Model.php → firstOrFail()
-
-FIX:
-  When $attributes is empty, either throw ModelNotFoundException immediately,
-  or require at least one attribute (throw \InvalidArgumentException).
-
-------------------------------------------------------------------------
 2.8 — count() uses $this->bindings directly, missing fromSub/having/
        groupByRaw bindings
 ------------------------------------------------------------------------
