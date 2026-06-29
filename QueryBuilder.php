@@ -352,7 +352,7 @@ class QueryBuilder {
         }
         if ($column instanceof \Closure) {
             // Nested group: build SQL preserving explicit OR prefixes
-            $nested = new self($this->model);
+            $nested = new self($this->model, false);
             $column($nested);
             $group = $nested->wheres;
             $bindings = $nested->bindings;
@@ -406,7 +406,7 @@ class QueryBuilder {
 
     public function orWhere($column, $operator = null, $value = null) {
         if ($column instanceof \Closure) {
-            $nested = new self($this->model);
+            $nested = new self($this->model, false);
             $column($nested);
             $group = $nested->wheres;
             $bindings = $nested->bindings;

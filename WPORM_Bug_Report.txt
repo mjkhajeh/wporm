@@ -44,45 +44,16 @@ PRIORITY 3 — MINOR BUGS / CODE QUALITY / COMPATIBILITY ISSUES
 ================================================================================
 
 ------------------------------------------------------------------------
-3.5 — Nested where/orWhere closures apply global scopes to the sub-builder
-------------------------------------------------------------------------
-DESCRIPTION:
-  When where(Closure) or orWhere(Closure) builds a nested WHERE group, it
-  creates:
-    $nested = new self($this->model);
-  The QueryBuilder constructor applies global scopes by default (second
-  parameter defaults to true). This adds global-scope WHERE clauses inside
-  nested parenthesized groups, which is wrong — nested groups should only
-  contain the conditions explicitly added inside the closure.
-
-  Note: whereExists(), applyRelationExistenceClause(), and has() correctly
-  use new self($this->model, false) to avoid this problem. The nested
-  where/orWhere closures do not.
-
-AFFECTED FILES:
-  - QueryBuilder.php → where(), orWhere()
-
-FIX:
-  Change the nested builder creation to:
-    $nested = new self($this->model, false);
-  in both the where() and orWhere() closure branches.
-
-------------------------------------------------------------------------
 3.6 — Dead public methods: getWithEvent() and firstWithEvent()
 ------------------------------------------------------------------------
 DESCRIPTION:
-  Model::getWithEvent() and Model::firstWithEvent() are public static methods
-  that manually call retrieved() on results from a QueryBuilder. This is now
-  redundant because QueryBuilder::get() already fires retrieved() internally.
-  These methods are not called anywhere in the codebase and expose a
-  confusing duplicate API surface.
+  Model::getWithEvent() and Model::firstWithEvent() are public static methods that manually call retrieved() on results from a QueryBuilder. This is now redundant because QueryBuilder::get() already fires retrieved() internally. These methods are not called anywhere in the codebase and expose a confusing duplicate API surface.
 
 AFFECTED FILES:
   - Model.php → getWithEvent(), firstWithEvent()
 
 FIX:
-  Mark both methods as @deprecated with a notice to use QueryBuilder::get()
-  and QueryBuilder::first() directly, or remove them entirely.
+  Mark both methods as @deprecated with a notice to use QueryBuilder::get() and QueryBuilder::first() directly, or remove them entirely.
 
 ------------------------------------------------------------------------
 3.7 — select() silently clobbers prior selectRaw() calls
