@@ -882,6 +882,7 @@ protected function castSet($key, $value) {
 
 		// Legacy hook kept for back-compat — only fire if no dispatcher handles it
 		if (method_exists($this, 'creating')
+			&& (new \ReflectionMethod($this, 'creating'))->getDeclaringClass()->getName() !== __CLASS__
 			&& empty($this->dispatchesEvents['creating'])
 			&& empty(EventDispatcher::getListeners(\MJ\WPORM\Events\Creating::class))
 		) {
@@ -916,6 +917,7 @@ protected function castSet($key, $value) {
 
 		// Legacy hook kept for back-compat — only fire if no dispatcher handles it
 		if (method_exists($this, 'updating')
+			&& (new \ReflectionMethod($this, 'updating'))->getDeclaringClass()->getName() !== __CLASS__
 			&& empty($this->dispatchesEvents['updating'])
 			&& empty(EventDispatcher::getListeners(\MJ\WPORM\Events\Updating::class))
 		) {
