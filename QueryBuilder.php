@@ -2147,7 +2147,8 @@ class QueryBuilder {
         // ── Call the relation on a *fresh* (attribute-less) instance so that
         //    belongsTo / hasOne etc. don't embed a single concrete FK value
         //    into the query — we always rebuild using whereIn below.        ──
-        $sampleQuery = $firstModel->$relation();
+        $modelClass = get_class($firstModel);
+        $sampleQuery = (new $modelClass)->$relation();
 
         // All relations must return a QueryBuilder; if somehow a plain model
         // came back (old-style) fall through to a safe no-op.

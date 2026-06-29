@@ -45,28 +45,6 @@ PRIORITY 2 — SIGNIFICANT BUGS
 ================================================================================
 
 ------------------------------------------------------------------------
-2.1 — eagerLoadRelation() uses a real hydrated model, not a fresh instance
-------------------------------------------------------------------------
-DESCRIPTION:
-  The comment in eagerLoadRelation() says "Call the relation on a *fresh*
-  (attribute-less) instance", but the code actually calls:
-    $sampleQuery = $firstModel->$relation();
-  where $firstModel is the first real hydrated model with real attribute values
-  from the database. For belongsTo, this means the query is initialized with
-  the first row's actual FK value before being rebuilt with whereIn. For
-  morphTo, using a real model is correct (it needs the concrete type). For
-  all other relation types, a genuinely clean model instance should be used
-  to avoid embedding real attribute values into the eager-load query setup.
-
-AFFECTED FILES:
-  - QueryBuilder.php → eagerLoadRelation()
-
-FIX:
-  Replace $firstModel->$relation() with (new $modelClass)->$relation() for
-  all relation types except morphTo (which legitimately needs data from the
-  actual model instances to resolve the polymorphic type).
-
-------------------------------------------------------------------------
 2.2 — chunk()/each() permanently mutate the builder's limit and offset
 ------------------------------------------------------------------------
 DESCRIPTION:
