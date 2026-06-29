@@ -620,25 +620,6 @@ protected function castSet($key, $value) {
 		return $result;
 	}
 
-	// Add a wrapper for triggering retrieved() after get/first
-	public static function getWithEvent($query) {
-		$results = $query->get();
-		foreach ($results as $instance) {
-			if (method_exists($instance, 'retrieved')) {
-				$instance->retrieved();
-			}
-		}
-		return $results;
-	}
-
-	public static function firstWithEvent($query) {
-		$instance = $query->first();
-		if ($instance && method_exists($instance, 'retrieved')) {
-			$instance->retrieved();
-		}
-		return $instance;
-	}
-
 	/**
 	 * updateOrCreate: Find a record matching attributes, update it or create a new one.
 	 *

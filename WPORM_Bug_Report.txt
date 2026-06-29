@@ -44,18 +44,6 @@ PRIORITY 3 — MINOR BUGS / CODE QUALITY / COMPATIBILITY ISSUES
 ================================================================================
 
 ------------------------------------------------------------------------
-3.6 — Dead public methods: getWithEvent() and firstWithEvent()
-------------------------------------------------------------------------
-DESCRIPTION:
-  Model::getWithEvent() and Model::firstWithEvent() are public static methods that manually call retrieved() on results from a QueryBuilder. This is now redundant because QueryBuilder::get() already fires retrieved() internally. These methods are not called anywhere in the codebase and expose a confusing duplicate API surface.
-
-AFFECTED FILES:
-  - Model.php → getWithEvent(), firstWithEvent()
-
-FIX:
-  Mark both methods as @deprecated with a notice to use QueryBuilder::get() and QueryBuilder::first() directly, or remove them entirely.
-
-------------------------------------------------------------------------
 3.7 — select() silently clobbers prior selectRaw() calls
 ------------------------------------------------------------------------
 DESCRIPTION:
@@ -114,39 +102,3 @@ AFFECTED FILES:
 FIX:
   Add a language() stub method to Blueprint.php that generates the appropriate
   KEY definition, or remove it from the documentation.
-
-================================================================================
-SUMMARY TABLE
-================================================================================
-
- #    | Severity     | File(s)                           | Issue
-------+--------------+-----------------------------------+---------------------------
- 1.1  | RESOLVED     | Model.php                         | retrieved() fires twice
- 1.2  | RESOLVED     | QueryBuilder.php                  | buildCountQuery() drops JOINs
- 1.3  | RESOLVED     | QueryBuilder.php                  | buildDeleteQuery() drops JOINs
- 1.4  | CRITICAL     | QueryBuilder.php                  | paginate() shared mutable state
- 1.5  | RESOLVED     | QueryBuilder.php                  | exists() mutates $this->limit
- 1.6  | CRITICAL     | Model.php + QueryBuilder.php      | Protected property access (fatal)
- 1.7  | CRITICAL     | ColumnDefinition.php + Blueprint  | Double-backtick index quoting
- 1.8  | CRITICAL     | Model.php                         | Legacy hooks always fire
- 2.1  | SIGNIFICANT  | QueryBuilder.php                  | eagerLoadRelation uses real model
- 2.2  | SIGNIFICANT  | QueryBuilder.php                  | chunk() pollutes limit/offset
- 2.3  | SIGNIFICANT  | Model.php                         | offsetSet() ignores non-fillable
- 2.4  | SIGNIFICANT  | Model.php                         | insert() ignores wpdb return value
- 2.5  | SIGNIFICANT  | Model.php                         | update() ignores wpdb return value
- 2.6  | SIGNIFICANT  | Blueprint.php + Blueprint.md      | softDeletesTz() not implemented
- 2.7  | SIGNIFICANT  | Model.php                         | firstOrFail([]) returns first row
- 2.8  | SIGNIFICANT  | QueryBuilder.php                  | count() missing fromSub bindings
- 3.1  | MINOR        | Model.php                         | __call() builds query eagerly
- 3.2  | MINOR        | Model.php                         | getTable() prefix edge case
- 3.3  | MINOR        | Blueprint.php                     | wrapArray() unquoted index columns
- 3.4  | MINOR        | Model.php                         | Dynamic property (PHP 8.2 deprecated)
- 3.5  | MINOR        | QueryBuilder.php                  | Nested closures apply global scopes
- 3.6  | MINOR        | Model.php                         | Dead methods getWithEvent etc.
- 3.7  | MINOR        | QueryBuilder.php + docs           | select() clobbers selectRaw()
- 3.8  | MINOR        | SchemaBuilder.php                 | Possible double-prefix in create()
- 3.9  | MINOR        | Blueprint.php + Blueprint.md      | language() not implemented
-
-================================================================================
-END OF REPORT
-================================================================================
