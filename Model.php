@@ -395,9 +395,7 @@ abstract class Model implements \ArrayAccess {
 	public function up(Blueprint $blueprint) {}
 
 	public function down(SchemaBuilder $schema) {
-		global $wpdb;
-		$table = $wpdb->prefix . $this->getTable();
-		$schema->drop($table);
+		$schema->drop($this->getTable());
 	}
 
 	public function fill(array $attributes) {
