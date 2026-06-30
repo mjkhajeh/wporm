@@ -204,6 +204,7 @@ class Blueprint
     public function timestamps() {
         $this->timestamp('created_at');
         $this->timestamp('updated_at');
+        return $this;
     }
     /**
      * Add a nullable datetime column for soft deletes (Eloquent-style shortcut).
