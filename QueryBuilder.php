@@ -1596,16 +1596,25 @@ class QueryBuilder {
      * @throws \Throwable
      */
     protected function executeWithLogging(callable $executor, string $sql, array $bindings = []) {
-        $start = microtime(true);
+        $needsLogging = QueryLogger::isQueryLogging() || !empty(QueryLogger::getListeners());
+        $needsDebug   = !empty($this->debug);
+        $needsTiming  = $needsLogging || $needsDebug;
+
+        $start  = $needsTiming ? microtime(true) : null;
         $result = $executor();
-        $time = (microtime(true) - $start) * 1000; // Convert to milliseconds
 
-        QueryLogger::log($sql, $bindings, $time);
+        if ($needsTiming) {
+            $elapsed = (microtime(true) - $start) * 1000;
 
-        if ($this->debug) {
-            error_log("[WPORM] {$time}ms: {$sql}");
-            if (!empty($bindings)) {
-                error_log("[WPORM] Bindings: " . print_r($bindings, true));
+            if ($needsLogging) {
+                QueryLogger::log($sql, $bindings, $elapsed);
+            }
+
+            if ($needsDebug) {
+                error_log("[WPORM] {$elapsed}ms: {$sql}");
+                if (!empty($bindings)) {
+                    error_log("[WPORM] Bindings: " . print_r($bindings, true));
+                }
             }
         }
 
