@@ -342,13 +342,15 @@ abstract class Model implements \ArrayAccess {
 		if (isset(static::$tableChecked[$class])) {
 			return;
 		}
+		// Mark as checked BEFORE creating the instance to prevent infinite
+		// recursion: new static → __construct → ensureTableExists.
+		static::$tableChecked[$class] = true;
 		global $wpdb;
 		$instance = new static;
 		$table = $instance->getTable();
 		$blueprint = new Blueprint($table, false, $wpdb);
 		$instance->up($blueprint);
 		$instance->createTableIfNotExists($blueprint);
-		static::$tableChecked[$class] = true;
 	}
 
 	public static function bootIfNotBooted() {
@@ -1902,6 +1904,7 @@ public function forceDelete() {
 	 * @var array<string, class-string>
 	 */
 	protected static $morphMap = [];
+	protected static $flippedMorphMap = [];
 
 	/**
 	 * Register morph type aliases. Merges into the existing map by default;
@@ -1916,6 +1919,7 @@ public function forceDelete() {
 	 */
 	public static function morphMap(array $map, $replace = false) {
 		static::$morphMap = $replace ? $map : array_merge(static::$morphMap, $map);
+		static::$flippedMorphMap = [];
 	}
 
 	/**
@@ -1948,8 +1952,11 @@ public function forceDelete() {
 	 * @return string
 	 */
 	public function getMorphClass() {
-		$flipped = array_flip(static::$morphMap);
-		return $flipped[static::class] ?? static::class;
+		$class = static::class;
+		if (empty(static::$flippedMorphMap)) {
+			static::$flippedMorphMap = array_flip(static::$morphMap);
+		}
+		return static::$flippedMorphMap[$class] ?? $class;
 	}
 
 	public function newFromBuilder(array $attributes) {

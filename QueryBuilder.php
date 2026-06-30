@@ -1452,9 +1452,12 @@ class QueryBuilder {
     public function first() {
         $previousLimit = $this->limit;
         $this->limit = 1;
-        $results = $this->get();
-        $this->limit = $previousLimit;
-        return $results[0] ?? null;
+        try {
+            $results = $this->get();
+            return $results[0] ?? null;
+        } finally {
+            $this->limit = $previousLimit;
+        }
     }
 
     public function count() {
