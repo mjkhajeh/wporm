@@ -3666,11 +3666,24 @@ class QueryBuilder {
         $perPage = (int)$perPage;
         $page = $page ?: (isset($_GET['page']) ? abs((int)$_GET['page']) : 1);
         $page = max($page, 1);
-        // Clone the builder for the count sub-query so that applySoftDeleteScope()
-        // (and any LIMIT/OFFSET we set below) mutate only an independent copy and
-        // never bleed into the $this->wheres / $this->bindings that get() will use.
-        $countBuilder = clone $this;
-        $total = $countBuilder->count();
+
+        // Save mutable state that count() / applySoftDeleteScope() may alter,
+        // then restore after the count query so get() applies the same scopes.
+        $savedWheres             = $this->wheres;
+        $savedBindings           = $this->bindings;
+        $savedSoftDeleteApplied  = $this->softDeleteScopeApplied;
+        $savedSelects            = $this->selects;
+
+        $this->selects = ['*'];
+        $total = $this->count();
+
+        // Restore wheres/bindings/softDelete flag so get() applies the
+        // soft-delete scope freshly (its guard flag is reset).
+        $this->wheres                = $savedWheres;
+        $this->bindings              = $savedBindings;
+        $this->softDeleteScopeApplied = $savedSoftDeleteApplied;
+        $this->selects               = $savedSelects;
+
         $this->limit($perPage)->offset(($page - 1) * $perPage);
         $results = $this->get();
         $lastPage = (int) ceil($total / $perPage);
