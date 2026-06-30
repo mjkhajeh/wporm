@@ -46,6 +46,15 @@ abstract class Model implements \ArrayAccess {
 	protected static $tableChecked = [];
 	protected static $queryModelInstances = [];
 	protected static $declaringClassCache = [];
+
+	/**
+	 * Cache of accessor method names per model class.
+	 * Key: model class name, Value: array of get*Attribute method names.
+	 *
+	 * @var array<string, array<string, string>>
+	 */
+	protected static $accessorCache = [];
+
 	protected $createdAtColumn = 'created_at';
 	protected $updatedAtColumn = 'updated_at';
     protected $_eagerLoaded = [];
@@ -472,10 +481,22 @@ abstract class Model implements \ArrayAccess {
         if (array_key_exists($key, $this->_eagerLoaded)) {
             return $this->_eagerLoaded[$key];
         }
+
+		$class = static::class;
+
+		// Check cached accessor (get*Attribute method)
+		if (isset(static::$accessorCache[$class][$key])) {
+			return $this->{static::$accessorCache[$class][$key]}();
+		}
 		$method = 'get' . Helpers::convert_to_pascal_case($key) . 'Attribute';
 		if (method_exists($this, $method)) {
+			if (!isset(static::$accessorCache[$class])) {
+				static::$accessorCache[$class] = [];
+			}
+			static::$accessorCache[$class][$key] = $method;
 			return $this->$method();
 		}
+
 		if (method_exists($this, $key)) {
 			$result = $this->$key();
 			// If the relationship method returns a QueryBuilder, resolve it based on context
