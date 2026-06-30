@@ -70,7 +70,7 @@ The latest task was completed. (Moderate Issues: 0)
   | ✅ 41 | Prunable / MassPrunable traits | Auto-cleanup old records |
   | ✅ 42 | $touches property | Auto-update parent timestamps |
   | ✅ 43 | Pivot model customization | withPivot(), withTimestamps(), custom pivot class |
-  | 44 | hasOneThrough | Single record through intermediate |
+  | ✅ 44 | hasOneThrough | Single record through intermediate |
   | 45 | hasOneOfMany | Latest/oldest/specific related record |
   | ✅ 46 | Database transactions with DB::transaction(closure) | Cleaner than begin/commit/rollBack |
   | 47 | Query logging / DB::listen() | Debug & profiling |

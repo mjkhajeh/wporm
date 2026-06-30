@@ -16,7 +16,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Schema management**: Create and modify tables using a fluent schema builder.
 - **Query builder**: Chainable query builder for flexible and safe SQL queries.
 - **Attribute casting**: Automatic type casting for model attributes.
-- **Relationships**: Define `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, and `hasManyThrough` relationships, with eager loading via `with()`, relationship-count eager loading via `withCount()`, and existence filtering via `whereHas()`/`has()`. Polymorphic relationships (`morphOne`, `morphMany`, `morphTo`) are also supported, including an optional `morphMap()` for short type aliases.
+- **Relationships**: Define `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`, and `hasOneThrough` relationships, with eager loading via `with()`, relationship-count eager loading via `withCount()`, and existence filtering via `whereHas()`/`has()`. Polymorphic relationships (`morphOne`, `morphMany`, `morphTo`) are also supported, including an optional `morphMap()` for short type aliases.
 - **Convenient creation**: `create()` for a one-line insert + return model, plus `updateOrCreate()`, `firstOrCreate()`, and `firstOrNew()` for upsert-style lookups.
 - **Aggregates & utilities**: `sum()`, `avg()`, `min()`, `max()`, `value()`, `pluck()`, `exists()`/`doesntExist()`, and `increment()`/`decrement()`.
 - **Fail-fast lookups**: `findOrFail()`/`firstOrFail()` (including array-of-ids lookups, and `Collection::firstOrFail()`) throw a `ModelNotFoundException` instead of silently returning `null`.
@@ -1125,6 +1125,15 @@ foreach ($tags as $tag) {
   - `$localKey` — the primary key on *this* model (`User`), defaults to `$primaryKey`.
 
   In other words: `User` → (`Post.user_id`) → `Post` → (`Comment.post_id`) → `Comment`.
+
+- **hasOneThrough**: One-to-one through an intermediate model
+  ```php
+  // Country hasOneThrough Capital, through Land:
+  public function capital() {
+      return $this->hasOneThrough(Capital::class, Land::class, 'country_id', 'land_id');
+  }
+  ```
+  Same key convention as `hasManyThrough`, but returns a single model (or `null`) instead of a collection.
 
 ### Polymorphic Relationships: morphOne, morphMany, morphTo
 

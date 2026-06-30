@@ -2647,6 +2647,44 @@ class QueryBuilder {
         }
 
         // ══════════════════════════════════════════════════════════════════════
+        // hasOneThrough — single record reached via an intermediate table
+        // ══════════════════════════════════════════════════════════════════════
+        if ($type === 'hasOneThrough') {
+            $firstKey    = $ctx['firstKey'];
+            $secondKey   = $ctx['secondKey'];
+            $localKey    = $ctx['localKey'];
+            $relatedTable  = $ctx['relatedTable'];
+            $throughTable  = $ctx['throughTable'];
+            $throughPK     = $ctx['throughPK'];
+            $relClass      = $ctx['related'];
+
+            $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
+
+            $query = $relClass::query(!$disableGlobalScopes)
+                ->select(["$relatedTable.*", "$throughTable.$firstKey as _through_fk"])
+                ->join($throughTable, "$relatedTable.$secondKey", '=', "$throughTable.$throughPK")
+                ->whereIn("$throughTable.$firstKey", $ids);
+
+            if ($constraint) $constraint($query);
+
+            $map = [];
+            foreach ($query->get() as $rel) {
+                $throughFk = $rel->_through_fk ?? null;
+                if ($throughFk !== null) {
+                    $rel->forgetAttribute('_through_fk');
+                    // Keep only the first match per parent (hasOne-style semantics)
+                    if (!isset($map[$throughFk])) {
+                        $map[$throughFk] = $rel;
+                    }
+                }
+            }
+            foreach ($models as $m) {
+                $m->setEagerLoaded($relation, $map[$m->$localKey] ?? null);
+            }
+            return;
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
         // morphOne — polymorphic one-to-one. Same shape as hasOne, plus a
         // "type" column filter so only rows owned by *this* model class (or
         // its morph-map alias) are matched.
@@ -2886,7 +2924,7 @@ class QueryBuilder {
         // hasManyThrough — COUNT(*) GROUP BY through-table foreign key,
         // joined through the intermediate table.
         // ══════════════════════════════════════════════════════════════════
-        if ($type === 'hasManyThrough') {
+        if ($type === 'hasManyThrough' || $type === 'hasOneThrough') {
             $firstKey     = $ctx['firstKey'];
             $secondKey    = $ctx['secondKey'];
             $localKey     = $ctx['localKey'];
@@ -3087,8 +3125,8 @@ class QueryBuilder {
             return;
         }
 
-        // ── hasManyThrough ─────────────────────────────────────────────
-        if ($type === 'hasManyThrough') {
+        // ── hasManyThrough / hasOneThrough ─────────────────────────────
+        if ($type === 'hasManyThrough' || $type === 'hasOneThrough') {
             $firstKey     = $ctx['firstKey'];
             $secondKey    = $ctx['secondKey'];
             $localKey     = $ctx['localKey'];
@@ -3671,10 +3709,10 @@ class QueryBuilder {
             return;
         }
 
-        // ── hasManyThrough ────────────────────────────────────────────────────
+        // ── hasManyThrough / hasOneThrough ──────────────────────────────────
         // EXISTS (SELECT 1 FROM related JOIN through ON related.secondKey = through.throughPK
         //         WHERE through.firstKey = outer.localKey [AND ...])
-        if ($type === 'hasManyThrough') {
+        if ($type === 'hasManyThrough' || $type === 'hasOneThrough') {
             $firstKey     = $ctx['firstKey'];
             $secondKey    = $ctx['secondKey'];
             $localKey     = $ctx['localKey'];
@@ -3841,8 +3879,8 @@ class QueryBuilder {
             return $this;
         }
 
-        // ── hasManyThrough ────────────────────────────────────────────────────
-        if ($type === 'hasManyThrough') {
+        // ── hasManyThrough / hasOneThrough ──────────────────────────────────
+        if ($type === 'hasManyThrough' || $type === 'hasOneThrough') {
             $firstKey     = $ctx['firstKey'];
             $secondKey    = $ctx['secondKey'];
             $localKey     = $ctx['localKey'];

@@ -445,7 +445,7 @@ abstract class Model implements \ArrayAccess {
                 $context = $result->getRelationContext();
                 $type = $context['type'] ?? null;
                 // Single-result relations
-                if ($type === 'belongsTo' || $type === 'hasOne' || $type === 'morphOne' || $type === 'morphTo') {
+                if ($type === 'belongsTo' || $type === 'hasOne' || $type === 'hasOneThrough' || $type === 'morphOne' || $type === 'morphTo') {
                     return $result->first();
                 }
                 // Collection relations (hasMany, belongsToMany, hasManyThrough, morphMany)
@@ -1599,6 +1599,53 @@ public function forceDelete() {
         )->where("$throughTable.$firstKey", $this->$localKey);
 
         return $query->setRelationContext('hasManyThrough', [
+            'firstKey'     => $firstKey,
+            'secondKey'    => $secondKey,
+            'localKey'     => $localKey,
+            'relatedTable' => $relatedTable,
+            'throughTable' => $throughTable,
+            'throughPK'    => $throughPK,
+            'related'      => $related,
+        ]);
+    }
+
+    /**
+     * Define a one-to-one relationship through an intermediate model.
+     *
+     * Similar to hasManyThrough, but returns a single related record
+     * instead of a collection.
+     *
+     * @template T of Model
+     * @template Through of Model
+     * @param class-string<T>       $related
+     * @param class-string<Through> $through
+     * @param string|null $firstKey   FK on the through table pointing to this model
+     * @param string|null $secondKey  FK on the related table pointing to the through table
+     * @param string|null $localKey   PK on this model
+     * @return QueryBuilder<T>
+     */
+    public function hasOneThrough($related, $through, $firstKey = null, $secondKey = null, $localKey = null) {
+        $throughInstance = new $through;
+        $relatedInstance = new $related;
+
+        $firstKey  = $firstKey  ?: strtolower(Helpers::class_basename(static::class)) . '_id';
+        $secondKey = $secondKey ?: strtolower(Helpers::class_basename($through)) . '_id';
+        $localKey  = $localKey  ?: $this->primaryKey;
+
+        $relatedTable  = $relatedInstance->getTable();
+        $throughTable  = $throughInstance->getTable();
+        $throughPK     = $throughInstance->getPrimaryKey();
+
+        $query = $related::query();
+        $query->join(
+            $throughTable,
+            "$relatedTable.$secondKey",
+            '=',
+            "$throughTable.$throughPK"
+        )->where("$throughTable.$firstKey", $this->$localKey)
+         ->limit(1);
+
+        return $query->setRelationContext('hasOneThrough', [
             'firstKey'     => $firstKey,
             'secondKey'    => $secondKey,
             'localKey'     => $localKey,

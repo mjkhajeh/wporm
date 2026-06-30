@@ -1738,6 +1738,32 @@ $comments = $user->hasManyThrough(Comment::class, Post::class, 'user_id', 'post_
 // comments.post_id  -> $secondKey (FK on Comment, the related table, -> Post)
 ```
 
+### hasOneThrough($related, $through, $firstKey = null, $secondKey = null, $localKey = null)
+**Description:** Define a one-to-one relationship through an intermediate model. Similar to `hasManyThrough`, but returns a single related record instead of a collection. Useful when a model has one distant related model via an intermediary.
+
+**Parameters (matching `hasManyThrough`):**
+- `$firstKey` — FK **on the through table** that points back to *this* model. Defaults to `{this_model}_id`.
+- `$secondKey` — FK **on the related table** that points to the through table. Defaults to `{through_model}_id`.
+- `$localKey` — PK on *this* model. Defaults to `$primaryKey`.
+
+**Example:**
+```php
+// Country hasOneThrough Capital, through Land:
+// land.country_id   -> $firstKey  (FK on Land -> Country)
+// capitals.land_id  -> $secondKey (FK on Capital -> Land)
+public function capital() {
+    return $this->hasOneThrough(Capital::class, Land::class, 'country_id', 'land_id');
+}
+
+// Access as property (resolves automatically):
+$capital = $country->capital;
+```
+
+**Notes:**
+- Access as a property (`$country->capital`) returns a single Model or `null`
+- Call `->first()` explicitly to resolve: `$country->capital()->first()`
+- Supports eager loading, `withCount`, `whereHas`, and all other query builder features
+
 ### morphOne($related, $name, $type = null, $id = null, $localKey = null)
 **Description:** Define a polymorphic one-to-one relationship. Defined on the *owning* model (e.g. `Post`). The related table stores the owning model's class (or morph-map alias) in a `{$name}_type` column and its primary key in a `{$name}_id` column. Returns a lazy, chainable `QueryBuilder` — call `->first()` to resolve it, or access it as a property (e.g. `$post->image`) to resolve it automatically.
 
@@ -1874,7 +1900,7 @@ $posts = Post::with('comments')->get();
 $comments = Comment::with('commentable')->get();
 ```
 
-- `hasOne`/`belongsTo`/`morphOne`/`morphTo` relations resolve to a single model (or `null`).
+- `hasOne`/`belongsTo`/`hasOneThrough`/`morphOne`/`morphTo` relations resolve to a single model (or `null`).
 - `hasMany`/`belongsToMany`/`hasManyThrough`/`morphMany` relations resolve to a `Collection`.
 
 See [Per-relation global-scope control](./Readme.md#per-relation-global-scope-control-eager-loads) in the Readme for disabling global scopes on a specific eager-loaded relation.
