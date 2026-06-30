@@ -1061,6 +1061,56 @@ WPORM supports Eloquent-style relationships. You can define them in your model u
 
   **Join column:** The related table is joined on its own `$primaryKey` (not a hardcoded `id`), so
   this works correctly even if the related model uses a custom primary key.
+
+### Pivot Model Customization
+
+WPORM supports Eloquent-style pivot customization for `belongsToMany` relationships.
+
+#### withPivot()
+
+Select additional pivot table columns to be accessible via `$model->pivot`:
+
+```php
+$tags = $post->tags()->withPivot('order', 'active')->get();
+foreach ($tags as $tag) {
+    echo $tag->pivot->order;
+    echo $tag->pivot->active;
+}
+```
+
+#### withTimestamps()
+
+Include pivot table timestamps (`created_at`, `updated_at`) automatically:
+
+```php
+$tags = $post->tags()->withTimestamps()->get();
+foreach ($tags as $tag) {
+    echo $tag->pivot->created_at;
+    echo $tag->pivot->updated_at;
+}
+```
+
+#### using() — Custom Pivot Class
+
+Use a custom pivot class for additional logic:
+
+```php
+use MJ\WPORM\Pivot;
+
+class TagPost extends Pivot {
+    public function isPriority(): bool {
+        return ($this->order ?? 0) < 10;
+    }
+}
+
+$tags = $post->tags()->using(TagPost::class)->get();
+foreach ($tags as $tag) {
+    if ($tag->pivot->isPriority()) {
+        // ...
+    }
+}
+```
+
 - **hasManyThrough**: Has-many-through
   ```php
   public function comments() {

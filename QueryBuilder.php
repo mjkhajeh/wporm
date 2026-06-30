@@ -21,6 +21,28 @@ class QueryBuilder {
     protected $with = [];
     protected $withCount = [];
     protected $withAggregate = [];
+
+    /**
+     * Additional pivot table columns to select on belongsToMany relationships.
+     *
+     * @var array<string>
+     */
+    protected $withPivot = [];
+
+    /**
+     * Whether to include pivot table timestamps (created_at, updated_at).
+     *
+     * @var bool
+     */
+    protected $pivotTimestamps = false;
+
+    /**
+     * Custom pivot class to use for this relationship.
+     *
+     * @var class-string<Pivot>|null
+     */
+    protected $pivotClass = null;
+
     protected $applyGlobalScopes = true;
     protected $relationContext = [];
 
@@ -988,6 +1010,88 @@ class QueryBuilder {
             }
         }
         return $this;
+    }
+
+    /**
+     * Select additional pivot table columns for belongsToMany relationships.
+     *
+     * The pivot columns will be accessible on the related model via $model->pivot->column.
+     *
+     * Usage:
+     *   // Single column
+     *   $post->tags()->withPivot('order')->get();
+     *
+     *   // Multiple columns
+     *   $post->tags()->withPivot('order', 'active')->get();
+     *
+     *   // With timestamps
+     *   $post->tags()->withPivot('order')->withTimestamps()->get();
+     *
+     * @param string ...$columns  Pivot column names to select
+     * @return $this
+     */
+    public function withPivot(string ...$columns): self {
+        $this->withPivot = array_unique(array_merge($this->withPivot, $columns));
+        return $this;
+    }
+
+    /**
+     * Include pivot table timestamps (created_at, updated_at) in the query.
+     *
+     * The timestamps will be accessible on the related model via $model->pivot->created_at.
+     *
+     * Usage:
+     *   $post->tags()->withTimestamps()->get();
+     *
+     * @return $this
+     */
+    public function withTimestamps(): self {
+        $this->pivotTimestamps = true;
+        return $this;
+    }
+
+    /**
+     * Specify a custom pivot class to use for this relationship.
+     *
+     * The custom class must extend MJ\WPORM\Pivot and will be instantiated
+     * for each pivot record instead of the default Pivot class.
+     *
+     * Usage:
+     *   $post->tags()->using(TagPost::class)->get();
+     *
+     * @param class-string<Pivot> $class  The pivot class to use
+     * @return $this
+     */
+    public function using(string $class): self {
+        $this->pivotClass = $class;
+        return $this;
+    }
+
+    /**
+     * Get the pivot columns configured for this query.
+     *
+     * @return array<string>
+     */
+    public function getPivotColumns(): array {
+        return $this->withPivot;
+    }
+
+    /**
+     * Check if pivot timestamps are enabled.
+     *
+     * @return bool
+     */
+    public function getPivotTimestamps(): bool {
+        return $this->pivotTimestamps;
+    }
+
+    /**
+     * Get the custom pivot class, if any.
+     *
+     * @return class-string<Pivot>|null
+     */
+    public function getPivotClass(): ?string {
+        return $this->pivotClass;
     }
 
     /**
@@ -2438,25 +2542,64 @@ class QueryBuilder {
 
             $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
 
-            // Load related rows joining through the pivot; also SELECT the pivot FK
-            // so we can group results back to each parent.
             $relatedInstance = new $relClass;
             $relatedPK       = $relatedInstance->getPrimaryKey();
 
+            // Create the base query with the pivot FK aliased for grouping
             $query = $relClass::query(!$disableGlobalScopes)
                 ->select(["$relatedTable.*", "$pivotTable.$foreignPivotKey as _pivot_fk"])
                 ->join($pivotTable, "$relatedTable.$relatedPK", '=', "$pivotTable.$relatedPivotKey")
                 ->whereIn("$pivotTable.$foreignPivotKey", $ids);
 
+            // Apply the constraint closure FIRST — user may call withPivot/withTimestamps/using
             if ($constraint) $constraint($query);
+
+            // Read pivot configuration AFTER the constraint has run
+            $pivotColumns   = $query->getPivotColumns();
+            $pivotTimestamps = $query->getPivotTimestamps();
+            $pivotClass     = $query->getPivotClass() ?? Pivot::class;
+
+            // Add additional pivot column selects
+            foreach ($pivotColumns as $col) {
+                $query->selectRaw("$pivotTable.$col as _pivot_$col");
+            }
+
+            // Add pivot timestamps if requested (skip if already included via withPivot)
+            if ($pivotTimestamps) {
+                if (!in_array('created_at', $pivotColumns, true)) {
+                    $query->selectRaw("$pivotTable.created_at as _pivot_created_at");
+                }
+                if (!in_array('updated_at', $pivotColumns, true)) {
+                    $query->selectRaw("$pivotTable.updated_at as _pivot_updated_at");
+                }
+            }
 
             $grouped = [];
             foreach ($query->get() as $rel) {
                 $pivotFk = $rel->_pivot_fk ?? null;
                 if ($pivotFk !== null) {
-                    // Remove the internal alias from the model's attributes so it
-                    // does not appear in toArray() / toJson() output.
                     $rel->forgetAttribute('_pivot_fk');
+
+                    $pivotData = [$foreignPivotKey => $pivotFk];
+
+                    foreach ($pivotColumns as $col) {
+                        $pivotKey = "_pivot_$col";
+                        $pivotData[$col] = $rel->$pivotKey ?? null;
+                        $rel->forgetAttribute($pivotKey);
+                    }
+
+                    if ($pivotTimestamps && !in_array('created_at', $pivotColumns, true)) {
+                        $pivotData['created_at'] = $rel->_pivot_created_at ?? null;
+                        $rel->forgetAttribute('_pivot_created_at');
+                    }
+                    if ($pivotTimestamps && !in_array('updated_at', $pivotColumns, true)) {
+                        $pivotData['updated_at'] = $rel->_pivot_updated_at ?? null;
+                        $rel->forgetAttribute('_pivot_updated_at');
+                    }
+
+                    $pivot = new $pivotClass(null, $pivotData, $rel);
+                    $rel->setEagerLoaded('pivot', $pivot);
+
                     $grouped[$pivotFk][] = $rel;
                 }
             }

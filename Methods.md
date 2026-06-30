@@ -1642,6 +1642,80 @@ $roles = $user->belongsToMany(Role::class);
 $roles = $user->belongsToMany(Role::class, 'user_role', 'user_id', 'role_id');
 ```
 
+### Pivot Model Customization
+
+WPORM supports Eloquent-style pivot customization for `belongsToMany` relationships.
+
+#### withPivot()
+
+Select additional pivot table columns to be accessible on the related model via `$model->pivot`:
+
+```php
+// Single column
+$tags = $post->tags()->withPivot('order')->get();
+foreach ($tags as $tag) {
+    echo $tag->pivot->order;
+}
+
+// Multiple columns
+$tags = $post->tags()->withPivot('order', 'active')->get();
+
+// Chain with other methods
+$tags = $post->tags()
+    ->withPivot('order', 'active')
+    ->where('active', true)
+    ->get();
+```
+
+#### withTimestamps()
+
+Include pivot table timestamps (`created_at`, `updated_at`) automatically:
+
+```php
+$tags = $post->tags()->withTimestamps()->get();
+foreach ($tags as $tag) {
+    echo $tag->pivot->created_at;
+    echo $tag->pivot->updated_at;
+}
+
+// Combine with withPivot()
+$tags = $post->tags()
+    ->withPivot('order')
+    ->withTimestamps()
+    ->get();
+```
+
+#### using() — Custom Pivot Class
+
+Use a custom pivot class for additional logic:
+
+```php
+use MJ\WPORM\Pivot;
+
+class TagPost extends Pivot {
+    public function isPriority(): bool {
+        return ($this->order ?? 0) < 10;
+    }
+}
+
+// Use the custom class
+$tags = $post->tags()->using(TagPost::class)->get();
+foreach ($tags as $tag) {
+    if ($tag->pivot->isPriority()) {
+        // ...
+    }
+}
+```
+
+**Pivot API:**
+
+| Method | Description |
+|---|---|
+| `$model->pivot` | Access the Pivot instance on a related model |
+| `->withPivot(...$columns)` | Select additional pivot columns |
+| `->withTimestamps()` | Include pivot created_at/updated_at |
+| `->using($class)` | Use a custom Pivot subclass |
+
 ### hasManyThrough($related, $through, $firstKey = null, $secondKey = null, $localKey = null)
 **Description:** Define a has-many-through relationship — access a distant relation through an intermediate ("through") model.
 
