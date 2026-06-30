@@ -1927,7 +1927,7 @@ public function forceDelete() {
 	public function newFromBuilder(array $attributes) {
 		$instance = new static;
 		foreach ($attributes as $key => $value) {
-			$instance->attributes[$key] = $value;
+			$instance->attributes[$key] = $instance->castGet($key, $value);
 			// Set the property for the primary key if present
 			if ($key === $instance->primaryKey) {
 				$instance->{$instance->primaryKey} = $value;
