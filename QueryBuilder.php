@@ -1658,7 +1658,10 @@ class QueryBuilder {
             array_unshift($parameters, $this);
             return call_user_func_array([$this->model, $scopeMethod], $parameters);
         }
-        throw new \BadMethodCallException("Method {$method} does not exist.");
+        throw new \BadMethodCallException(
+            "Method {$method} does not exist. If it's a query scope, "
+            . "check that the model defines scope{$scopeMethod}()."
+        );
     }
 
     // JSON WHERE CLAUSES
