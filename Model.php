@@ -41,6 +41,7 @@ abstract class Model implements \ArrayAccess {
 	protected static $booted = [];
 	protected static $globalScopes = [];
 	protected static $observerInstances = [];
+	protected static $tableChecked = [];
 	protected $createdAtColumn = 'created_at';
 	protected $updatedAtColumn = 'updated_at';
     protected $_eagerLoaded = [];
@@ -323,23 +324,30 @@ abstract class Model implements \ArrayAccess {
 	}
 
 	public function __construct(array $attributes = []) {
-		global $wpdb;
-		static $tableChecked = [];
-		$table = $this->getTable();
-
 		static::bootIfNotBooted();
-
-		if (!isset($tableChecked[$table])) {
-			// Build the schema through the Blueprint API. up() populates the
-			// Blueprint object; we read toSql() from it directly so there is
-			// no need for the subclass to manually assign $this->schema.
-			$blueprint = new Blueprint($table, false, $wpdb);
-			$this->up($blueprint);
-			$this->createTableIfNotExists($blueprint);
-			$tableChecked[$table] = true;
-		}
-
+		static::ensureTableExists();
 		$this->fill($attributes);
+	}
+
+	/**
+	 * Ensure the model's table exists in the database. Runs Blueprint +
+	 * createTableIfNotExists exactly once per model class, cached in
+	 * $tableChecked so subsequent instantiations skip all schema work.
+	 *
+	 * @return void
+	 */
+	protected static function ensureTableExists() {
+		$class = static::class;
+		if (isset(static::$tableChecked[$class])) {
+			return;
+		}
+		global $wpdb;
+		$instance = new static;
+		$table = $instance->getTable();
+		$blueprint = new Blueprint($table, false, $wpdb);
+		$instance->up($blueprint);
+		$instance->createTableIfNotExists($blueprint);
+		static::$tableChecked[$class] = true;
 	}
 
 	public static function bootIfNotBooted() {
