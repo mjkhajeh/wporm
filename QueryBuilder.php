@@ -57,6 +57,15 @@ class QueryBuilder {
     protected static $relationContextCache = [];
 
     /**
+     * Cache of scope instances keyed by class name.
+     * Scopes are stateless — they modify the query builder via apply(),
+     * so a single instance can be reused across all calls.
+     *
+     * @var array<string, \MJ\WPORM\Scopes\ScopeInterface>
+     */
+    protected static $scopeInstances = [];
+
+    /**
      * When set, the FROM clause is a derived table (subquery) instead of a
      * plain table name.  Shape: ['sql' => string, 'alias' => string, 'bindings' => array]
      */
@@ -1936,7 +1945,10 @@ class QueryBuilder {
      */
     public function applyScope($scope): self {
         if (is_string($scope) && class_exists($scope)) {
-            $scope = new $scope();
+            if (!isset(static::$scopeInstances[$scope])) {
+                static::$scopeInstances[$scope] = new $scope();
+            }
+            $scope = static::$scopeInstances[$scope];
         }
 
         if ($scope instanceof \MJ\WPORM\Scopes\ScopeInterface) {
