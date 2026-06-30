@@ -226,7 +226,7 @@ class Blueprint
     public function renameColumn(string $from, string $to)
     {
         // Optional: Try to guess type via DESCRIBE
-        $columns = $this->db->get_results("DESCRIBE {$this->table}");
+        $columns = $this->db->get_results($this->db->prepare("DESCRIBE %i", $this->table));
         $type = 'TEXT';
 
         foreach ($columns as $col) {
