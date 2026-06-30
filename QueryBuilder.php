@@ -3610,7 +3610,7 @@ class QueryBuilder {
      */
     public function paginate($perPage = 15, $page = null) {
         $perPage = (int)$perPage;
-        $page = $page ?: (isset($_GET['page']) ? (int)$_GET['page'] : 1);
+        $page = $page ?: (isset($_GET['page']) ? abs((int)$_GET['page']) : 1);
         $page = max($page, 1);
         // Clone the builder for the count sub-query so that applySoftDeleteScope()
         // (and any LIMIT/OFFSET we set below) mutate only an independent copy and
@@ -3645,7 +3645,7 @@ class QueryBuilder {
      */
     public function simplePaginate($perPage = 15, $page = null) {
         $perPage = (int)$perPage;
-        $page = $page ?: (isset($_GET['page']) ? (int)$_GET['page'] : 1);
+        $page = $page ?: (isset($_GET['page']) ? abs((int)$_GET['page']) : 1);
         $page = max($page, 1);
         $this->limit($perPage + 1)->offset(($page - 1) * $perPage);
         $results = $this->get();
