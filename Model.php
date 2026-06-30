@@ -12,6 +12,8 @@ abstract class Model implements \ArrayAccess {
 	protected $primaryKey = 'id';
 	protected $fillable = [];
 	protected $guarded = ['id'];
+	protected $fillableFlip = null;
+	protected $guardedFlip = null;
 	protected $schema = '';
 	protected $casts = [];
 	protected $timestamps = true;
@@ -440,7 +442,10 @@ abstract class Model implements \ArrayAccess {
 	}
 
 	protected function isFillableAttribute($key) {
-		if (in_array($key, $this->fillable, true)) {
+		if ($this->fillableFlip === null) {
+			$this->fillableFlip = array_flip($this->fillable);
+		}
+		if (isset($this->fillableFlip[$key])) {
 			return true;
 		}
 
@@ -456,7 +461,10 @@ abstract class Model implements \ArrayAccess {
 			return false;
 		}
 
-		return in_array('*', $this->guarded, true) || in_array($key, $this->guarded, true);
+		if ($this->guardedFlip === null) {
+			$this->guardedFlip = array_flip($this->guarded);
+		}
+		return isset($this->guardedFlip['*']) || isset($this->guardedFlip[$key]);
 	}
 
 	public function __get($key) {
