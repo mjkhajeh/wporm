@@ -25,6 +25,7 @@ This document describes all public and static methods of the `MJ\WPORM\Model` cl
 - [$dispatchesEvents and EventDispatcher](#dispatchesevents-and-eventdispatcher)
 - [Observers](#observers)
 - [Mass Assignment Protection](#mass-assignment-protection)
+- [$touches — Auto-Update Parent Timestamps](#touches--auto-update-parent-timestamps)
 - [Hidden & Visible Attributes](#hidden--visible-attributes)
 - [JSON Where Clauses](#json-where-clauses)
 - [Transactions](#transactions)
@@ -2134,6 +2135,63 @@ $user->name = 'Jane'; // works fine — direct property assignment still bypasse
 **Notes:**
 - `newFromBuilder()` — used internally to hydrate models from query results — intentionally bypasses `$fillable`/`$guarded`, since it's populating attributes from trusted data already in the database, not from user input.
 - For protecting attributes from being **read** out in API responses (rather than written via mass assignment), see `$hidden`/`$visible` below.
+
+---
+
+## $touches — Auto-Update Parent Timestamps
+
+### $touches
+**Description:** An array of relationship names that should have their `updated_at` timestamp updated when this model is saved. When a child model is saved, any parent listed in `$touches` will automatically have its `updated_at` set to the current time. This mirrors Eloquent's `$touches` behavior.
+
+**Example:**
+```php
+class Comment extends Model {
+    protected $touches = ['post'];
+
+    public function post() {
+        return $this->belongsTo(Post::class);
+    }
+}
+
+// When a comment is saved, the parent post's updated_at is also updated
+$comment = Comment::find(1);
+$comment->body = 'Updated comment';
+$comment->save();
+
+// The parent Post's updated_at is now current
+$post = Post::find($comment->post_id);
+echo $post->updated_at; // reflects the time the comment was saved
+```
+
+**Multiple relationships:**
+```php
+class Comment extends Model {
+    protected $touches = ['post', 'author'];
+
+    public function post() {
+        return $this->belongsTo(Post::class);
+    }
+
+    public function author() {
+        return $this->belongsTo(User::class);
+    }
+}
+```
+
+**getTouches()**
+**Description:** Get the relationships that should be touched when this model is saved.
+
+**Example:**
+```php
+$comment = new Comment;
+$comment->getTouches(); // ['post']
+```
+
+**Notes:**
+- Only works with `belongsTo` relationships (parent models)
+- The parent model must have `timestamps = true` (default)
+- Touching happens after a successful save (insert or update)
+- Prevents infinite loops — only one level of touching
 
 ---
 

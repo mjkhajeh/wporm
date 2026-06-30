@@ -68,7 +68,7 @@ The latest task was completed. (Moderate Issues: 0)
   | ✅ 39 | Collection enrichment | Added: each, reduce, flatMap, sortBy/sortByDesc, groupBy, keyBy, unique, values, keys, sum, avg/average, min, max, diff, intersect, merge, push, pull, put, implode, when, unless, firstWhere, mapToGroups. (toJson already existed — see ✅57; chunk()/each() at the query-builder level already existed — see ✅21; Collection::each() is the in-memory complement.) |
   | ✅ 40 | Query scopes as classes | ScopeInterface instead of just scope*() methods |
   | ✅ 41 | Prunable / MassPrunable traits | Auto-cleanup old records |
-  | 42 | $touches property | Auto-update parent timestamps |
+  | ✅ 42 | $touches property | Auto-update parent timestamps |
   | 43 | Pivot model customization | withPivot(), withTimestamps(), custom pivot class |
   | 44 | hasOneThrough | Single record through intermediate |
   | 45 | hasOneOfMany | Latest/oldest/specific related record |

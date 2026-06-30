@@ -15,6 +15,18 @@ abstract class Model implements \ArrayAccess {
 	protected $schema = '';
 	protected $casts = [];
 	protected $timestamps = true;
+
+	/**
+	 * The relationships that should have their timestamps updated when
+	 * this model is saved. Similar to Eloquent's $touches property.
+	 *
+	 * Usage:
+	 *   protected $touches = ['post'];
+	 *
+	 * @var array<int, string>
+	 */
+	protected $touches = [];
+
 	protected $attributes = [];
 	protected $original = [];
 	protected $exists = false;
@@ -70,6 +82,15 @@ abstract class Model implements \ArrayAccess {
      */
     public function getTimestamps() {
         return $this->timestamps;
+    }
+
+    /**
+     * Get the relationships that should be touched when this model is saved.
+     *
+     * @return array<int, string>
+     */
+    public function getTouches(): array {
+        return $this->touches;
     }
 
     /**
@@ -943,11 +964,83 @@ protected function castSet($key, $value) {
 		$result = $this->exists ? $this->update() : $this->insert();
 
 		if ($result !== false) {
+			// Touch parent timestamps if $touches is defined
+			$this->touchOwners();
+
 			// saved (after-hook — result not used to halt)
 			$this->fireModelEvent('saved');
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Touch the updated_at timestamp of parent models defined in $touches.
+	 *
+	 * After this model is saved, any parent relationship listed in $touches
+	 * will have its updated_at column set to the current time. This mirrors
+	 * Eloquent's $touches behavior.
+	 *
+	 * Uses touch() instead of save() to avoid triggering model events
+	 * and prevent infinite recursion through circular $touches references.
+	 *
+	 * Usage:
+	 *   class Comment extends Model {
+	 *       protected $touches = ['post'];
+	 *
+	 *       public function post() {
+	 *           return $this->belongsTo(Post::class);
+	 *       }
+	 *   }
+	 *
+	 * @return void
+	 */
+	protected function touchOwners() {
+		if (empty($this->touches)) {
+			return;
+		}
+
+		foreach ($this->touches as $relation) {
+			if (!method_exists($this, $relation)) {
+				continue;
+			}
+
+			$related = $this->$relation;
+			if ($related instanceof Model && $related->timestamps) {
+				$related->touch();
+			}
+		}
+	}
+
+	/**
+	 * Update the model's updated_at timestamp and save without triggering events.
+	 *
+	 * This is used internally by touchOwners() to update parent timestamps
+	 * without firing saving/saved/updating/updated events or causing
+	 * recursive touching through circular $touches references.
+	 *
+	 * @return bool
+	 */
+	public function touch(): bool {
+		if (!$this->timestamps || !$this->exists) {
+			return false;
+		}
+
+		$this->attributes[$this->updatedAtColumn] = current_time('mysql');
+
+		global $wpdb;
+		$pk = $this->primaryKey;
+		$result = $wpdb->update(
+			$this->getTable(),
+			[$this->updatedAtColumn => $this->attributes[$this->updatedAtColumn]],
+			[$pk => $this->attributes[$pk]]
+		);
+
+		if ($result !== false) {
+			$this->original[$this->updatedAtColumn] = $this->attributes[$this->updatedAtColumn];
+		}
+
+		return $result !== false;
 	}
 
 	protected function insert() {

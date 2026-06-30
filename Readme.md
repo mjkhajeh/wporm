@@ -750,6 +750,48 @@ class StrictModel extends Model {
 
 > Note: Hydrating a model from a database row (e.g. via `find()`, `get()`, `all()`) always populates every column, regardless of `$fillable`/`$guarded` — these protections only apply to mass assignment of *user-supplied* data.
 
+## $touches — Auto-Update Parent Timestamps
+
+When a child model is saved, you can automatically update the `updated_at` timestamp of its parent relationships using the `$touches` property:
+
+```php
+class Comment extends Model {
+    protected $touches = ['post'];
+
+    public function post() {
+        return $this->belongsTo(Post::class);
+    }
+}
+
+// When a comment is saved, the parent post's updated_at is also updated
+$comment = Comment::find(1);
+$comment->body = 'Updated comment';
+$comment->save();
+
+// The parent Post's updated_at now reflects the comment save time
+$post = Post::find($comment->post_id);
+```
+
+You can touch multiple relationships:
+
+```php
+class Comment extends Model {
+    protected $touches = ['post', 'author'];
+
+    public function post() {
+        return $this->belongsTo(Post::class);
+    }
+
+    public function author() {
+        return $this->belongsTo(User::class);
+    }
+}
+```
+
+- Only works with `belongsTo` relationships (parent models)
+- The parent model must have `timestamps = true` (default)
+- Touching happens after a successful save (insert or update)
+
 ## Hidden & Visible Attributes: $hidden and $visible
 
 To keep sensitive columns (passwords, tokens, API secrets, etc.) out of `toArray()`/`toJson()` output — and therefore out of API responses or logs — set `$hidden` on your model, Eloquent-style:
