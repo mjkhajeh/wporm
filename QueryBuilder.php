@@ -21,6 +21,7 @@ class QueryBuilder {
     protected $with = [];
     protected $withCount = [];
     protected $withAggregate = [];
+    protected $casts = [];
 
     /**
      * Additional pivot table columns to select on belongsToMany relationships.
@@ -103,6 +104,7 @@ class QueryBuilder {
         $this->wpdb = $wpdb;
         $this->model = $model;
         $this->table = $model->getTable();
+        $this->casts = $model->getCasts();
         $this->applyGlobalScopes = $applyGlobalScopes;
         // Apply global scopes if enabled
         if ($this->applyGlobalScopes && method_exists($model, 'applyGlobalScopes')) {
@@ -432,9 +434,8 @@ class QueryBuilder {
             $operator = '=';
         }
         // Cast DateTime for casted columns (handle nulls too)
-        $casts = $this->model->getCasts();
-        if (isset($casts[$column])) {
-            $cast = $casts[$column];
+        if (isset($this->casts[$column])) {
+            $cast = $this->casts[$column];
             if (($cast === 'datetime' || $cast === 'timestamp') && $value instanceof \DateTime) {
                 if ($cast === 'datetime') {
                     $value = $value->format('Y-m-d H:i:s');
