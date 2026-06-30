@@ -42,6 +42,7 @@ abstract class Model implements \ArrayAccess {
 	protected static $globalScopes = [];
 	protected static $observerInstances = [];
 	protected static $tableChecked = [];
+	protected static $queryModelInstances = [];
 	protected $createdAtColumn = 'created_at';
 	protected $updatedAtColumn = 'updated_at';
     protected $_eagerLoaded = [];
@@ -361,6 +362,25 @@ abstract class Model implements \ArrayAccess {
 	}
 
 	/**
+	 * Return a cached model instance for query-building purposes.
+	 *
+	 * Methods like query(), find(), tableName(), insertOrIgnore(), etc.
+	 * only need metadata (table name, primary key, timestamps, soft-deletes)
+	 * from the model — they never modify or return the instance. Caching
+	 * one instance per class avoids constructing a fresh Model (with
+	 * bootIfNotBooted + ensureTableExists + fill) on every static call.
+	 *
+	 * @return static
+	 */
+	protected static function getQueryModel() {
+		$class = static::class;
+		if (!isset(static::$queryModelInstances[$class])) {
+			static::$queryModelInstances[$class] = new static;
+		}
+		return static::$queryModelInstances[$class];
+	}
+
+	/**
 	 * Create the model's table if it does not already exist.
 	 *
 	 * Schema is sourced exclusively from the Blueprint that up() built.
@@ -626,7 +646,7 @@ protected function castSet($key, $value) {
     protected function restored() {}
 
 	public static function query($applyGlobalScopes = true) {
-		$instance = new static;
+		$instance = static::getQueryModel();
 		$query = new \MJ\WPORM\QueryBuilder($instance, $applyGlobalScopes);
 		return $query;
 	}
@@ -655,7 +675,7 @@ protected function castSet($key, $value) {
 			return static::query()->find($id);
 		}
 
-		$instance = new static;
+		$instance = static::getQueryModel();
 		$pk = $instance->primaryKey;
 		return static::query()->where($pk, $id)->first();
 	}
@@ -678,7 +698,7 @@ protected function castSet($key, $value) {
 	 */
 	public static function findOrFail($id) {
 		if (is_array($id)) {
-			$instance = new static;
+			$instance = static::getQueryModel();
 			$pk = $instance->primaryKey;
 			$result = static::find($id);
 			$foundIds = [];
@@ -790,7 +810,7 @@ protected function castSet($key, $value) {
      */
     public static function insertOrIgnore(array $attributes)
     {
-        $instance = new static;
+        $instance = static::getQueryModel();
         $table = $instance->getTable();
         // If $attributes is a list of records (array of arrays)
         if (isset($attributes[0]) && is_array($attributes[0])) {
@@ -853,7 +873,7 @@ protected function castSet($key, $value) {
      */
     public static function upsert(array $values, $uniqueBy, $update = null)
     {
-        $instance = new static;
+        $instance = static::getQueryModel();
         $table = $instance->getTable();
 
         if (empty($values)) {
@@ -1451,8 +1471,7 @@ public function forceDelete() {
 	 */
 	public static function tableName()
 	{
-		$instance = new static;
-		return $instance->getTable();
+		return static::getQueryModel()->getTable();
 	}
 
 	/**
@@ -2311,7 +2330,7 @@ public function forceDelete() {
      * @return \MJ\WPORM\QueryBuilder
      */
     public static function withTrashed($query = null) {
-        $instance = new static;
+        $instance = static::getQueryModel();
         $query = $query ?: static::query();
         if ($instance->softDeletes) {
             $query->withTrashed = true;
@@ -2326,7 +2345,7 @@ public function forceDelete() {
      * @return \MJ\WPORM\QueryBuilder
      */
     public static function onlyTrashed($query = null) {
-        $instance = new static;
+        $instance = static::getQueryModel();
         $query = $query ?: static::query();
         if ($instance->softDeletes) {
             $query->onlyTrashed = true;
@@ -2341,7 +2360,7 @@ public function forceDelete() {
      * @return \MJ\WPORM\QueryBuilder
      */
     public static function withoutTrashed($query = null) {
-        $instance = new static;
+        $instance = static::getQueryModel();
         $query = $query ?: static::query();
         if ($instance->softDeletes) {
             $query->withTrashed = false;
