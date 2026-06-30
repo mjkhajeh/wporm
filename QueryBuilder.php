@@ -1507,7 +1507,8 @@ class QueryBuilder {
      * This executes a TRUNCATE TABLE statement for the current model table.
      */
     public function truncate() {
-        $sql = "TRUNCATE TABLE {$this->table}";
+        $sql = "TRUNCATE TABLE %s";
+        $sql = $this->wpdb->prepare( $sql, Helpers::quoteIdentifier($this->table) );
         return $this->executeWithLogging(
             fn() => $this->wpdb->query($sql),
             $sql
