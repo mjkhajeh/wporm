@@ -1449,10 +1449,11 @@ class QueryBuilder {
     }
 
     public function first() {
-        $this->limit(1);
+        $clone = clone $this;
+        $clone->limit(1);
         // get() already handles eager loading, relationship counts (withCount()),
         // and retrieved() for each model.
-        $results = $this->get();
+        $results = $clone->get();
         $model = $results[0] ?? null;
         return $model;
     }
