@@ -2037,7 +2037,9 @@ public function forceDelete() {
 	public function toArray() {
         $attributes = [];
         foreach ($this->attributes as $key => $value) {
-            $attributes[$key] = $this->castGet($key, $value);
+            $attributes[$key] = isset($this->casts[$key])
+                ? $this->castGet($key, $value)
+                : $value;
         }
         // Add already eager loaded relations only (avoid infinite loop)
         foreach ($this->_eagerLoaded as $relation => $data) {
