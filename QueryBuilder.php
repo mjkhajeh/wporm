@@ -1485,6 +1485,7 @@ class QueryBuilder {
     }
 
     public function delete() {
+        $this->applySoftDeleteScope();
         $sql = $this->buildDeleteQuery();
         if (!empty($this->bindings)) {
             return $this->executeWithLogging(
@@ -3393,6 +3394,7 @@ class QueryBuilder {
      * Returns number of affected rows.
      */
     public function update($data, $value = null) {
+        $this->applySoftDeleteScope();
         if (!is_array($data)) {
             // Single column, value
             $data = [$data => $value];
