@@ -46,6 +46,7 @@ abstract class Model implements \ArrayAccess {
 	protected static $tableChecked = [];
 	protected static $queryModelInstances = [];
 	protected static $declaringClassCache = [];
+	protected static $tableNameCache = [];
 
 	/**
 	 * Cache of accessor method names per model class.
@@ -1520,7 +1521,12 @@ public function forceDelete() {
 	 */
 	public static function tableName()
 	{
-		return static::getQueryModel()->getTable();
+		$class = static::class;
+		if (isset(static::$tableNameCache[$class])) {
+			return static::$tableNameCache[$class];
+		}
+		static::$tableNameCache[$class] = static::getQueryModel()->getTable();
+		return static::$tableNameCache[$class];
 	}
 
 	/**
