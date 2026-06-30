@@ -43,6 +43,7 @@ abstract class Model implements \ArrayAccess {
 	protected static $observerInstances = [];
 	protected static $tableChecked = [];
 	protected static $queryModelInstances = [];
+	protected static $declaringClassCache = [];
 	protected $createdAtColumn = 'created_at';
 	protected $updatedAtColumn = 'updated_at';
     protected $_eagerLoaded = [];
@@ -1081,7 +1082,7 @@ protected function castSet($key, $value) {
 
 		// Legacy hook kept for back-compat — only fire if no dispatcher handles it
 		if (method_exists($this, 'creating')
-			&& (new \ReflectionMethod($this, 'creating'))->getDeclaringClass()->getName() !== __CLASS__
+			&& $this->getDeclaringClassName('creating') !== __CLASS__
 			&& empty($this->dispatchesEvents['creating'])
 			&& empty(EventDispatcher::getListeners(\MJ\WPORM\Events\Creating::class))
 		) {
@@ -1117,7 +1118,7 @@ protected function castSet($key, $value) {
 
 		// Legacy hook kept for back-compat — only fire if no dispatcher handles it
 		if (method_exists($this, 'updating')
-			&& (new \ReflectionMethod($this, 'updating'))->getDeclaringClass()->getName() !== __CLASS__
+			&& $this->getDeclaringClassName('updating') !== __CLASS__
 			&& empty($this->dispatchesEvents['updating'])
 			&& empty(EventDispatcher::getListeners(\MJ\WPORM\Events\Updating::class))
 		) {
@@ -1421,9 +1422,26 @@ public function forceDelete() {
         return true;
     }
     return $this->delete();
-}
+	}
 
-/**
+	/**
+	 * Get the declaring class name for a method, cached per model class.
+	 * Used to check whether a legacy hook (creating, updating, etc.) is
+	 * defined on the subclass vs. the base Model class.
+	 *
+	 * @param string $method
+	 * @return string
+	 */
+	protected function getDeclaringClassName(string $method): string {
+		$class = static::class;
+		if (!isset(static::$declaringClassCache[$class][$method])) {
+			static::$declaringClassCache[$class][$method] =
+				(new \ReflectionMethod($this, $method))->getDeclaringClass()->getName();
+		}
+		return static::$declaringClassCache[$class][$method];
+	}
+
+	/**
      * Force delete the model and all specified relationships.
      * Usage: $model->forceDeleteWith(['posts', 'comments'])
      *
