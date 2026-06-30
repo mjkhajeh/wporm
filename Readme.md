@@ -2142,6 +2142,61 @@ Product::query()->onlyTrashed()->get(); // only deleted
 $product->restore(); // sets deleted = 0
 ```
 
+## Prunable / MassPrunable Traits
+
+WPORM provides two traits for automatic cleanup of old records, similar to Eloquent's Prunable and MassPrunable.
+
+### Prunable
+
+The `Prunable` trait processes records **one at a time**, firing model events (deleting/deleted) for each. Use this when you need to run logic during pruning or have event-driven workflows.
+
+```php
+use MJ\WPORM\Prunable;
+
+class AuditLog extends Model {
+    use Prunable;
+
+    public function prunable() {
+        // Prune records older than 90 days
+        return static::query()->where('created_at', '<', now()->subDays(90));
+    }
+}
+
+// Run the pruning
+$pruned = AuditLog::prune();
+echo "Pruned {$pruned} records";
+```
+
+### MassPrunable
+
+The `MassPrunable` trait processes records **in chunks** using direct SQL DELETE queries. Model events are **not** fired. Use this for large datasets where performance is critical.
+
+```php
+use MJ\WPORM\MassPrunable;
+
+class AuditLog extends Model {
+    use MassPrunable;
+
+    public function prunable() {
+        return static::query()->where('created_at', '<', now()->subDays(90));
+    }
+}
+
+// Run the mass pruning (default chunk size: 1000)
+$pruned = AuditLog::prune();
+
+// Custom chunk size
+$pruned = AuditLog::prune(5000);
+```
+
+### Prunable vs MassPrunable
+
+| | `Prunable` | `MassPrunable` |
+|---|---|---|
+| Processing | One record at a time | In chunks (default: 1000) |
+| Model events | Yes (`deleting`, `deleted`) | No |
+| Memory usage | Low (uses cursor) | Low (uses pluck + chunk) |
+| Best for | Event-driven logic, small datasets | Large datasets, performance-critical |
 
 ## Conditional Queries: when()
 

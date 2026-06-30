@@ -31,6 +31,7 @@ This document describes all public and static methods of the `MJ\WPORM\Model` cl
 - [Raw Table Queries with DB::table()](#raw-table-queries-with-dbtable)
 - [Pagination](#pagination)
 - [Soft Deletes](#soft-deletes)
+- [Prunable / MassPrunable Traits](#prunable--massprunable-traits)
 - [Collection Methods](#collection-methods)
 
 ---
@@ -2796,6 +2797,89 @@ $trashed = User::query()->onlyTrashed()->get();
 $table->softDeletes(); // Adds 'deleted_at' DATETIME NULL
 $table->softDeletes('removed_at'); // Adds 'removed_at' DATETIME NULL
 ```
+
+---
+
+## Prunable / MassPrunable Traits
+
+WPORM provides two traits for automatic cleanup of old records, similar to Eloquent's Prunable and MassPrunable.
+
+### Prunable
+
+The `Prunable` trait processes records **one at a time**, firing model events (deleting/deleted) for each. Use this when you need to run logic during pruning or have event-driven workflows.
+
+```php
+use MJ\WPORM\Prunable;
+
+class AuditLog extends Model {
+    use Prunable;
+
+    public function prunable() {
+        // Prune records older than 90 days
+        return static::query()->where('created_at', '<', now()->subDays(90));
+    }
+}
+
+// Run the pruning
+$pruned = AuditLog::prune();
+echo "Pruned {$pruned} records";
+```
+
+**Prunable API:**
+
+| Method | Description |
+|---|---|
+| `prunable()` | (abstract) Return a QueryBuilder defining which records to prune |
+| `prune()` | (static) Delete matching records one at a time, firing model events |
+
+**Notes:**
+- Each deletion fires `deleting` and `deleted` events
+- Returns the number of records pruned
+- Uses `cursor()` internally for memory efficiency
+
+### MassPrunable
+
+The `MassPrunable` trait processes records **in chunks** using direct SQL DELETE queries. Model events are **not** fired. Use this for large datasets where performance is critical.
+
+```php
+use MJ\WPORM\MassPrunable;
+
+class AuditLog extends Model {
+    use MassPrunable;
+
+    public function prunable() {
+        return static::query()->where('created_at', '<', now()->subDays(90));
+    }
+}
+
+// Run the mass pruning (default chunk size: 1000)
+$pruned = AuditLog::prune();
+
+// Custom chunk size
+$pruned = AuditLog::prune(5000);
+```
+
+**MassPrunable API:**
+
+| Method | Description |
+|---|---|
+| `prunable()` | (abstract) Return a QueryBuilder defining which records to prune |
+| `prune(int $chunkSize = 1000)` | (static) Delete matching records in chunks via direct SQL |
+
+**Notes:**
+- Model events are **not** fired (faster, but no event hooks)
+- Processes in configurable chunks (default: 1000)
+- Uses `pluck()` + `whereIn()` for efficient batch deletion
+- Returns the total number of records pruned
+
+### Prunable vs MassPrunable
+
+| | `Prunable` | `MassPrunable` |
+|---|---|---|
+| Processing | One record at a time | In chunks (default: 1000) |
+| Model events | Yes (`deleting`, `deleted`) | No |
+| Memory usage | Low (uses cursor) | Low (uses pluck + chunk) |
+| Best for | Event-driven logic, small datasets | Large datasets, performance-critical |
 
 ---
 

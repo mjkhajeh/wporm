@@ -64,6 +64,18 @@ class QueryBuilder {
         return count($this->wheres);
     }
 
+    /**
+     * Create a clone of this query builder for independent modifications.
+     *
+     * Useful when you need to run a variation of the same query without
+     * affecting the original builder's state (e.g., in MassPrunable).
+     *
+     * @return static
+     */
+    public function clone(): static {
+        return clone $this;
+    }
+
     public function __construct($model, $applyGlobalScopes = true) {
         global $wpdb;
         $this->wpdb = $wpdb;
