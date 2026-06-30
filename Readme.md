@@ -2016,6 +2016,54 @@ $dept = Departments::query()->with(['topics' => function($q) {
 }])->first();
 ```
 
+## Query Scopes as Classes
+
+WPORM supports reusable, testable scope classes via `ScopeInterface`. Unlike `scope*()` methods (which live on the model), scope classes are standalone, shareable, and easy to unit test.
+
+### Defining a Scope Class
+
+```php
+use MJ\WPORM\Scopes\ScopeInterface;
+use MJ\WPORM\QueryBuilder;
+use MJ\WPORM\Model;
+
+class ActiveScope implements ScopeInterface {
+    public function apply(QueryBuilder $query, Model $model): void {
+        $query->where('active', true);
+    }
+}
+
+// Or extend the abstract base class
+use MJ\WPORM\Scopes\Scope;
+
+class RecentScope extends Scope {
+    public function apply(QueryBuilder $query, Model $model): void {
+        $query->where('created_at', '>=', date('Y-m-d H:i:s', strtotime('-30 days')));
+    }
+}
+```
+
+### Using Scope Classes
+
+```php
+// Register as a global scope (auto-instantiated from class-string)
+User::addGlobalScope('active', ActiveScope::class);
+
+// Apply ad-hoc (one-off, no global registration)
+$users = User::query()->applyScope(new ActiveScope())->get();
+
+// Works with any model
+$posts = Post::query()->applyScope(new ActiveScope())->get();
+```
+
+### Benefits Over scope*() Methods
+
+| | `scope*()` methods | `ScopeInterface` classes |
+|---|---|---|
+| Location | On the model class | Standalone classes |
+| Reusability | Single model only | Any model |
+| Testability | Requires model instance | Unit-testable in isolation |
+| Composition | Manual | Composable via `applyScope()` |
 
 ## Soft Deletes
 

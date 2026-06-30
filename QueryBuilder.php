@@ -1690,6 +1690,39 @@ class QueryBuilder {
     }
 
     /**
+     * Apply a scope class to this query (ad-hoc, not registered globally).
+     *
+     * Accepts a ScopeInterface instance, a closure, or a class-string that
+     * implements ScopeInterface. Useful for one-off scopes without registering
+     * them globally.
+     *
+     * Usage:
+     *   // Apply a scope class instance
+     *   User::query()->applyScope(new ActiveScope())->get();
+     *
+     *   // Apply a closure
+     *   User::query()->applyScope(function($query, $model) {
+     *       $query->where('active', true);
+     *   })->get();
+     *
+     * @param \MJ\WPORM\Scopes\ScopeInterface|callable|string $scope
+     * @return $this
+     */
+    public function applyScope($scope): self {
+        if (is_string($scope) && class_exists($scope)) {
+            $scope = new $scope();
+        }
+
+        if ($scope instanceof \MJ\WPORM\Scopes\ScopeInterface) {
+            $scope->apply($this, $this->model);
+        } elseif (is_callable($scope)) {
+            $scope($this, $this->model);
+        }
+
+        return $this;
+    }
+
+    /**
      * Return the raw SQL with placeholders (for debugging).
      */
     public function toSql() {

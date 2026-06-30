@@ -242,8 +242,35 @@ abstract class Model implements \ArrayAccess {
         }
     }
 
-	// Register a global scope
-	public static function addGlobalScope($identifier, callable $scope) {
+	/**
+	 * Register a global scope for this model.
+	 *
+	 * Accepts a callable (closure), a ScopeInterface instance, or a
+	 * class-string that implements ScopeInterface.
+	 *
+	 * Usage:
+	 *   // Closure
+	 *   User::addGlobalScope('active', function($query) {
+	 *       $query->where('active', true);
+	 *   });
+	 *
+	 *   // Scope class instance
+	 *   User::addGlobalScope('active', new ActiveScope());
+	 *
+	 *   // Scope class-string (instantiated automatically)
+	 *   User::addGlobalScope('active', ActiveScope::class);
+	 *
+	 * @param string $identifier  Unique name for this scope
+	 * @param callable|\MJ\WPORM\Scopes\ScopeInterface|class-string $scope
+	 * @return void
+	 */
+	public static function addGlobalScope($identifier, $scope) {
+		// Auto-instantiate class-strings that implement ScopeInterface
+		if (is_string($scope) && class_exists($scope)
+			&& is_subclass_of($scope, \MJ\WPORM\Scopes\ScopeInterface::class)
+		) {
+			$scope = new $scope();
+		}
 		static::$globalScopes[static::class][$identifier] = $scope;
 	}
 
@@ -257,10 +284,18 @@ abstract class Model implements \ArrayAccess {
 		return static::$globalScopes[static::class] ?? [];
 	}
 
-	// Apply global scopes to a query builder
+	/**
+	 * Apply global scopes to a query builder.
+	 *
+	 * Handles both callable scopes (closures) and ScopeInterface instances.
+	 */
 	public static function applyGlobalScopes(QueryBuilder $query) {
 		foreach (static::getGlobalScopes() as $scope) {
-			$scope($query);
+			if ($scope instanceof \MJ\WPORM\Scopes\ScopeInterface) {
+				$scope->apply($query, new static);
+			} elseif (is_callable($scope)) {
+				$scope($query);
+			}
 		}
 		return $query;
 	}

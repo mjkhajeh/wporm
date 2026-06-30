@@ -37,14 +37,21 @@ This document describes all public and static methods of the `MJ\WPORM\Model` cl
 
 ## Global Scopes
 
-### addGlobalScope($identifier, callable $scope)
-**Description:** Register a global scope (closure) to be applied to all queries for this model.
+### addGlobalScope($identifier, $scope)
+**Description:** Register a global scope to be applied to all queries for this model. Accepts a closure, a `ScopeInterface` instance, or a class-string that implements `ScopeInterface`.
 
 **Example:**
 ```php
+// Closure
 User::addGlobalScope('active', function($query) {
     $query->where('active', 1);
 });
+
+// Scope class instance
+User::addGlobalScope('active', new ActiveScope());
+
+// Scope class-string (instantiated automatically)
+User::addGlobalScope('active', ActiveScope::class);
 ```
 
 ### removeGlobalScope($identifier)
@@ -69,6 +76,92 @@ $scopes = User::getGlobalScopes();
 **Example:**
 ```php
 $query = User::applyGlobalScopes(new QueryBuilder(new User));
+```
+
+---
+
+## Query Scopes as Classes (ScopeInterface)
+
+WPORM supports reusable, testable scope classes via the `ScopeInterface`. Unlike `scope*()` methods (which live on the model), scope classes are standalone, shareable across models, and easy to unit test.
+
+### Defining a Scope Class
+
+Create a class implementing `ScopeInterface` (or extending `Scope`):
+
+```php
+use MJ\WPORM\Scopes\ScopeInterface;
+use MJ\WPORM\QueryBuilder;
+use MJ\WPORM\Model;
+
+class ActiveScope implements ScopeInterface {
+    public function apply(QueryBuilder $query, Model $model): void {
+        $query->where('active', true);
+    }
+}
+
+// Or extend the abstract base class
+use MJ\WPORM\Scopes\Scope;
+
+class RecentScope extends Scope {
+    public function apply(QueryBuilder $query, Model $model): void {
+        $query->where('created_at', '>=', date('Y-m-d H:i:s', strtotime('-30 days')));
+    }
+}
+```
+
+### Registering Globally
+
+Scope classes can be registered as global scopes:
+
+```php
+// By class-string (auto-instantiated)
+User::addGlobalScope('active', ActiveScope::class);
+
+// By instance
+User::addGlobalScope('active', new ActiveScope());
+
+// All queries now include WHERE active = 1
+$users = User::get();
+```
+
+### Applying Ad-Hoc
+
+Use `applyScope()` on the query builder for one-off scopes without global registration:
+
+```php
+// Apply a scope class instance
+$users = User::query()->applyScope(new ActiveScope())->get();
+
+// Apply a class-string
+$users = User::query()->applyScope(ActiveScope::class)->get();
+
+// Apply a closure
+$users = User::query()->applyScope(function($query, $model) {
+    $query->where('age', '>=', 18);
+})->get();
+```
+
+### ScopeInterface API
+
+| Method | Description |
+|---|---|
+| `ScopeInterface::apply(QueryBuilder $query, Model $model): void` | Apply constraints to the query |
+| `Scope` (abstract) | Convenience base class implementing `ScopeInterface` |
+| `Model::addGlobalScope($id, $scope)` | Register a scope globally (closure, instance, or class-string) |
+| `QueryBuilder::applyScope($scope)` | Apply a scope ad-hoc (closure, instance, or class-string) |
+| `Model::removeGlobalScope($id)` | Remove a registered global scope |
+| `Model::getGlobalScopes()` | Get all registered scopes for this model |
+
+### Scoping a Different Model
+
+Scope classes can be applied to any model's query, not just the one they were designed for:
+
+```php
+// Apply ActiveScope to a Post query
+$posts = Post::query()->applyScope(new ActiveScope())->get();
+
+// Or register it globally on Post
+Post::addGlobalScope('active', ActiveScope::class);
 ```
 
 ---
