@@ -2271,7 +2271,7 @@ class QueryBuilder {
     /**
      * Build the WHERE clause string from $this->wheres, correctly handling OR prefixes.
      * Returns the clause WITHOUT the leading "WHERE" keyword, or empty string if no conditions.
-     * Also quotes dot-notation identifiers (table.column).
+     * Identifiers are already quoted at parse time (in where() / orWhere()).
      */
     protected function buildWhereClause() {
         if (empty($this->wheres)) {
@@ -2289,9 +2289,6 @@ class QueryBuilder {
                 }
             }
         }
-        $where = preg_replace_callback('/(?<![`])([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)(?![`])/', function($m) {
-            return Helpers::quoteIdentifier($m[1]);
-        }, $where);
         return $where;
     }
 
@@ -2333,10 +2330,6 @@ class QueryBuilder {
         if (!empty($this->havings)) {
             $havingParts = [];
             foreach ($this->havings as [$expr, $vals]) {
-                // Quote identifiers in HAVING
-                $expr = preg_replace_callback('/([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)/', function($m) {
-                    return Helpers::quoteIdentifier($m[1]);
-                }, $expr);
                 $havingParts[] = $expr;
             }
             $sql .= " HAVING " . implode(' AND ', $havingParts);
