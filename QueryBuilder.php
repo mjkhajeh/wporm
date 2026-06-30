@@ -2277,7 +2277,7 @@ class QueryBuilder {
                 }
             }
         }
-        $where = preg_replace_callback('/([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)/', function($m) {
+        $where = preg_replace_callback('/(?<![`])([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)(?![`])/', function($m) {
             return Helpers::quoteIdentifier($m[1]);
         }, $where);
         return $where;
