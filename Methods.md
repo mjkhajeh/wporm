@@ -33,6 +33,7 @@ This document describes all public and static methods of the `MJ\WPORM\Model` cl
 - [Pagination](#pagination)
 - [Soft Deletes](#soft-deletes)
 - [Prunable / MassPrunable Traits](#prunable--massprunable-traits)
+- [Query Logging & Debugging](#query-logging--debugging)
 - [Collection Methods](#collection-methods)
 
 ---
@@ -3340,6 +3341,124 @@ $total = $orders->sum(fn($o) => $o->total * $o->qty);
 $avgPrice = $products->avg('price');
 $cheapest = $products->min('price');
 $mostExpensive = $products->max('price');
+```
+
+---
+
+## Query Logging & Debugging
+
+WPORM provides a centralized query logging system for debugging and profiling, similar to Eloquent's query log.
+
+### DB::enableQueryLog()
+**Description:** Enable query logging. All subsequent queries will be recorded with their SQL, bindings, execution time, and connection info.
+
+**Example:**
+```php
+DB::enableQueryLog();
+
+// Run queries...
+User::where('active', true)->get();
+Post::where('published', true)->limit(10)->get();
+
+// Get logged queries
+$queries = DB::getQueryLog();
+```
+
+### DB::disableQueryLog()
+**Description:** Disable query logging.
+
+**Example:**
+```php
+DB::disableQueryLog();
+```
+
+### DB::isQueryLogging()
+**Description:** Check if query logging is enabled.
+
+**Example:**
+```php
+if (DB::isQueryLogging()) {
+    // Logging is active
+}
+```
+
+### DB::listen(callable $callback)
+**Description:** Register a listener that fires for every executed query. The callback receives three arguments: `$sql` (the SQL string), `$bindings` (bound parameter values), and `$time` (execution time in milliseconds).
+
+**Example:**
+```php
+// Log all queries to error_log
+DB::listen(function($sql, $bindings, $time) {
+    error_log("[Query] {$time}ms: {$sql}");
+});
+
+// Collect queries for analysis
+$queries = [];
+DB::listen(function($sql, $bindings, $time) use (&$queries) {
+    $queries[] = compact('sql', 'bindings', 'time');
+});
+
+// Performance monitoring
+DB::listen(function($sql, $bindings, $time) {
+    if ($time > 100) {
+        error_log("[SLOW QUERY] {$time}ms: {$sql}");
+    }
+});
+```
+
+### DB::getQueryLog()
+**Description:** Get all logged queries. Returns an array of query entries, each containing `query`, `bindings`, `time`, and `connection`.
+
+**Example:**
+```php
+$queries = DB::getQueryLog();
+foreach ($queries as $q) {
+    echo "{$q['time']}ms: {$q['query']}\n";
+    print_r($q['bindings']);
+}
+```
+
+### DB::queryCount()
+**Description:** Get the total number of logged queries.
+
+**Example:**
+```php
+echo "Executed " . DB::queryCount() . " queries";
+```
+
+### DB::queryTime()
+**Description:** Get the total execution time of all logged queries (in milliseconds).
+
+**Example:**
+```php
+echo "Total query time: " . DB::queryTime() . "ms";
+```
+
+### DB::flushQueryLog()
+**Description:** Clear the query log.
+
+**Example:**
+```php
+DB::flushQueryLog();
+```
+
+### QueryLogger Class
+For advanced usage, you can use the `QueryLogger` class directly:
+
+```php
+use MJ\WPORM\QueryLogger;
+
+// Enable logging
+QueryLogger::enableQueryLog();
+
+// Register listener
+QueryLogger::listen(function($sql, $bindings, $time) {
+    // Custom handling
+});
+
+// Get stats
+$count = QueryLogger::count();
+$totalTime = QueryLogger::totalTime();
 ```
 
 ---

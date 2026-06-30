@@ -89,4 +89,102 @@ class DB {
         global $wpdb;
         return QueryBuilder::runTransaction($wpdb, $callback, $attempts);
     }
+
+    // ── Query Logging ────────────────────────────────────────────────────────
+
+    /**
+     * Enable query logging.
+     *
+     * @return void
+     */
+    public static function enableQueryLog(): void
+    {
+        QueryLogger::enableQueryLog();
+    }
+
+    /**
+     * Disable query logging.
+     *
+     * @return void
+     */
+    public static function disableQueryLog(): void
+    {
+        QueryLogger::disableQueryLog();
+    }
+
+    /**
+     * Check if query logging is enabled.
+     *
+     * @return bool
+     */
+    public static function isQueryLogging(): bool
+    {
+        return QueryLogger::isQueryLogging();
+    }
+
+    /**
+     * Register a listener that fires for every executed query.
+     *
+     * The callback receives three arguments:
+     *   - string $sql      The executed SQL (with placeholders)
+     *   - array  $bindings The bound parameter values
+     *   - float  $time     Execution time in milliseconds
+     *
+     * Usage:
+     *   DB::listen(function($sql, $bindings, $time) {
+     *       error_log("[Query] {$time}ms: {$sql}");
+     *   });
+     *
+     * @param callable $callback
+     * @return void
+     */
+    public static function listen(callable $callback): void
+    {
+        QueryLogger::listen($callback);
+    }
+
+    /**
+     * Get all logged queries.
+     *
+     * @return array<int, array{
+     *     query: string,
+     *     bindings: array,
+     *     time: float,
+     *     connection: string
+     * }>
+     */
+    public static function getQueryLog(): array
+    {
+        return QueryLogger::getQueryLog();
+    }
+
+    /**
+     * Get the total number of logged queries.
+     *
+     * @return int
+     */
+    public static function queryCount(): int
+    {
+        return QueryLogger::count();
+    }
+
+    /**
+     * Get the total execution time of all logged queries.
+     *
+     * @return float  Time in milliseconds
+     */
+    public static function queryTime(): float
+    {
+        return QueryLogger::totalTime();
+    }
+
+    /**
+     * Clear the query log.
+     *
+     * @return void
+     */
+    public static function flushQueryLog(): void
+    {
+        QueryLogger::flushQueryLog();
+    }
 }

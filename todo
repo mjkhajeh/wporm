@@ -73,7 +73,7 @@ The latest task was completed. (Moderate Issues: 0)
   | ✅ 44 | hasOneThrough | Single record through intermediate |
   | ✅ 45 | hasOneOfMany | Latest/oldest/specific related record |
   | ✅ 46 | Database transactions with DB::transaction(closure) | Cleaner than begin/commit/rollBack |
-  | 47 | Query logging / DB::listen() | Debug & profiling |
+  | ✅ 47 | Query logging / DB::listen() | Debug & profiling |
   | ✅ 48 | CURRENT_TIMESTAMP default handling in ColumnDefinition | Currently wraps it in quotes as a string |
 
   ———

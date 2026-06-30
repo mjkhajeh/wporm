@@ -1367,11 +1367,11 @@ class QueryBuilder {
             $sql = $this->wpdb->prepare($sql, ...$bindings);
         }
         // If bindings are empty, do not call prepare
-        if ($this->debug) {
-            error_log('[WPORM][get] SQL: ' . $sql);
-            error_log('[WPORM][get] Bindings: ' . print_r($bindings, true));
-        }
-        $results = $this->wpdb->get_results($sql, ARRAY_A);
+        $results = $this->executeWithLogging(
+            fn() => $this->wpdb->get_results($sql, ARRAY_A),
+            $sql,
+            $bindings
+        );
         if (!$results) return new \MJ\WPORM\Collection([]);
         $modelClass = get_class($this->model);
         $models = array_map(function ($row) use ($modelClass) {
@@ -1430,11 +1430,11 @@ class QueryBuilder {
         if (!empty($bindings)) {
             $sql = $this->wpdb->prepare($sql, ...$bindings);
         }
-        if ($this->debug) {
-            error_log('[WPORM][cursor] SQL: ' . $sql);
-            error_log('[WPORM][cursor] Bindings: ' . print_r($bindings, true));
-        }
-        $results = $this->wpdb->get_results($sql, ARRAY_A);
+        $results = $this->executeWithLogging(
+            fn() => $this->wpdb->get_results($sql, ARRAY_A),
+            $sql,
+            $bindings
+        );
         if (!$results) {
             return;
         }
@@ -1454,9 +1454,6 @@ class QueryBuilder {
         // and retrieved() for each model.
         $results = $this->get();
         $model = $results[0] ?? null;
-        if ($this->debug) {
-            error_log('[WPORM][first] Results: ' . print_r($results, true));
-        }
         return $model;
     }
 
@@ -1472,27 +1469,33 @@ class QueryBuilder {
         $bindings = !empty($this->unions)
             ? $this->getUnionWrappedBindings()
             : array_merge($this->getFromSubBindings(), $this->bindings);
-        if ($this->debug) {
-            error_log('[WPORM][count] SQL: ' . $sql);
-            error_log('[WPORM][count] Bindings: ' . print_r($bindings, true));
-        }
         if (!empty($bindings)) {
-            return (int) $this->wpdb->get_var($this->wpdb->prepare($sql, ...$bindings));
+            return (int) $this->executeWithLogging(
+                fn() => $this->wpdb->get_var($this->wpdb->prepare($sql, ...$bindings)),
+                $sql,
+                $bindings
+            );
         } else {
-            return (int) $this->wpdb->get_var($sql);
+            return (int) $this->executeWithLogging(
+                fn() => $this->wpdb->get_var($sql),
+                $sql
+            );
         }
     }
 
     public function delete() {
         $sql = $this->buildDeleteQuery();
-        if ($this->debug) {
-            error_log('[WPORM][delete] SQL: ' . $sql);
-            error_log('[WPORM][delete] Bindings: ' . print_r($this->bindings, true));
-        }
         if (!empty($this->bindings)) {
-            return $this->wpdb->query($this->wpdb->prepare($sql, ...$this->bindings));
+            return $this->executeWithLogging(
+                fn() => $this->wpdb->query($this->wpdb->prepare($sql, ...$this->bindings)),
+                $sql,
+                $this->bindings
+            );
         } else {
-            return $this->wpdb->query($sql);
+            return $this->executeWithLogging(
+                fn() => $this->wpdb->query($sql),
+                $sql
+            );
         }
     }
 
@@ -1503,10 +1506,10 @@ class QueryBuilder {
      */
     public function truncate() {
         $sql = "TRUNCATE TABLE {$this->table}";
-        if ($this->debug) {
-            error_log('[WPORM][truncate] SQL: ' . $sql);
-        }
-        return $this->wpdb->query($sql);
+        return $this->executeWithLogging(
+            fn() => $this->wpdb->query($sql),
+            $sql
+        );
     }
 
     // -------------------------------------------------------------------------
@@ -1588,6 +1591,23 @@ class QueryBuilder {
      * @return mixed
      * @throws \Throwable
      */
+    protected function executeWithLogging(callable $executor, string $sql, array $bindings = []) {
+        $start = microtime(true);
+        $result = $executor();
+        $time = (microtime(true) - $start) * 1000; // Convert to milliseconds
+
+        QueryLogger::log($sql, $bindings, $time);
+
+        if ($this->debug) {
+            error_log("[WPORM] {$time}ms: {$sql}");
+            if (!empty($bindings)) {
+                error_log("[WPORM] Bindings: " . print_r($bindings, true));
+            }
+        }
+
+        return $result;
+    }
+
     public static function runTransaction($wpdb, \Closure $callback, int $attempts = 1) {
         $attempts = max(1, $attempts);
 
@@ -3105,9 +3125,16 @@ class QueryBuilder {
         $bindings = $query->getBindings();
 
         if (!empty($bindings)) {
-            $rows = $this->wpdb->get_results($this->wpdb->prepare($sql, ...$bindings), ARRAY_A);
+            $rows = $this->executeWithLogging(
+                fn() => $this->wpdb->get_results($this->wpdb->prepare($sql, ...$bindings), ARRAY_A),
+                $sql,
+                $bindings
+            );
         } else {
-            $rows = $this->wpdb->get_results($sql, ARRAY_A);
+            $rows = $this->executeWithLogging(
+                fn() => $this->wpdb->get_results($sql, ARRAY_A),
+                $sql
+            );
         }
 
         $counts = [];
@@ -3297,9 +3324,16 @@ class QueryBuilder {
         $bindings = $query->getBindings();
 
         if (!empty($bindings)) {
-            $rows = $this->wpdb->get_results($this->wpdb->prepare($sql, ...$bindings), ARRAY_A);
+            $rows = $this->executeWithLogging(
+                fn() => $this->wpdb->get_results($this->wpdb->prepare($sql, ...$bindings), ARRAY_A),
+                $sql,
+                $bindings
+            );
         } else {
-            $rows = $this->wpdb->get_results($sql, ARRAY_A);
+            $rows = $this->executeWithLogging(
+                fn() => $this->wpdb->get_results($sql, ARRAY_A),
+                $sql
+            );
         }
 
         $map = [];
@@ -3377,14 +3411,17 @@ class QueryBuilder {
             $sql .= ' WHERE ' . $where;
         }
         $allBindings = array_merge($bindings, $this->bindings);
-        if ($this->debug) {
-            error_log('[WPORM][update] SQL: ' . $sql);
-            error_log('[WPORM][update] Bindings: ' . print_r($allBindings, true));
-        }
         if (!empty($allBindings)) {
-            return $this->wpdb->query($this->wpdb->prepare($sql, ...$allBindings));
+            return $this->executeWithLogging(
+                fn() => $this->wpdb->query($this->wpdb->prepare($sql, ...$allBindings)),
+                $sql,
+                $allBindings
+            );
         } else {
-            return $this->wpdb->query($sql);
+            return $this->executeWithLogging(
+                fn() => $this->wpdb->query($sql),
+                $sql
+            );
         }
     }
 
@@ -3462,7 +3499,11 @@ class QueryBuilder {
                 }
             }
             $sql = sprintf('INSERT IGNORE INTO %s (%s) VALUES %s', $tableName, implode(', ', array_map([Helpers::class, 'quoteIdentifier'], $columns)), $allPlaceholders);
-            return $this->wpdb->query($this->wpdb->prepare($sql, ...$allValues));
+            return $this->executeWithLogging(
+                fn() => $this->wpdb->query($this->wpdb->prepare($sql, ...$allValues)),
+                $sql,
+                $allValues
+            );
         }
 
         // Build placeholders
@@ -3499,12 +3540,11 @@ class QueryBuilder {
             implode(', ', $updateParts)
         );
 
-        if ($this->debug) {
-            error_log('[WPORM][upsert] SQL: ' . $sql);
-            error_log('[WPORM][upsert] Bindings: ' . print_r($allValues, true));
-        }
-
-        return $this->wpdb->query($this->wpdb->prepare($sql, ...$allValues));
+        return $this->executeWithLogging(
+            fn() => $this->wpdb->query($this->wpdb->prepare($sql, ...$allValues)),
+            $sql,
+            $allValues
+        );
     }
 
     /**
@@ -4178,15 +4218,17 @@ class QueryBuilder {
             $this->selects = $selects;
         }
 
-        if ($this->debug) {
-            error_log("[WPORM][$function] SQL: " . $sql);
-            error_log("[WPORM][$function] Bindings: " . print_r($bindings, true));
-        }
-
         if (!empty($bindings)) {
-            $result = $this->wpdb->get_row($this->wpdb->prepare($sql, ...$bindings), ARRAY_A);
+            $result = $this->executeWithLogging(
+                fn() => $this->wpdb->get_row($this->wpdb->prepare($sql, ...$bindings), ARRAY_A),
+                $sql,
+                $bindings
+            );
         } else {
-            $result = $this->wpdb->get_row($sql, ARRAY_A);
+            $result = $this->executeWithLogging(
+                fn() => $this->wpdb->get_row($sql, ARRAY_A),
+                $sql
+            );
         }
 
         return $result['aggregate'] ?? null;
@@ -4306,9 +4348,16 @@ class QueryBuilder {
         }
 
         if (!empty($bindings)) {
-            $rows = $this->wpdb->get_results($this->wpdb->prepare($sql, ...$bindings), ARRAY_A);
+            $rows = $this->executeWithLogging(
+                fn() => $this->wpdb->get_results($this->wpdb->prepare($sql, ...$bindings), ARRAY_A),
+                $sql,
+                $bindings
+            );
         } else {
-            $rows = $this->wpdb->get_results($sql, ARRAY_A);
+            $rows = $this->executeWithLogging(
+                fn() => $this->wpdb->get_results($sql, ARRAY_A),
+                $sql
+            );
         }
 
         if (!$rows) {
@@ -4392,9 +4441,16 @@ class QueryBuilder {
         }
 
         if (!empty($bindings)) {
-            $result = $this->wpdb->get_var($this->wpdb->prepare($sql, ...$bindings));
+            $result = $this->executeWithLogging(
+                fn() => $this->wpdb->get_var($this->wpdb->prepare($sql, ...$bindings)),
+                $sql,
+                $bindings
+            );
         } else {
-            $result = $this->wpdb->get_var($sql);
+            $result = $this->executeWithLogging(
+                fn() => $this->wpdb->get_var($sql),
+                $sql
+            );
         }
 
         return $result !== null;
@@ -4482,8 +4538,15 @@ class QueryBuilder {
         }
 
         if (!empty($allBindings)) {
-            return $this->wpdb->query($this->wpdb->prepare($sql, ...$allBindings));
+            return $this->executeWithLogging(
+                fn() => $this->wpdb->query($this->wpdb->prepare($sql, ...$allBindings)),
+                $sql,
+                $allBindings
+            );
         }
-        return $this->wpdb->query($sql);
+        return $this->executeWithLogging(
+            fn() => $this->wpdb->query($sql),
+            $sql
+        );
     }
 }

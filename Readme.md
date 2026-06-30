@@ -1944,6 +1944,41 @@ db::table('custom_table')->where('status', 'active')->get();
 
 See [DB.md](./DB.md) for more details.
 
+## Query Logging & Debugging
+
+WPORM provides a centralized query logging system for debugging and profiling:
+
+```php
+use MJ\WPORM\DB;
+
+// Enable query logging
+DB::enableQueryLog();
+
+// Run queries
+User::where('active', true)->get();
+Post::where('published', true)->limit(10)->get();
+
+// Get logged queries
+$queries = DB::getQueryLog();
+foreach ($queries as $q) {
+    echo "{$q['time']}ms: {$q['query']}\n";
+}
+
+// Register a listener for real-time monitoring
+DB::listen(function($sql, $bindings, $time) {
+    if ($time > 100) {
+        error_log("[SLOW QUERY] {$time}ms: {$sql}");
+    }
+});
+
+// Get stats
+echo "Queries: " . DB::queryCount() . "\n";
+echo "Total time: " . DB::queryTime() . "ms\n";
+
+// Clear the log
+DB::flushQueryLog();
+```
+
 ## Complex Where Statements
 WPORM now supports complex nested where/orWhere statements using closures, similar to Eloquent:
 
