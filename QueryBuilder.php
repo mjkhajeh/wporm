@@ -1955,15 +1955,15 @@ class QueryBuilder {
      * correctly.
      */
     public function getBindings() {
-        return array_merge(
-            $this->getFromSubBindings(),
-            $this->getSelectBindings(),
-            $this->bindings,
-            $this->getGroupByBindings(),
-            $this->getHavingBindings(),
-            $this->getUnionBindings(),
-            $this->getOrderByBindings()
-        );
+        return [
+            ...$this->getFromSubBindings(),
+            ...$this->getSelectBindings(),
+            ...$this->bindings,
+            ...$this->getGroupByBindings(),
+            ...$this->getHavingBindings(),
+            ...$this->getUnionBindings(),
+            ...$this->getOrderByBindings()
+        ];
     }
 
     /**
