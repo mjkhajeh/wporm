@@ -1815,7 +1815,7 @@ class QueryBuilder {
             $value = $operator;
             $operator = '=';
         }
-        $this->havings[] = ["$column $operator %s", [$value]];
+        $this->havings[] = [Helpers::quoteIdentifier($column) . " $operator %s", [$value]];
         return $this;
     }
 
@@ -1826,7 +1826,7 @@ class QueryBuilder {
         if (count($values) !== 2) {
             throw new \InvalidArgumentException('havingBetween expects exactly 2 values.');
         }
-        $this->havings[] = ["$column BETWEEN %s AND %s", $values];
+        $this->havings[] = [Helpers::quoteIdentifier($column) . " BETWEEN %s AND %s", $values];
         return $this;
     }
 
@@ -1839,7 +1839,7 @@ class QueryBuilder {
             $value = $operator;
             $operator = '=';
         }
-        $this->havings[] = ["OR $column $operator %s", [$value]];
+        $this->havings[] = ["OR " . Helpers::quoteIdentifier($column) . " $operator %s", [$value]];
         return $this;
     }
 
@@ -1851,7 +1851,7 @@ class QueryBuilder {
         if (count($values) !== 2) {
             throw new \InvalidArgumentException('orHavingBetween expects exactly 2 values.');
         }
-        $this->havings[] = ["OR $column BETWEEN %s AND %s", $values];
+        $this->havings[] = ["OR " . Helpers::quoteIdentifier($column) . " BETWEEN %s AND %s", $values];
         return $this;
     }
 
