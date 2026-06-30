@@ -1299,7 +1299,7 @@ protected function castSet($key, $value) {
 
 		foreach ($this->attributes as $key => $value) {
 			if (!in_array($key, $except, true)) {
-				$instance->$key = $value;
+				$instance->setAttributeDirectly($key, $value);
 			}
 		}
 
