@@ -704,10 +704,11 @@ protected function castSet($key, $value) {
 	 * @throws ModelNotFoundException
 	 */
 	public static function firstOrFail(array $attributes = []) {
-		if (empty($attributes)) {
-			throw (new ModelNotFoundException())->setModel(static::class);
+		$query = static::query();
+		if (!empty($attributes)) {
+			$query->where($attributes);
 		}
-		$result = static::query()->where($attributes)->first();
+		$result = $query->first();
 		if ($result === null) {
 			throw (new ModelNotFoundException())->setModel(static::class);
 		}
