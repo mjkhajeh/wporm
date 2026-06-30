@@ -27,6 +27,13 @@ class EventDispatcher
     protected static $listeners = [];
 
     /**
+     * Cache of instantiated listener objects, keyed by class name.
+     *
+     * @var array<string, object>
+     */
+    protected static $instances = [];
+
+    /**
      * Register a global listener for an event class.
      *
      * @param string          $eventClass  Fully-qualified event class name.
@@ -60,6 +67,7 @@ class EventDispatcher
     {
         if ($eventClass === null) {
             static::$listeners = [];
+            static::$instances = [];
         } else {
             unset(static::$listeners[$eventClass]);
         }
@@ -125,7 +133,10 @@ class EventDispatcher
         }
 
         if (is_string($listener) && class_exists($listener)) {
-            $instance = new $listener();
+            if (!isset(static::$instances[$listener])) {
+                static::$instances[$listener] = new $listener();
+            }
+            $instance = static::$instances[$listener];
             if (method_exists($instance, 'handle')) {
                 return $instance->handle($event);
             }
