@@ -378,7 +378,7 @@ abstract class Model implements \ArrayAccess {
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
 		$table = $this->getTable();
-		if ($wpdb->get_var("SHOW TABLES LIKE '{$table}'") !== $table) {
+		if ($wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $wpdb->esc_like($table))) !== $table) {
 			$charsetCollate = $wpdb->get_charset_collate();
 
 			$sql = "CREATE TABLE {$table} (
