@@ -40,6 +40,7 @@ abstract class Model implements \ArrayAccess {
 	protected $wasRecentlyCreated = false;
 	protected static $booted = [];
 	protected static $globalScopes = [];
+	protected static $observerInstances = [];
 	protected $createdAtColumn = 'created_at';
 	protected $updatedAtColumn = 'updated_at';
     protected $_eagerLoaded = [];
@@ -2199,7 +2200,10 @@ public function forceDelete() {
 		// 2. Call observers — Eloquent-style: $observer->$event($model)
 		foreach ($observers as $observer) {
 			if (is_string($observer)) {
-				$observer = new $observer();
+				if (!isset(static::$observerInstances[$observer])) {
+					static::$observerInstances[$observer] = new $observer();
+				}
+				$observer = static::$observerInstances[$observer];
 			}
 			if (method_exists($observer, $event)) {
 				$observed = $observer->$event($this);
