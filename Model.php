@@ -1375,10 +1375,20 @@ protected function castSet($key, $value) {
 
 public function forceDelete() {
     if ($this->softDeletes) {
+        if ($this->fireModelEvent('deleting') === false) {
+            return false;
+        }
+        if (method_exists($this, 'deleting')) {
+            $this->deleting();
+        }
         global $wpdb;
         $pk = $this->primaryKey;
         $wpdb->delete($this->getTable(), [$pk => $this->attributes[$pk]]);
         $this->exists = false;
+        $this->fireModelEvent('deleted');
+        if (method_exists($this, 'deleted')) {
+            $this->deleted();
+        }
         return true;
     }
     return $this->delete();
