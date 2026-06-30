@@ -995,6 +995,70 @@ class QueryBuilder {
     }
 
     /**
+     * Order by the latest (most recent) record for hasOneOfMany relationships.
+     *
+     * Usage:
+     *   public function latestPost() {
+     *       return $this->hasOne(Post::class)->latestOfMany();
+     *   }
+     *
+     * @param string $column  Column to order by (default: 'created_at')
+     * @return $this
+     */
+    public function latestOfMany(string $column = 'created_at'): self {
+        $this->orderBy($column, 'desc');
+        return $this;
+    }
+
+    /**
+     * Order by the oldest (least recent) record for hasOneOfMany relationships.
+     *
+     * Usage:
+     *   public function oldestPost() {
+     *       return $this->hasOne(Post::class)->oldestOfMany();
+     *   }
+     *
+     * @param string $column  Column to order by (default: 'created_at')
+     * @return $this
+     */
+    public function oldestOfMany(string $column = 'created_at'): self {
+        $this->orderBy($column, 'asc');
+        return $this;
+    }
+
+    /**
+     * Order by the largest value for hasOneOfMany relationships.
+     *
+     * Usage:
+     *   public function largestOrder() {
+     *       return $this->hasOne(Order::class)->largestOfMany('total');
+     *   }
+     *
+     * @param string $column  Column to order by (required)
+     * @return $this
+     */
+    public function largestOfMany(string $column): self {
+        $this->orderBy($column, 'desc');
+        return $this;
+    }
+
+    /**
+     * Order by the smallest value for hasOneOfMany relationships.
+     *
+     * Usage:
+     *   public function smallestOrder() {
+     *       return $this->hasOne(Order::class)->smallestOfMany('total');
+     *   }
+     *
+     * @param string $column  Column to order by (required)
+     * @return $this
+     */
+    public function smallestOfMany(string $column): self {
+        $this->orderBy($column, 'asc');
+        return $this;
+    }
+
+    /**
      * Eager load relation with constraints (closure).
      * Usage: ->with(['history' => function($query) { $query->where(...); }])
      */
@@ -2507,6 +2571,46 @@ class QueryBuilder {
         }
 
         // ══════════════════════════════════════════════════════════════════════
+        // hasOneOfMany — single record with ordering from hasMany relationship
+        // ══════════════════════════════════════════════════════════════════════
+        if ($type === 'hasOneOfMany') {
+            $foreignKey = $ctx['foreignKey'];
+            $localKey   = $ctx['localKey'];
+            $relClass   = $ctx['related'];
+
+            $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
+
+            $query = $relClass::query(!$disableGlobalScopes)
+                ->whereIn($foreignKey, $ids);
+
+            // Apply ordering from the sample query (latestOfMany, oldestOfMany, etc.)
+            // Orders are stored as strings like "column direction" or arrays with 'raw' key
+            foreach ($sampleQuery->orders ?? [] as $order) {
+                if (is_array($order) && isset($order['raw'])) {
+                    $query->reorder()->orderByRaw($order['raw'], $order['bindings'] ?? []);
+                } elseif (preg_match('/^([a-zA-Z0-9_\.]+)\s+(asc|desc)$/i', $order, $m)) {
+                    $query->orderBy($m[1], strtolower($m[2]));
+                } elseif (preg_match('/^([a-zA-Z0-9_\.]+)$/', $order, $m)) {
+                    $query->orderBy($m[1], 'asc');
+                }
+            }
+
+            if ($constraint) $constraint($query);
+
+            $map = [];
+            foreach ($query->get() as $rel) {
+                // Keep only the first match per parent (hasOneOfMany semantics)
+                if (!isset($map[$rel->$foreignKey])) {
+                    $map[$rel->$foreignKey] = $rel;
+                }
+            }
+            foreach ($models as $m) {
+                $m->setEagerLoaded($relation, $map[$m->$localKey] ?? null);
+            }
+            return;
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
         // hasMany — FK on related table, multiple results per parent
         // ══════════════════════════════════════════════════════════════════════
         if ($type === 'hasMany') {
@@ -2833,9 +2937,9 @@ class QueryBuilder {
         $type = $ctx['type'] ?? null;
 
         // ══════════════════════════════════════════════════════════════════
-        // hasOne / hasMany — COUNT(*) GROUP BY foreignKey on the related table
+        // hasOne / hasMany / hasOneOfMany — COUNT(*) GROUP BY foreignKey on the related table
         // ══════════════════════════════════════════════════════════════════
-        if ($type === 'hasOne' || $type === 'hasMany') {
+        if ($type === 'hasOne' || $type === 'hasMany' || $type === 'hasOneOfMany') {
             $foreignKey = $ctx['foreignKey'];
             $localKey   = $ctx['localKey'];
             $relClass   = $ctx['related'];
@@ -3044,8 +3148,8 @@ class QueryBuilder {
         $type = $ctx['type'] ?? null;
         $fn   = strtoupper($function);
 
-        // ── hasOne / hasMany ────────────────────────────────────────────
-        if ($type === 'hasOne' || $type === 'hasMany') {
+        // ── hasOne / hasMany / hasOneOfMany ────────────────────────────
+        if ($type === 'hasOne' || $type === 'hasMany' || $type === 'hasOneOfMany') {
             $foreignKey = $ctx['foreignKey'];
             $localKey   = $ctx['localKey'];
             $relClass   = $ctx['related'];
@@ -3675,9 +3779,9 @@ class QueryBuilder {
             return;
         }
 
-        // ── hasOne / hasMany ──────────────────────────────────────────────────
+        // ── hasOne / hasMany / hasOneOfMany ──────────────────────────────────
         // EXISTS (SELECT 1 FROM related WHERE related.foreignKey = outer.localKey [AND ...])
-        if ($type === 'hasOne' || $type === 'hasMany') {
+        if ($type === 'hasOne' || $type === 'hasMany' || $type === 'hasOneOfMany') {
             $foreignKey = $ctx['foreignKey'];
             $localKey   = $ctx['localKey'];
             $relatedTable = $relQuery->table;
@@ -3828,8 +3932,8 @@ class QueryBuilder {
 
         $outerTable = $this->table;
 
-        // ── hasOne / hasMany ─────────────────────────────────────────────────
-        if ($type === 'hasOne' || $type === 'hasMany') {
+        // ── hasOne / hasMany / hasOneOfMany ─────────────────────────────────
+        if ($type === 'hasOne' || $type === 'hasMany' || $type === 'hasOneOfMany') {
             $foreignKey   = $ctx['foreignKey'];
             $localKey     = $ctx['localKey'];
             $relatedTable = $relQuery->table;

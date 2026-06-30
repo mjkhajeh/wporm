@@ -445,7 +445,7 @@ abstract class Model implements \ArrayAccess {
                 $context = $result->getRelationContext();
                 $type = $context['type'] ?? null;
                 // Single-result relations
-                if ($type === 'belongsTo' || $type === 'hasOne' || $type === 'hasOneThrough' || $type === 'morphOne' || $type === 'morphTo') {
+                if ($type === 'belongsTo' || $type === 'hasOne' || $type === 'hasOneThrough' || $type === 'hasOneOfMany' || $type === 'morphOne' || $type === 'morphTo') {
                     return $result->first();
                 }
                 // Collection relations (hasMany, belongsToMany, hasManyThrough, morphMany)
@@ -1402,7 +1402,7 @@ public function forceDelete() {
             if ($related instanceof \MJ\WPORM\QueryBuilder) {
                 $context = $related->getRelationContext();
                 $type = $context['type'] ?? null;
-                if ($type === 'belongsTo' || $type === 'hasOne' || $type === 'morphOne' || $type === 'morphTo') {
+                if ($type === 'belongsTo' || $type === 'hasOne' || $type === 'hasOneThrough' || $type === 'hasOneOfMany' || $type === 'morphOne' || $type === 'morphTo') {
                     $resolved = $related->first();
                     if ($resolved instanceof \MJ\WPORM\Model) {
                         $resolved->forceDelete();
@@ -1475,6 +1475,34 @@ public function forceDelete() {
 		$localKey   = $localKey   ?: $this->primaryKey;
 		$query = $related::query()->where($foreignKey, $this->$localKey);
 		return $query->setRelationContext('hasOne', [
+			'foreignKey' => $foreignKey,
+			'localKey'   => $localKey,
+			'related'    => $related,
+		]);
+	}
+
+	/**
+	 * Define a one-to-one relationship that returns a single record
+	 * from a hasMany relationship based on ordering (Eloquent-style).
+	 *
+	 * Useful for getting the "latest", "oldest", "largest", or "smallest"
+	 * related record without loading the full collection.
+	 *
+	 * @template T of Model
+	 * @param class-string<T> $related
+	 * @param string|null $foreignKey  FK on the related table pointing to this model
+	 * @param string|null $localKey    PK on this table (default: $primaryKey)
+	 * @return QueryBuilder<T>
+	 */
+	public function hasOneOfMany($related, $foreignKey = null, $localKey = null) {
+		$foreignKey = $foreignKey ?: strtolower(Helpers::class_basename(static::class)) . '_id';
+		$localKey   = $localKey   ?: $this->primaryKey;
+
+		$query = $related::query()
+			->where($foreignKey, $this->$localKey)
+			->limit(1);
+
+		return $query->setRelationContext('hasOneOfMany', [
 			'foreignKey' => $foreignKey,
 			'localKey'   => $localKey,
 			'related'    => $related,

@@ -1615,6 +1615,49 @@ $posts = $user->hasMany(Post::class)->get();
 $posts = $user->posts; // equivalent, via property access
 ```
 
+### hasOneOfMany($related, $foreignKey = null, $localKey = null)
+**Description:** Define a one-to-one relationship that returns a single record from a many relationship based on ordering. Use with `latestOfMany()`, `oldestOfMany()`, `largestOfMany()`, or `smallestOfMany()` to specify which record to return.
+
+**Example:**
+```php
+// Get the latest post for a user
+public function latestPost() {
+    return $this->hasOneOfMany(Post::class)->latestOfMany();
+}
+
+// Get the oldest post
+public function oldestPost() {
+    return $this->hasOneOfMany(Post::class)->oldestOfMany();
+}
+
+// Get the largest order
+public function largestOrder() {
+    return $this->hasOneOfMany(Order::class)->largestOfMany('total');
+}
+
+// Get the smallest order
+public function smallestOrder() {
+    return $this->hasOneOfMany(Order::class)->smallestOfMany('total');
+}
+
+// Access as property (returns Model or null)
+$latestPost = $user->latestPost;
+
+// Chain with other query methods
+$latestPublishedPost = $user->latestPost()
+    ->where('published', true)
+    ->first();
+```
+
+**OfMany methods:**
+
+| Method | Description |
+|---|---|
+| `latestOfMany($column = 'created_at')` | Order by column descending (most recent/largest) |
+| `oldestOfMany($column = 'created_at')` | Order by column ascending (oldest/smallest) |
+| `largestOfMany($column)` | Order by column descending |
+| `smallestOfMany($column)` | Order by column ascending |
+
 ### belongsTo($related, $foreignKey = null, $ownerKey = null)
 **Description:** Define an inverse one-to-one or many relationship. Like `hasOne`/`hasMany`, this returns a lazy, chainable `QueryBuilder` rather than eagerly executing the query — call `->first()` (or further chain `->where(...)` etc.) to resolve it.
 

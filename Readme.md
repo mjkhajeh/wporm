@@ -16,7 +16,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Schema management**: Create and modify tables using a fluent schema builder.
 - **Query builder**: Chainable query builder for flexible and safe SQL queries.
 - **Attribute casting**: Automatic type casting for model attributes.
-- **Relationships**: Define `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`, and `hasOneThrough` relationships, with eager loading via `with()`, relationship-count eager loading via `withCount()`, and existence filtering via `whereHas()`/`has()`. Polymorphic relationships (`morphOne`, `morphMany`, `morphTo`) are also supported, including an optional `morphMap()` for short type aliases.
+- **Relationships**: Define `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`, `hasOneThrough`, and `hasOneOfMany` relationships, with eager loading via `with()`, relationship-count eager loading via `withCount()`, and existence filtering via `whereHas()`/`has()`. Polymorphic relationships (`morphOne`, `morphMany`, `morphTo`) are also supported, including an optional `morphMap()` for short type aliases.
 - **Convenient creation**: `create()` for a one-line insert + return model, plus `updateOrCreate()`, `firstOrCreate()`, and `firstOrNew()` for upsert-style lookups.
 - **Aggregates & utilities**: `sum()`, `avg()`, `min()`, `max()`, `value()`, `pluck()`, `exists()`/`doesntExist()`, and `increment()`/`decrement()`.
 - **Fail-fast lookups**: `findOrFail()`/`firstOrFail()` (including array-of-ids lookups, and `Collection::firstOrFail()`) throw a `ModelNotFoundException` instead of silently returning `null`.
@@ -1041,6 +1041,17 @@ WPORM supports Eloquent-style relationships. You can define them in your model u
       return $this->hasMany(Post::class, 'user_id');
   }
   ```
+- **hasOneOfMany**: Single record from many (with ordering)
+  ```php
+  public function latestPost() {
+      return $this->hasOneOfMany(Post::class)->latestOfMany();
+  }
+
+  public function largestOrder() {
+      return $this->hasOneOfMany(Order::class)->largestOfMany('total');
+  }
+  ```
+  Use `latestOfMany()`, `oldestOfMany()`, `largestOfMany()`, or `smallestOfMany()` to specify which record to return. Access as a property for automatic resolution.
 - **belongsTo**: Inverse one-to-one or many
   ```php
   public function user() {
