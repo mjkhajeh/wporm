@@ -48,6 +48,15 @@ class QueryBuilder {
     protected $relationContext = [];
 
     /**
+     * Cache of relation context arrays keyed by "ModelClass::relation".
+     * The context (type, keys, related class) is static metadata determined
+     * by the model class and relation name — it does not change between queries.
+     *
+     * @var array<string, array>
+     */
+    protected static $relationContextCache = [];
+
+    /**
      * When set, the FROM clause is a derived table (subquery) instead of a
      * plain table name.  Shape: ['sql' => string, 'alias' => string, 'bindings' => array]
      */
@@ -2532,16 +2541,23 @@ class QueryBuilder {
         //    belongsTo / hasOne etc. don't embed a single concrete FK value
         //    into the query — we always rebuild using whereIn below.        ──
         $modelClass = get_class($firstModel);
-        $sampleQuery = (new $modelClass)->$relation();
+        $cacheKey   = $modelClass . '::' . $relation;
+        $sampleQuery = null;
 
-        // All relations must return a QueryBuilder; if somehow a plain model
-        // came back (old-style) fall through to a safe no-op.
-        if (!($sampleQuery instanceof \MJ\WPORM\QueryBuilder)) {
-            return;
+        if (isset(static::$relationContextCache[$cacheKey])) {
+            $ctx  = static::$relationContextCache[$cacheKey];
+            $type = $ctx['type'] ?? null;
+        } else {
+            $sampleQuery = (new $modelClass)->$relation();
+
+            if (!($sampleQuery instanceof \MJ\WPORM\QueryBuilder)) {
+                return;
+            }
+
+            $ctx  = $sampleQuery->getRelationContext();
+            $type = $ctx['type'] ?? null;
+            static::$relationContextCache[$cacheKey] = $ctx;
         }
-
-        $ctx  = $sampleQuery->getRelationContext();
-        $type = $ctx['type'] ?? null;
 
         // ══════════════════════════════════════════════════════════════════════
         // belongsTo — FK lives on *this* model, PK lives on the related model
@@ -2615,6 +2631,9 @@ class QueryBuilder {
 
             // Apply ordering from the sample query (latestOfMany, oldestOfMany, etc.)
             // Orders are stored as strings like "column direction" or arrays with 'raw' key
+            if ($sampleQuery === null) {
+                $sampleQuery = (new $modelClass)->$relation();
+            }
             foreach ($sampleQuery->orders ?? [] as $order) {
                 if (is_array($order) && isset($order['raw'])) {
                     $query->reorder()->orderByRaw($order['raw'], $order['bindings'] ?? []);
@@ -2957,14 +2976,22 @@ class QueryBuilder {
             return;
         }
 
-        $sampleQuery = $firstModel->$relation();
-        if (!($sampleQuery instanceof \MJ\WPORM\QueryBuilder)) {
-            foreach ($models as $m) { $m->forceSetAttribute($alias, 0); }
-            return;
-        }
+        $modelClass = get_class($firstModel);
+        $cacheKey   = $modelClass . '::' . $relation;
 
-        $ctx  = $sampleQuery->getRelationContext();
-        $type = $ctx['type'] ?? null;
+        if (isset(static::$relationContextCache[$cacheKey])) {
+            $ctx  = static::$relationContextCache[$cacheKey];
+            $type = $ctx['type'] ?? null;
+        } else {
+            $sampleQuery = $firstModel->$relation();
+            if (!($sampleQuery instanceof \MJ\WPORM\QueryBuilder)) {
+                foreach ($models as $m) { $m->forceSetAttribute($alias, 0); }
+                return;
+            }
+            $ctx  = $sampleQuery->getRelationContext();
+            $type = $ctx['type'] ?? null;
+            static::$relationContextCache[$cacheKey] = $ctx;
+        }
 
         // ══════════════════════════════════════════════════════════════════
         // hasOne / hasMany / hasOneOfMany — COUNT(*) GROUP BY foreignKey on the related table
@@ -3175,14 +3202,22 @@ class QueryBuilder {
             return;
         }
 
-        $sampleQuery = $firstModel->$relation();
-        if (!($sampleQuery instanceof \MJ\WPORM\QueryBuilder)) {
-            foreach ($models as $m) { $m->forceSetAttribute($alias, null); }
-            return;
-        }
+        $modelClass = get_class($firstModel);
+        $cacheKey   = $modelClass . '::' . $relation;
 
-        $ctx  = $sampleQuery->getRelationContext();
-        $type = $ctx['type'] ?? null;
+        if (isset(static::$relationContextCache[$cacheKey])) {
+            $ctx  = static::$relationContextCache[$cacheKey];
+            $type = $ctx['type'] ?? null;
+        } else {
+            $sampleQuery = $firstModel->$relation();
+            if (!($sampleQuery instanceof \MJ\WPORM\QueryBuilder)) {
+                foreach ($models as $m) { $m->forceSetAttribute($alias, null); }
+                return;
+            }
+            $ctx  = $sampleQuery->getRelationContext();
+            $type = $ctx['type'] ?? null;
+            static::$relationContextCache[$cacheKey] = $ctx;
+        }
         $fn   = strtoupper($function);
 
         // ── hasOne / hasMany / hasOneOfMany ────────────────────────────
