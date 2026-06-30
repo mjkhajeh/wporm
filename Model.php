@@ -8,57 +8,70 @@ namespace MJ\WPORM;
  * @method static string tableName()   Get the table name for the model statically
  */
 abstract class Model implements \ArrayAccess {
+
+	// ── Instance properties (per-model) ─────────────────────────────────────
+
+	// Table / schema
 	protected $table;
 	protected $primaryKey = 'id';
+	protected $schema = '';
+
+	// Mass assignment
 	protected $fillable = [];
 	protected $guarded = ['id'];
 	protected $fillableFlip = null;
 	protected $guardedFlip = null;
-	protected $schema = '';
-	protected $casts = [];
-	protected $timestamps = true;
 
-	/**
-	 * The relationships that should have their timestamps updated when
-	 * this model is saved. Similar to Eloquent's $touches property.
-	 *
-	 * Usage:
-	 *   protected $touches = ['post'];
-	 *
-	 * @var array<int, string>
-	 */
+	// Type casting
+	protected $casts = [];
+
+	// Timestamps
+	protected $timestamps = true;
+	protected $createdAtColumn = 'created_at';
+	protected $updatedAtColumn = 'updated_at';
+
+	// Soft deletes
+	protected $softDeletes = false;
+	protected $deletedAtColumn = 'deleted_at';
+	protected $softDeleteType = 'timestamp';
+
+	// Relationships
 	protected $touches = [];
 
+	// Attribute visibility / JSON output
+	protected $hidden = [];
+	protected $visible = [];
+	protected $runtimeHidden = [];
+	protected $runtimeVisible = [];
+	protected $appends = [];
+
+	// Runtime data
 	protected $attributes = [];
 	protected $original = [];
 	protected $exists = false;
-
-	/**
-	 * Whether this model was created by a recent insert (not an update).
-	 * Set to true after save() triggers an INSERT; false after UPDATE or load.
-	 *
-	 * @var bool
-	 */
 	protected $wasRecentlyCreated = false;
+	protected $_eagerLoaded = [];
+
+	// ── Static properties (shared across instances) ─────────────────────────
+
+	// Boot / lifecycle
 	protected static $booted = [];
+
+	// Global scopes & observers
 	protected static $globalScopes = [];
+	protected static $observers = [];
 	protected static $observerInstances = [];
+
+	// Morph map
+	protected static $morphMap = [];
+	protected static $flippedMorphMap = [];
+
+	// Caches
 	protected static $tableChecked = [];
 	protected static $queryModelInstances = [];
 	protected static $declaringClassCache = [];
 	protected static $tableNameCache = [];
-
-	/**
-	 * Cache of accessor method names per model class.
-	 * Key: model class name, Value: array of get*Attribute method names.
-	 *
-	 * @var array<string, array<string, string>>
-	 */
 	protected static $accessorCache = [];
-
-	protected $createdAtColumn = 'created_at';
-	protected $updatedAtColumn = 'updated_at';
-    protected $_eagerLoaded = [];
 
     /**
      * Get the casts array for this model.
@@ -172,10 +185,6 @@ abstract class Model implements \ArrayAccess {
             $this->_eagerLoaded[$k] = $v;
         }
     }
-	protected $softDeletes = false;
-	protected $deletedAtColumn = 'deleted_at';
-	protected $appends = [];
-
     /**
      * Maps model lifecycle event names to listener classes (Eloquent-style
      * $dispatchesEvents). Each key is the lowercase event short-name; the
@@ -195,54 +204,6 @@ abstract class Model implements \ArrayAccess {
      * @var array<string, class-string|callable>
      */
     public $dispatchesEvents = [];
-
-    /**
-     * Registered observer classes for this model, keyed by model class name.
-     * Observers have lifecycle methods (creating, created, updating, updated,
-     * saving, saved, deleting, deleted, etc.) that are called automatically.
-     *
-     * @var array<string, array<string, string>>
-     */
-    protected static $observers = [];
-
-    /**
-     * Attributes that should be hidden from toArray()/toJson() output
-     * (e.g. passwords, tokens, secrets). Eloquent-style $hidden.
-     *
-     * @var array
-     */
-    protected $hidden = [];
-
-    /**
-     * If non-empty, ONLY these attributes (plus appended ones not excluded)
-     * are included in toArray()/toJson() output. Eloquent-style $visible.
-     * When both $visible and $hidden are set, $visible is applied first,
-     * then $hidden subtracts from what remains.
-     *
-     * @var array
-     */
-    protected $visible = [];
-
-    /**
-     * Runtime-only hidden attributes added via makeHidden(), merged with $hidden.
-     * @var array
-     */
-    protected $runtimeHidden = [];
-
-    /**
-     * Runtime-only visible attributes added via makeVisible(), subtracted from hidden.
-     * @var array
-     */
-    protected $runtimeVisible = [];
-
-    /**
-     * The soft delete type for this model ('timestamp' or 'boolean').
-     * 'timestamp' = uses deletedAtColumn (default: deleted_at)
-     * 'boolean' = uses a boolean flag column (e.g., deleted)
-     *
-     * @var string
-     */
-    protected $softDeleteType = 'timestamp';
 
     /**
      * Get the deleted_at column as a DateTime instance (if set and not null).
@@ -1947,17 +1908,6 @@ public function forceDelete() {
 			'related'      => $relatedClass,
 		]);
 	}
-
-	/**
-	 * Morph map: aliases for morph "type" column values, so the database
-	 * stores a short string (e.g. "post") instead of a fully-qualified
-	 * class name (e.g. "App\\Models\\Post"). Eloquent-style Relation::morphMap().
-	 * Shared across all models (keyed globally, not per-model).
-	 *
-	 * @var array<string, class-string>
-	 */
-	protected static $morphMap = [];
-	protected static $flippedMorphMap = [];
 
 	/**
 	 * Register morph type aliases. Merges into the existing map by default;
