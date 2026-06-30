@@ -112,7 +112,8 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
      * Get the first item in the collection.
      */
     public function first() {
-        return reset($this->items) ?: null;
+        $value = reset($this->items);
+        return $value !== false ? $value : null;
     }
 
     /**
