@@ -7,6 +7,14 @@ class Helpers {
     }
 
     public static function quoteIdentifier($name) {
+        // Fast path: plain column name (id, name, created_at, …) — skip all regex.
+        // Alphanumeric + underscores only covers the vast majority of column names.
+        if ($name !== '' && $name[0] !== '`' && $name !== '*'
+            && ctype_alnum(str_replace('_', '', $name))
+        ) {
+            return '`' . $name . '`';
+        }
+
         // If already quoted or is a function call, return as is
         if ($name === '*' || strpos($name, '`') !== false || preg_match('/\w+\s*\(/', $name)) {
             return $name;
