@@ -2273,6 +2273,9 @@ public function forceDelete() {
 	}
 
 	public function offsetSet($offset, $value): void {
+		if (!$this->isFillableAttribute($offset)) {
+			return;
+		}
 		$this->setAttributeDirectly($offset, $value);
 	}
 
