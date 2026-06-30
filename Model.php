@@ -2244,13 +2244,11 @@ public function forceDelete() {
 	}
 
 	public function isDirty($attribute = null) {
-		$changes = $this->getChanges();
-	
 		if ($attribute) {
-			return array_key_exists($attribute, $changes);
+			return !array_key_exists($attribute, $this->original)
+				|| $this->attributes[$attribute] !== $this->original[$attribute];
 		}
-	
-		return !empty($changes);
+		return !empty($this->getChanges());
 	}
 
 	public function getChanges() {
