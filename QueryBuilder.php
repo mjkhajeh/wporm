@@ -4173,7 +4173,7 @@ class QueryBuilder {
             $sub->from($relatedTable)
                 ->select(["COUNT(*)"])
                 ->whereColumn("$relatedTable.$morphId", '=', "$outerTable.$localKey")
-                ->where("$relatedTable.$morphType", $morphClass);
+                ->where($morphType, $morphClass);
 
             $subSql = $sub->buildSelectQuery();
             $this->wheres[] = "($subSql) $operator %s";

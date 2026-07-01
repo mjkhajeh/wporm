@@ -406,7 +406,15 @@ abstract class Model implements \ArrayAccess {
 	public function fill(array $attributes) {
 		foreach ($attributes as $key => $value) {
 			if ($this->isFillableAttribute($key)) {
-				$this->__set($key, $value);
+				$this->setAttributeDirectly($key, $value);
+			} else {
+				error_log(sprintf(
+					'WPORM: Mass-assignment guard blocked filling "%s" on %s. '
+					. 'Add "%s" to $fillable or set $guarded to [] to allow this.',
+					$key,
+					static::class,
+					$key
+				));
 			}
 		}
 		return $this;
@@ -487,6 +495,13 @@ abstract class Model implements \ArrayAccess {
 
 	public function __set($key, $value) {
 		if (!$this->isFillableAttribute($key)) {
+			error_log(sprintf(
+				'WPORM: Mass-assignment guard blocked setting "%s" on %s. '
+				. 'Add "%s" to $fillable or set $guarded to [] to allow this.',
+				$key,
+				static::class,
+				$key
+			));
 			return;
 		}
 
@@ -782,8 +797,8 @@ protected function castSet($key, $value) {
 	 * Mass assignment still goes through the constructor/fill()/__set()
 	 * pipeline, so $fillable/$guarded are enforced exactly as they are for
 	 * `new static($attributes)`. Any attribute not allowed through mass
-	 * assignment is silently skipped (consistent with the rest of WPORM's
-	 * mass-assignment behavior), rather than throwing.
+	 * assignment is skipped with a logged warning, making guard violations
+	 * visible in the error log.
 	 *
 	 * Usage:
 	 *   $user = User::create(['name' => 'Jane', 'email' => 'jane@example.com']);
@@ -2324,6 +2339,13 @@ public function forceDelete() {
 
 	public function offsetSet($offset, $value): void {
 		if (!$this->isFillableAttribute($offset)) {
+			error_log(sprintf(
+				'WPORM: Mass-assignment guard blocked ArrayAccess set of "%s" on %s. '
+				. 'Add "%s" to $fillable or set $guarded to [] to allow this.',
+				$offset,
+				static::class,
+				$offset
+			));
 			return;
 		}
 		$this->setAttributeDirectly($offset, $value);
