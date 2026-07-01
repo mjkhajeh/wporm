@@ -325,6 +325,7 @@ class QueryBuilder {
      * @return $this
      */
     public function whereSub(string $column, string $operator, $query): self {
+        Helpers::validateOperator($operator);
         [$sql, $bindings] = $this->createSub($query);
         $this->wheres[] = Helpers::quoteIdentifier($column) . " $operator ($sql)";
         foreach ($bindings as $b) {
@@ -342,6 +343,7 @@ class QueryBuilder {
      * @return $this
      */
     public function orWhereSub(string $column, string $operator, $query): self {
+        Helpers::validateOperator($operator);
         [$sql, $bindings] = $this->createSub($query);
         $this->wheres[] = 'OR ' . Helpers::quoteIdentifier($column) . " $operator ($sql)";
         foreach ($bindings as $b) {
@@ -451,6 +453,7 @@ class QueryBuilder {
             $value = $operator;
             $operator = '=';
         }
+        Helpers::validateOperator($operator);
         // Cast DateTime for casted columns (handle nulls too)
         if (isset($this->casts[$column])) {
             $cast = $this->casts[$column];
@@ -502,6 +505,7 @@ class QueryBuilder {
             $value = $operator;
             $operator = '=';
         }
+        Helpers::validateOperator($operator);
         $this->wheres[] = 'OR ' . Helpers::quoteIdentifier($column) . " $operator %s";
         $this->bindings[] = $value;
         return $this;
@@ -622,6 +626,7 @@ class QueryBuilder {
             $value = $operator;
             $operator = '=';
         }
+        Helpers::validateOperator($operator);
         // Use '!=' instead of 'NOT =' for equality
         if ($operator === '=') {
             $this->wheres[] = Helpers::quoteIdentifier($column) . " != %s";
@@ -637,6 +642,7 @@ class QueryBuilder {
             $value = $operator;
             $operator = '=';
         }
+        Helpers::validateOperator($operator);
         // Use '!=' instead of 'NOT =' for equality
         if ($operator === '=') {
             $this->wheres[] = "OR " . Helpers::quoteIdentifier($column) . " != %s";
@@ -653,6 +659,7 @@ class QueryBuilder {
         foreach ($conditions as $cond) {
             if (is_array($cond)) {
                 if (count($cond) === 3) {
+                    Helpers::validateOperator($cond[1]);
                     $orGroup[] = Helpers::quoteIdentifier($cond[0]) . " $cond[1] %s";
                     $bindings[] = $cond[2];
                 } elseif (count($cond) === 2) {
@@ -678,6 +685,7 @@ class QueryBuilder {
         foreach ($conditions as $cond) {
             if (is_array($cond)) {
                 if (count($cond) === 3) {
+                    Helpers::validateOperator($cond[1]);
                     $orGroup[] = Helpers::quoteIdentifier($cond[0]) . " $cond[1] %s";
                     $bindings[] = $cond[2];
                 } elseif (count($cond) === 2) {
@@ -703,6 +711,7 @@ class QueryBuilder {
         foreach ($conditions as $cond) {
             if (is_array($cond)) {
                 if (count($cond) === 3) {
+                    Helpers::validateOperator($cond[1]);
                     $andGroup[] = Helpers::quoteIdentifier($cond[0]) . " $cond[1] %s";
                     $bindings[] = $cond[2];
                 } elseif (count($cond) === 2) {
@@ -728,6 +737,7 @@ class QueryBuilder {
         foreach ($conditions as $cond) {
             if (is_array($cond)) {
                 if (count($cond) === 3) {
+                    Helpers::validateOperator($cond[1]);
                     $andGroup[] = Helpers::quoteIdentifier($cond[0]) . " $cond[1] %s";
                     $bindings[] = $cond[2];
                 } elseif (count($cond) === 2) {
@@ -753,6 +763,7 @@ class QueryBuilder {
         foreach ($conditions as $cond) {
             if (is_array($cond)) {
                 if (count($cond) === 3) {
+                    Helpers::validateOperator($cond[1]);
                     $notGroup[] = Helpers::quoteIdentifier($cond[0]) . " $cond[1] %s";
                     $bindings[] = $cond[2];
                 } elseif (count($cond) === 2) {
@@ -778,6 +789,7 @@ class QueryBuilder {
         foreach ($conditions as $cond) {
             if (is_array($cond)) {
                 if (count($cond) === 3) {
+                    Helpers::validateOperator($cond[1]);
                     $notGroup[] = Helpers::quoteIdentifier($cond[0]) . " $cond[1] %s";
                     $bindings[] = $cond[2];
                 } elseif (count($cond) === 2) {
@@ -954,6 +966,7 @@ class QueryBuilder {
             $second = $operator;
             $operator = '=';
         }
+        Helpers::validateOperator($operator);
     $this->wheres[] = "OR " . Helpers::quoteIdentifier($first) . " $operator " . Helpers::quoteIdentifier($second);
         return $this;
     }
@@ -1699,6 +1712,7 @@ class QueryBuilder {
             $value = $operator;
             $operator = '=';
         }
+        Helpers::validateOperator($operator);
         $jsonPath = $this->parseJsonPath($column);
         $this->wheres[] = "JSON_UNQUOTE(JSON_EXTRACT($jsonPath)) $operator %s";
         $this->bindings[] = $value;
@@ -1710,6 +1724,7 @@ class QueryBuilder {
             $value = $operator;
             $operator = '=';
         }
+        Helpers::validateOperator($operator);
         $jsonPath = $this->parseJsonPath($column);
         $this->wheres[] = "OR JSON_UNQUOTE(JSON_EXTRACT($jsonPath)) $operator %s";
         $this->bindings[] = $value;
@@ -1735,6 +1750,7 @@ class QueryBuilder {
             $value = $operator;
             $operator = '=';
         }
+        Helpers::validateOperator($operator);
         $jsonPath = $this->parseJsonPath($column);
         $this->wheres[] = "JSON_LENGTH(JSON_EXTRACT($jsonPath)) $operator %s";
         $this->bindings[] = $value;
@@ -1746,6 +1762,7 @@ class QueryBuilder {
             $value = $operator;
             $operator = '=';
         }
+        Helpers::validateOperator($operator);
         $jsonPath = $this->parseJsonPath($column);
         $this->wheres[] = "OR JSON_LENGTH(JSON_EXTRACT($jsonPath)) $operator %s";
         $this->bindings[] = $value;
@@ -1768,6 +1785,7 @@ class QueryBuilder {
                 'bindings' => $join->bindings,
             ];
         } elseif ($first && $operator && $second) {
+            Helpers::validateOperator($operator);
             $this->joins[] = [
                 'type' => $type,
                 'table' => $table,
@@ -1848,6 +1866,7 @@ class QueryBuilder {
             $value = $operator;
             $operator = '=';
         }
+        Helpers::validateOperator($operator);
         $this->havings[] = [Helpers::quoteIdentifier($column) . " $operator %s", [$value]];
         return $this;
     }
@@ -1872,6 +1891,7 @@ class QueryBuilder {
             $value = $operator;
             $operator = '=';
         }
+        Helpers::validateOperator($operator);
         $this->havings[] = ["OR " . Helpers::quoteIdentifier($column) . " $operator %s", [$value]];
         return $this;
     }
@@ -4022,6 +4042,8 @@ class QueryBuilder {
             $count    = $operator;
             $operator = '>=';
         }
+
+        Helpers::validateOperator($operator);
 
         $model = $this->model;
         if (!method_exists($model, $relation)) {

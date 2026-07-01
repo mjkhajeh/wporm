@@ -41,6 +41,34 @@ class Helpers {
         return '`' . str_replace('`', '', $name) . '`';
     }
 
+    /**
+     * Validate that a comparison operator is safe to interpolate into SQL.
+     *
+     * @param string $operator
+     * @return string  The original operator (unchanged) if valid
+     * @throws \InvalidArgumentException if the operator is not in the allowlist
+     */
+    public static function validateOperator(string $operator): string {
+        static $allowed = [
+            '=', '!=', '<>', '<', '>', '<=', '>=', '<=>',
+            'LIKE', 'NOT LIKE',
+            'RLIKE', 'REGEXP', 'NOT REGEXP',
+            'IN', 'NOT IN',
+            'BETWEEN', 'NOT BETWEEN',
+            'IS', 'IS NOT',
+        ];
+
+        $upper = strtoupper(trim($operator));
+
+        if (!in_array($upper, $allowed, true)) {
+            throw new \InvalidArgumentException(
+                "Invalid SQL operator: {$operator}. Allowed operators: " . implode(', ', $allowed)
+            );
+        }
+
+        return $operator;
+    }
+
     public static function convert_to_pascal_case( $input ) {
         $input = str_replace( ['-', '_'], ' ', $input );
         $words = explode( ' ', $input ); // Split input string into an array of words
