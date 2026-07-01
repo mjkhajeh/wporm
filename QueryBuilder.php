@@ -972,7 +972,13 @@ class QueryBuilder {
     }
 
     public function orderBy($column, $direction = 'asc') {
-      $this->orders[] = Helpers::quoteIdentifier($column) . ' ' . $direction;
+        $direction = strtolower(trim($direction));
+        if ($direction !== 'asc' && $direction !== 'desc') {
+            throw new \InvalidArgumentException(
+                "Invalid ORDER BY direction: '{$direction}'. Must be 'asc' or 'desc'."
+            );
+        }
+        $this->orders[] = Helpers::quoteIdentifier($column) . ' ' . $direction;
         return $this;
     }
 
