@@ -2480,8 +2480,18 @@ public function forceDelete() {
 
 	public function isDirty($attribute = null) {
 		if ($attribute) {
-			return !array_key_exists($attribute, $this->original)
-				|| $this->attributes[$attribute] !== $this->original[$attribute];
+			$existsInOriginal = array_key_exists($attribute, $this->original);
+			$existsInAttributes = array_key_exists($attribute, $this->attributes);
+
+			if (!$existsInOriginal && !$existsInAttributes) {
+				return false;
+			}
+
+			if (!$existsInOriginal || !$existsInAttributes) {
+				return true;
+			}
+
+			return $this->attributes[$attribute] !== $this->original[$attribute];
 		}
 		return !empty($this->getChanges());
 	}
