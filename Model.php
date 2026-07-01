@@ -1059,6 +1059,9 @@ protected function castSet($key, $value) {
 			return;
 		}
 
+		// Pre-fetch all touched relations in one batch to avoid N+1 queries.
+		$this->eagerLoadTouchedRelations();
+
 		foreach ($this->touches as $relation) {
 			if (!method_exists($this, $relation)) {
 				continue;
@@ -1067,6 +1070,101 @@ protected function castSet($key, $value) {
 			$related = $this->$relation;
 			if ($related instanceof Model && $related->timestamps) {
 				$related->touch();
+			}
+		}
+	}
+
+	/**
+	 * Eager-load all relations listed in $touches to avoid N+1 queries.
+	 *
+	 * For belongsTo relations, batches the foreign-key lookup into a single
+	 * WHERE IN query. Other relation types are loaded individually since they
+	 * are uncommon in $touches and harder to batch.
+	 *
+	 * Results are stored in $_eagerLoaded so that __get() returns the cached
+	 * value without triggering a lazy-load query.
+	 *
+	 * @return void
+	 */
+	protected function eagerLoadTouchedRelations() {
+		// Group belongsTo relations by related class for batch loading.
+		$batchedByClass = [];
+		$singleRelations = [];
+
+		foreach ($this->touches as $relation) {
+			if (!method_exists($this, $relation)) {
+				continue;
+			}
+
+			// Call the relation method on a fresh instance to get context.
+			$modelClass = static::class;
+			$sampleQuery = (new $modelClass)->$relation();
+
+			if (!($sampleQuery instanceof \MJ\WPORM\QueryBuilder)) {
+				continue;
+			}
+
+			$context = $sampleQuery->getRelationContext();
+			$type = $context['type'] ?? null;
+
+			if ($type === 'belongsTo') {
+				$relClass = $context['related'];
+				if (!isset($batchedByClass[$relClass])) {
+					$batchedByClass[$relClass] = [];
+				}
+				$batchedByClass[$relClass][] = [
+					'relation'   => $relation,
+					'foreignKey' => $context['foreignKey'],
+					'ownerKey'   => $context['ownerKey'],
+				];
+			} else {
+				$singleRelations[] = $relation;
+			}
+		}
+
+		// Batch-load belongsTo relations: one query per related class.
+		foreach ($batchedByClass as $relClass => $relations) {
+			$fks = [];
+			foreach ($relations as $r) {
+				$fkValue = $this->attributes[$r['foreignKey']] ?? null;
+				if ($fkValue !== null) {
+					$fks[$r['foreignKey']] = $fkValue;
+				}
+			}
+
+			if (empty($fks)) {
+				foreach ($relations as $r) {
+					$this->setEagerLoaded($r['relation'], null);
+				}
+				continue;
+			}
+
+			$pk = (new $relClass)->getPrimaryKey();
+			$ids = array_unique(array_values($fks));
+
+			$results = $relClass::query()
+				->whereIn($pk, $ids)
+				->get();
+
+			// Index results by PK for fast lookup.
+			$index = [];
+			foreach ($results as $model) {
+				$index[$model->$pk] = $model;
+			}
+
+			// Map each relation to its loaded model.
+			foreach ($relations as $r) {
+				$fkValue = $fks[$r['foreignKey']] ?? null;
+				$this->setEagerLoaded($r['relation'], $index[$fkValue] ?? null);
+			}
+		}
+
+		// Load non-batchable relations individually.
+		foreach ($singleRelations as $relation) {
+			$modelClass = static::class;
+			$query = (new $modelClass)->$relation();
+			if ($query instanceof \MJ\WPORM\QueryBuilder) {
+				$this->setEagerLoaded($relation, $query->first());
 			}
 		}
 	}
