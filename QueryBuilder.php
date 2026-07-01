@@ -3690,8 +3690,10 @@ class QueryBuilder {
      */
     public function paginate($perPage = 15, $page = null) {
         $perPage = (int)$perPage;
-        $page = $page ?: (isset($_GET['page']) ? abs((int)$_GET['page']) : 1);
-        $page = max($page, 1);
+        if ($page === null) {
+            $page = isset($_GET['page']) ? abs((int)$_GET['page']) : 1;
+        }
+        $page = max((int)$page, 1);
 
         // Save mutable state that count() / applySoftDeleteScope() may alter,
         // then restore after the count query so get() applies the same scopes.
@@ -3738,8 +3740,10 @@ class QueryBuilder {
      */
     public function simplePaginate($perPage = 15, $page = null) {
         $perPage = (int)$perPage;
-        $page = $page ?: (isset($_GET['page']) ? abs((int)$_GET['page']) : 1);
-        $page = max($page, 1);
+        if ($page === null) {
+            $page = isset($_GET['page']) ? abs((int)$_GET['page']) : 1;
+        }
+        $page = max((int)$page, 1);
         $this->limit($perPage + 1)->offset(($page - 1) * $perPage);
         $results = $this->get();
         $hasMore = count($results) > $perPage;
