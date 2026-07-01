@@ -136,7 +136,7 @@ class ColumnDefinition
                 $val = strtoupper(trim($this->default));
             } else {
                 // Plain string literal — quote it (and escape embedded quotes).
-                $val = "'" . str_replace("'", "\\'", $this->default) . "'";
+                $val = "'" . addslashes($this->default) . "'";
             }
             $sql .= " DEFAULT $val";
         }
