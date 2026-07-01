@@ -697,7 +697,7 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
             case '!==':
                 return $actual !== $expected;
             default:
-                return $actual == $expected;
+                return false;
         }
     }
 
