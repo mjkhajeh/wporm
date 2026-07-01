@@ -133,17 +133,17 @@ class Blueprint
     public function time(string $column) { return $this->addColumn("TIME", $column); }
 
     public function datetime(string $column) { return $this->addColumn("DATETIME", $column); }
-    public function datetimeTz(string $column) { return $this->addColumn("DATETIME WITH TIME ZONE", $column); }
-    public function timestampTz(string $column) { return $this->addColumn("TIMESTAMP WITH TIME ZONE", $column); }
-    public function timestampTzWithDefault(string $column) { return $this->addColumn("TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP", $column); }
+    public function datetimeTz(string $column) { return $this->addColumn("DATETIME", $column); }
+    public function timestampTz(string $column) { return $this->addColumn("TIMESTAMP", $column); }
+    public function timestampTzWithDefault(string $column) { return $this->addColumn("TIMESTAMP DEFAULT CURRENT_TIMESTAMP", $column); }
     public function timestampWithDefault(string $column) { return $this->addColumn("TIMESTAMP DEFAULT CURRENT_TIMESTAMP", $column); }
     public function dateTimeWithDefault(string $column) { return $this->addColumn("DATETIME DEFAULT CURRENT_TIMESTAMP", $column); }
-    public function dateTimeTzWithDefault(string $column) { return $this->addColumn("DATETIME WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP", $column); }
-    public function dateTimeTzWithDefaultCurrentOnUpdate(string $column) { return $this->addColumn("DATETIME WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP", $column); }
+    public function dateTimeTzWithDefault(string $column) { return $this->addColumn("DATETIME DEFAULT CURRENT_TIMESTAMP", $column); }
+    public function dateTimeTzWithDefaultCurrentOnUpdate(string $column) { return $this->addColumn("DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP", $column); }
     public function dateTimeWithDefaultCurrentOnUpdate(string $column) { return $this->addColumn("DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP", $column); }
-    public function timeTz(string $column) { return $this->addColumn("TIME WITH TIME ZONE", $column); }
-    public function timeTzWithDefault(string $column) { return $this->addColumn("TIME WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP", $column); }
-    public function timeTzWithDefaultCurrentOnUpdate(string $column) { return $this->addColumn("TIME WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP", $column); }
+    public function timeTz(string $column) { return $this->addColumn("TIME", $column); }
+    public function timeTzWithDefault(string $column) { return $this->addColumn("TIME DEFAULT CURRENT_TIMESTAMP", $column); }
+    public function timeTzWithDefaultCurrentOnUpdate(string $column) { return $this->addColumn("TIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP", $column); }
     public function timeWithDefault(string $column) { return $this->addColumn("TIME DEFAULT CURRENT_TIMESTAMP", $column); }
 
     public function binary(string $column) { return $this->addColumn("BLOB", $column); }
