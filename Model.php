@@ -1375,7 +1375,9 @@ protected function castSet($key, $value) {
 		if ($this->timestamps && !array_key_exists($this->updatedAtColumn, $extra)) {
 			// incrementOrDecrement() on the query builder auto-touches updated_at;
 			// mirror that onto the in-memory model too (best-effort, approximate).
-			$this->original[$this->updatedAtColumn] = $this->attributes[$this->updatedAtColumn] ?? null;
+			$now = current_time('mysql');
+			$this->attributes[$this->updatedAtColumn] = $now;
+			$this->original[$this->updatedAtColumn] = $now;
 		}
 
 		return $result;
