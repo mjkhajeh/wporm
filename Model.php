@@ -2016,11 +2016,13 @@ public function forceDelete() {
 	 * Also mirrored into $original so isDirty()/getChanges() don't report
 	 * the count as a pending change.
 	 *
+	 * @internal Framework-internal method. Do not call from application code.
+	 *
 	 * @param string $key
 	 * @param mixed $value
 	 * @return $this
 	 */
-	public function forceSetAttribute($key, $value) {
+	public function _forceSetAttribute($key, $value) {
 		$this->attributes[$key] = $value;
 		$this->original[$key] = $value;
 		return $this;

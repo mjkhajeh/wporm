@@ -3013,7 +3013,7 @@ class QueryBuilder {
 
         $firstModel = $models[0];
         if (!method_exists($firstModel, $relation)) {
-            foreach ($models as $m) { $m->forceSetAttribute($alias, 0); }
+            foreach ($models as $m) { $m->_forceSetAttribute($alias, 0); }
             return;
         }
 
@@ -3026,7 +3026,7 @@ class QueryBuilder {
         } else {
             $sampleQuery = $firstModel->$relation();
             if (!($sampleQuery instanceof \MJ\WPORM\QueryBuilder)) {
-                foreach ($models as $m) { $m->forceSetAttribute($alias, 0); }
+                foreach ($models as $m) { $m->_forceSetAttribute($alias, 0); }
                 return;
             }
             $ctx  = $sampleQuery->getRelationContext();
@@ -3052,7 +3052,7 @@ class QueryBuilder {
 
             $counts = $this->fetchGroupedCounts($query);
             foreach ($models as $m) {
-                $m->forceSetAttribute($alias, $counts[$m->$localKey] ?? 0);
+                $m->_forceSetAttribute($alias, $counts[$m->$localKey] ?? 0);
             }
             return;
         }
@@ -3071,7 +3071,7 @@ class QueryBuilder {
             )));
 
             if (empty($ids)) {
-                foreach ($models as $m) { $m->forceSetAttribute($alias, 0); }
+                foreach ($models as $m) { $m->_forceSetAttribute($alias, 0); }
                 return;
             }
 
@@ -3083,7 +3083,7 @@ class QueryBuilder {
 
             $counts = $this->fetchGroupedCounts($query);
             foreach ($models as $m) {
-                $m->forceSetAttribute($alias, $counts[$m->$foreignKey] ?? 0);
+                $m->_forceSetAttribute($alias, $counts[$m->$foreignKey] ?? 0);
             }
             return;
         }
@@ -3117,7 +3117,7 @@ class QueryBuilder {
 
             $counts = $this->fetchGroupedCounts($query);
             foreach ($models as $m) {
-                $m->forceSetAttribute($alias, $counts[$m->$localKey] ?? 0);
+                $m->_forceSetAttribute($alias, $counts[$m->$localKey] ?? 0);
             }
             return;
         }
@@ -3149,7 +3149,7 @@ class QueryBuilder {
 
             $counts = $this->fetchGroupedCounts($query);
             foreach ($models as $m) {
-                $m->forceSetAttribute($alias, $counts[$m->$localKey] ?? 0);
+                $m->_forceSetAttribute($alias, $counts[$m->$localKey] ?? 0);
             }
             return;
         }
@@ -3176,7 +3176,7 @@ class QueryBuilder {
 
             $counts = $this->fetchGroupedCounts($query);
             foreach ($models as $m) {
-                $m->forceSetAttribute($alias, $counts[$m->$localKey] ?? 0);
+                $m->_forceSetAttribute($alias, $counts[$m->$localKey] ?? 0);
             }
             return;
         }
@@ -3184,7 +3184,7 @@ class QueryBuilder {
         // ── Unsupported relation type (e.g. morphTo): default to 0, matching
         //    Eloquent's behavior of not supporting counts on morphTo. ───────
         foreach ($models as $m) {
-            $m->forceSetAttribute($alias, 0);
+            $m->_forceSetAttribute($alias, 0);
         }
     }
 
@@ -3239,7 +3239,7 @@ class QueryBuilder {
 
         $firstModel = $models[0];
         if (!method_exists($firstModel, $relation)) {
-            foreach ($models as $m) { $m->forceSetAttribute($alias, null); }
+            foreach ($models as $m) { $m->_forceSetAttribute($alias, null); }
             return;
         }
 
@@ -3252,7 +3252,7 @@ class QueryBuilder {
         } else {
             $sampleQuery = $firstModel->$relation();
             if (!($sampleQuery instanceof \MJ\WPORM\QueryBuilder)) {
-                foreach ($models as $m) { $m->forceSetAttribute($alias, null); }
+                foreach ($models as $m) { $m->_forceSetAttribute($alias, null); }
                 return;
             }
             $ctx  = $sampleQuery->getRelationContext();
@@ -3277,7 +3277,7 @@ class QueryBuilder {
 
             $map = $this->fetchGroupedAggregates($query);
             foreach ($models as $m) {
-                $m->forceSetAttribute($alias, $map[$m->$localKey] ?? null);
+                $m->_forceSetAttribute($alias, $map[$m->$localKey] ?? null);
             }
             return;
         }
@@ -3294,7 +3294,7 @@ class QueryBuilder {
             )));
 
             if (empty($ids)) {
-                foreach ($models as $m) { $m->forceSetAttribute($alias, null); }
+                foreach ($models as $m) { $m->_forceSetAttribute($alias, null); }
                 return;
             }
 
@@ -3306,7 +3306,7 @@ class QueryBuilder {
 
             $map = $this->fetchGroupedAggregates($query);
             foreach ($models as $m) {
-                $m->forceSetAttribute($alias, $map[$m->$foreignKey] ?? null);
+                $m->_forceSetAttribute($alias, $map[$m->$foreignKey] ?? null);
             }
             return;
         }
@@ -3337,7 +3337,7 @@ class QueryBuilder {
 
             $map = $this->fetchGroupedAggregates($query);
             foreach ($models as $m) {
-                $m->forceSetAttribute($alias, $map[$m->$localKey] ?? null);
+                $m->_forceSetAttribute($alias, $map[$m->$localKey] ?? null);
             }
             return;
         }
@@ -3366,7 +3366,7 @@ class QueryBuilder {
 
             $map = $this->fetchGroupedAggregates($query);
             foreach ($models as $m) {
-                $m->forceSetAttribute($alias, $map[$m->$localKey] ?? null);
+                $m->_forceSetAttribute($alias, $map[$m->$localKey] ?? null);
             }
             return;
         }
@@ -3390,14 +3390,14 @@ class QueryBuilder {
 
             $map = $this->fetchGroupedAggregates($query);
             foreach ($models as $m) {
-                $m->forceSetAttribute($alias, $map[$m->$localKey] ?? null);
+                $m->_forceSetAttribute($alias, $map[$m->$localKey] ?? null);
             }
             return;
         }
 
         // ── Unsupported (e.g. morphTo): default to null ────────────────
         foreach ($models as $m) {
-            $m->forceSetAttribute($alias, null);
+            $m->_forceSetAttribute($alias, null);
         }
     }
 
