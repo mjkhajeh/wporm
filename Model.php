@@ -1232,6 +1232,11 @@ protected function castSet($key, $value) {
 	}
 
 	public function delete() {
+		$pk = $this->primaryKey;
+		if (!isset($this->attributes[$pk])) {
+			return false;
+		}
+
 		if ($this->softDeletes) {
 			// softDeleting before-hook
 			if ($this->fireModelEvent('softDeleting') === false) {
@@ -1247,7 +1252,6 @@ protected function castSet($key, $value) {
 			}
 			global $wpdb;
 			$this->attributes[$this->deletedAtColumn] = $this->softDeleteType === 'boolean' ? 1 : current_time('mysql');
-			$pk = $this->primaryKey;
 			$wpdb->update($this->getTable(), [$this->deletedAtColumn => $this->attributes[$this->deletedAtColumn]], [$pk => $this->attributes[$pk]]);
 			$this->exists = true;
 			// softDeleted after-hook
@@ -1410,6 +1414,11 @@ protected function castSet($key, $value) {
 
 	public function restore() {
 		if ($this->softDeletes && $this->trashed()) {
+			$pk = $this->primaryKey;
+			if (!isset($this->attributes[$pk])) {
+				return false;
+			}
+
 			// restoring before-hook
 			if ($this->fireModelEvent('restoring') === false) {
 				return false;
@@ -1423,7 +1432,6 @@ protected function castSet($key, $value) {
 				$this->restoring();
 			}
 			global $wpdb;
-			$pk = $this->primaryKey;
 			$this->attributes[$this->deletedAtColumn] = $this->softDeleteType === 'boolean' ? 0 : null;
 			$wpdb->update($this->getTable(), [$this->deletedAtColumn => $this->attributes[$this->deletedAtColumn]], [$pk => $this->attributes[$pk]]);
 			$this->exists = true;
@@ -1444,6 +1452,11 @@ protected function castSet($key, $value) {
 
 public function forceDelete() {
     if ($this->softDeletes) {
+        $pk = $this->primaryKey;
+        if (!isset($this->attributes[$pk])) {
+            return false;
+        }
+
         if ($this->fireModelEvent('deleting') === false) {
             return false;
         }
@@ -1456,7 +1469,6 @@ public function forceDelete() {
             $this->deleting();
         }
         global $wpdb;
-        $pk = $this->primaryKey;
         $wpdb->delete($this->getTable(), [$pk => $this->attributes[$pk]]);
         $this->exists = false;
         $this->fireModelEvent('deleted');
