@@ -39,7 +39,12 @@ class ModelNotFoundException extends \RuntimeException {
 
         if (!empty($ids)) {
             $ids = is_array($ids) ? $ids : [$ids];
-            $message .= ' ' . implode(', ', $ids);
+            $safe = array_map(function ($id) {
+                return is_int($id) || ctype_digit((string) $id)
+                    ? (string) $id
+                    : addslashes((string) $id);
+            }, $ids);
+            $message .= ' ' . implode(', ', $safe);
         }
 
         $this->message = $message;
