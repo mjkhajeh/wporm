@@ -2068,9 +2068,10 @@ public function forceDelete() {
 		$instance = new static;
 		foreach ($attributes as $key => $value) {
 			$instance->attributes[$key] = $instance->castGet($key, $value);
-			// Set the property for the primary key if present
+			// Set the property for the primary key if present, bypassing
+			// mass-assignment guards since this is internal DB hydration.
 			if ($key === $instance->primaryKey) {
-				$instance->{$instance->primaryKey} = $value;
+				$instance->setAttributeDirectly($instance->primaryKey, $value);
 			}
 		}
 		$instance->original = $attributes;
