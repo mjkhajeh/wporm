@@ -3701,6 +3701,8 @@ class QueryBuilder {
         $savedBindings           = $this->bindings;
         $savedSoftDeleteApplied  = $this->softDeleteScopeApplied;
         $savedSelects            = $this->selects;
+        $savedLimit              = $this->limit;
+        $savedOffset             = $this->offset;
 
         $this->selects = ['*'];
         $total = $this->count();
@@ -3714,6 +3716,8 @@ class QueryBuilder {
 
         $this->limit($perPage)->offset(($page - 1) * $perPage);
         $results = $this->get();
+        $this->limit = $savedLimit;
+        $this->offset = $savedOffset;
         $lastPage = (int) ceil($total / $perPage);
         $from = $total ? (($page - 1) * $perPage) + 1 : 0;
         $to = $from + count($results) - 1;
@@ -3744,8 +3748,12 @@ class QueryBuilder {
             $page = isset($_GET['page']) ? abs((int)$_GET['page']) : 1;
         }
         $page = max((int)$page, 1);
+        $savedLimit = $this->limit;
+        $savedOffset = $this->offset;
         $this->limit($perPage + 1)->offset(($page - 1) * $perPage);
         $results = $this->get();
+        $this->limit = $savedLimit;
+        $this->offset = $savedOffset;
         $hasMore = count($results) > $perPage;
         $data = $hasMore ? $results->slice(0, $perPage) : $results;
         return [
