@@ -69,6 +69,12 @@ class EventDispatcher
             static::$listeners = [];
             static::$instances = [];
         } else {
+            // Prune cached instances for listeners being removed.
+            foreach (static::$listeners[$eventClass] ?? [] as $listener) {
+                if (is_string($listener) && isset(static::$instances[$listener])) {
+                    unset(static::$instances[$listener]);
+                }
+            }
             unset(static::$listeners[$eventClass]);
         }
     }
