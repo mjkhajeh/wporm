@@ -3436,7 +3436,7 @@ class QueryBuilder {
         // Remove SELECT ... FROM ... to just the subquery
         $sql = preg_replace('/^SELECT .*? FROM /i', 'SELECT 1 FROM ', $sql);
         $this->wheres[] = "EXISTS ($sql)";
-        $this->bindings = array_merge($this->bindings, $sub->bindings);
+        $this->bindings = array_merge($this->bindings, $sub->getBindings());
         return $this;
     }
     public function orWhereExists($callback) {
@@ -3445,7 +3445,7 @@ class QueryBuilder {
         $sql = $sub->buildSelectQuery();
         $sql = preg_replace('/^SELECT .*? FROM /i', 'SELECT 1 FROM ', $sql);
         $this->wheres[] = "OR EXISTS ($sql)";
-        $this->bindings = array_merge($this->bindings, $sub->bindings);
+        $this->bindings = array_merge($this->bindings, $sub->getBindings());
         return $this;
     }
     public function whereNotExists($callback) {
@@ -3454,7 +3454,7 @@ class QueryBuilder {
         $sql = $sub->buildSelectQuery();
         $sql = preg_replace('/^SELECT .*? FROM /i', 'SELECT 1 FROM ', $sql);
         $this->wheres[] = "NOT EXISTS ($sql)";
-        $this->bindings = array_merge($this->bindings, $sub->bindings);
+        $this->bindings = array_merge($this->bindings, $sub->getBindings());
         return $this;
     }
     public function orWhereNotExists($callback) {
@@ -3463,7 +3463,7 @@ class QueryBuilder {
         $sql = $sub->buildSelectQuery();
         $sql = preg_replace('/^SELECT .*? FROM /i', 'SELECT 1 FROM ', $sql);
         $this->wheres[] = "OR NOT EXISTS ($sql)";
-        $this->bindings = array_merge($this->bindings, $sub->bindings);
+        $this->bindings = array_merge($this->bindings, $sub->getBindings());
         return $this;
     }
 
