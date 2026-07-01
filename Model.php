@@ -1020,6 +1020,8 @@ protected function castSet($key, $value) {
 	 *
 	 * Uses touch() instead of save() to avoid triggering model events
 	 * and prevent infinite recursion through circular $touches references.
+	 * For user-initiated timestamp updates that should fire events, use
+	 * touchWithEvents() instead.
 	 *
 	 * Usage:
 	 *   class Comment extends Model {
@@ -1050,12 +1052,18 @@ protected function castSet($key, $value) {
 	}
 
 	/**
-	 * Update the model's updated_at timestamp and save without triggering events.
+	 * Update the model's updated_at timestamp and save WITHOUT triggering
+	 * lifecycle events (updating/updated).
 	 *
 	 * This is used internally by touchOwners() to update parent timestamps
 	 * without firing saving/saved/updating/updated events or causing
 	 * recursive touching through circular $touches references.
 	 *
+	 * IMPORTANT: Because events are skipped, any listeners registered via
+	 * dispatchesEvents, EventDispatcher, or observers will NOT be notified.
+	 * If you need events to fire, use touchWithEvents() instead.
+	 *
+	 * @see touchWithEvents()
 	 * @return bool
 	 */
 	public function touch(): bool {
@@ -1078,6 +1086,30 @@ protected function castSet($key, $value) {
 		}
 
 		return $result !== false;
+	}
+
+	/**
+	 * Update the model's updated_at timestamp and save, triggering the
+	 * full lifecycle event pipeline (saving/saved/updating/updated).
+	 *
+	 * Unlike touch(), this method fires all registered events and observers,
+	 * making it suitable for user-initiated timestamp updates where listeners
+	 * should be notified.
+	 *
+	 * WARNING: Do not use this inside touchOwners() or $touches callbacks,
+	 * as it will cause infinite recursion on circular references.
+	 *
+	 * @return bool
+	 */
+	public function touchWithEvents(): bool {
+		if (!$this->timestamps || !$this->exists) {
+			return false;
+		}
+
+		$this->attributes[$this->updatedAtColumn] = current_time('mysql');
+		$this->original[$this->updatedAtColumn] = $this->attributes[$this->updatedAtColumn];
+
+		return $this->save();
 	}
 
 	protected function insert() {
