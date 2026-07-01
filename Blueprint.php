@@ -221,7 +221,7 @@ class Blueprint
 
     public function dropColumn(string $column)
     {
-        $this->commands[] = "DROP COLUMN $column";
+        $this->commands[] = "DROP COLUMN " . Helpers::quoteIdentifier($column);
     }
 
     public function renameColumn(string $from, string $to)
