@@ -304,6 +304,9 @@ class Blueprint
 
     public function foreign(string $column, string $refTable, string $refColumn = 'id', string $onDelete = 'CASCADE', string $onUpdate = 'CASCADE')
     {
+        $column = Helpers::quoteIdentifier($column);
+        $refTable = Helpers::quoteIdentifier($refTable);
+        $refColumn = Helpers::quoteIdentifier($refColumn);
         $this->foreigns[] = "FOREIGN KEY ($column) REFERENCES $refTable($refColumn) ON DELETE $onDelete ON UPDATE $onUpdate";
     }
 
