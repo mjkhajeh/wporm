@@ -117,15 +117,26 @@ class Blueprint
         return $col;
     }
 
+    private function validatePrecision(int $precision, int $scale): void {
+        if ($precision <= 0 || $scale < 0 || $scale > $precision) {
+            throw new \InvalidArgumentException(
+                "Invalid precision ($precision) or scale ($scale): precision must be positive and >= scale."
+            );
+        }
+    }
+
     public function float(string $column, int $precision = 8, int $scale = 2) {
+        $this->validatePrecision($precision, $scale);
         return $this->addColumn("FLOAT($precision, $scale)", $column);
     }
 
     public function double(string $column, int $precision = 16, int $scale = 8) {
+        $this->validatePrecision($precision, $scale);
         return $this->addColumn("DOUBLE($precision, $scale)", $column);
     }
 
     public function decimal(string $column, int $precision = 16, int $scale = 2) {
+        $this->validatePrecision($precision, $scale);
         return $this->addColumn("DECIMAL($precision, $scale)", $column);
     }
     public function date(string $column) { return $this->addColumn("DATE", $column); }
