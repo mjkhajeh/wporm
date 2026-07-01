@@ -2530,6 +2530,9 @@ class QueryBuilder {
     }
 
     protected function buildDeleteQuery() {
+        if ($this->fromSub !== null) {
+            throw new \RuntimeException('DELETE is not supported on derived tables (fromSub). Use a real table name instead.');
+        }
         $sql   = "DELETE FROM " . Helpers::quoteIdentifier($this->table);
         $sql  .= $this->buildJoinClause();
         $where = $this->buildWhereClause();
@@ -3476,6 +3479,9 @@ class QueryBuilder {
      */
     public function update($data, $value = null) {
         $this->applySoftDeleteScope();
+        if ($this->fromSub !== null) {
+            throw new \RuntimeException('UPDATE is not supported on derived tables (fromSub). Use a real table name instead.');
+        }
         if (!is_array($data)) {
             // Single column, value
             $data = [$data => $value];
