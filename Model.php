@@ -820,7 +820,7 @@ protected function castSet($key, $value) {
     public static function insertOrIgnore(array $attributes)
     {
         $instance = static::getQueryModel();
-        $table = $instance->getTable();
+        $table = Helpers::quoteIdentifier($instance->getTable());
         // If $attributes is a list of records (array of arrays)
         if (isset($attributes[0]) && is_array($attributes[0])) {
             $columns = array_keys($attributes[0]);
@@ -883,7 +883,7 @@ protected function castSet($key, $value) {
     public static function upsert(array $values, $uniqueBy, $update = null)
     {
         $instance = static::getQueryModel();
-        $table = $instance->getTable();
+        $table = Helpers::quoteIdentifier($instance->getTable());
 
         if (empty($values)) {
             return 0;
