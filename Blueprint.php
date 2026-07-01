@@ -237,7 +237,7 @@ class Blueprint
             }
         }
 
-        $this->commands[] = "CHANGE $from $to $type";
+        $this->commands[] = "CHANGE " . Helpers::quoteIdentifier($from) . " " . Helpers::quoteIdentifier($to) . " $type";
     }
 
     /**
