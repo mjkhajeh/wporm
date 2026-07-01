@@ -594,11 +594,20 @@ protected function castSet($key, $value) {
             } elseif (is_numeric($value)) {
                 return date('Y-m-d H:i:s', (int)$value);
             } elseif (is_string($value)) {
-                return date('Y-m-d H:i:s', strtotime($value));
+                $ts = strtotime($value);
+                return $ts !== false ? date('Y-m-d H:i:s', $ts) : null;
             }
             return $value;
         case 'timestamp':
-            return $value instanceof \DateTime ? $value->getTimestamp() : (is_numeric($value) ? (int)$value : strtotime($value));
+            if ($value instanceof \DateTime) {
+                return $value->getTimestamp();
+            } elseif (is_numeric($value)) {
+                return (int)$value;
+            } elseif (is_string($value)) {
+                $ts = strtotime($value);
+                return $ts !== false ? $ts : null;
+            }
+            return $value;
         default:
             $cast_input = '';
             if( is_array( $cast ) ) {
