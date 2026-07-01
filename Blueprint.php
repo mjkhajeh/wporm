@@ -27,6 +27,9 @@ class Blueprint
     {
         // For fluent API like $table->string('name')->nullable()
         if (method_exists(ColumnDefinition::class, $method)) {
+            if (empty($this->columns)) {
+                return;
+            }
             $column = end($this->columns);
             $column->$method(...$args);
         }
