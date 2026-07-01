@@ -1237,7 +1237,12 @@ protected function castSet($key, $value) {
 			if ($this->fireModelEvent('softDeleting') === false) {
 				return false;
 			}
-			if (method_exists($this, 'softDeleting')) {
+			// Legacy hook kept for back-compat — only fire if no dispatcher handles it
+			if (method_exists($this, 'softDeleting')
+				&& $this->getDeclaringClassName('softDeleting') !== __CLASS__
+				&& empty($this->dispatchesEvents['softDeleting'])
+				&& empty(EventDispatcher::getListeners(\MJ\WPORM\Events\SoftDeleting::class))
+			) {
 				$this->softDeleting();
 			}
 			global $wpdb;
@@ -1247,7 +1252,12 @@ protected function castSet($key, $value) {
 			$this->exists = true;
 			// softDeleted after-hook
 			$this->fireModelEvent('softDeleted');
-			if (method_exists($this, 'softDeleted')) {
+			// Legacy hook kept for back-compat — only fire if no dispatcher handles it
+			if (method_exists($this, 'softDeleted')
+				&& $this->getDeclaringClassName('softDeleted') !== __CLASS__
+				&& empty($this->dispatchesEvents['softDeleted'])
+				&& empty(EventDispatcher::getListeners(\MJ\WPORM\Events\SoftDeleted::class))
+			) {
 				$this->softDeleted();
 			}
 			return true;
@@ -1257,14 +1267,27 @@ protected function castSet($key, $value) {
 		if ($this->fireModelEvent('deleting') === false) {
 			return false;
 		}
-		if (method_exists($this, 'deleting')) {
+		// Legacy hook kept for back-compat — only fire if no dispatcher handles it
+		if (method_exists($this, 'deleting')
+			&& $this->getDeclaringClassName('deleting') !== __CLASS__
+			&& empty($this->dispatchesEvents['deleting'])
+			&& empty(EventDispatcher::getListeners(\MJ\WPORM\Events\Deleting::class))
+		) {
 			$this->deleting();
 		}
 		global $wpdb;
 		$wpdb->delete($this->getTable(), [$this->primaryKey => $this->attributes[$this->primaryKey]]);
 		$this->exists = false;
-		// deleted after-hook
+		// deleted (after-hook)
 		$this->fireModelEvent('deleted');
+		// Legacy hook kept for back-compat — only fire if no dispatcher handles it
+		if (method_exists($this, 'deleted')
+			&& $this->getDeclaringClassName('deleted') !== __CLASS__
+			&& empty($this->dispatchesEvents['deleted'])
+			&& empty(EventDispatcher::getListeners(\MJ\WPORM\Events\Deleted::class))
+		) {
+			$this->deleted();
+		}
 		return true;
 	}
 
@@ -1391,7 +1414,12 @@ protected function castSet($key, $value) {
 			if ($this->fireModelEvent('restoring') === false) {
 				return false;
 			}
-			if (method_exists($this, 'restoring')) {
+			// Legacy hook kept for back-compat — only fire if no dispatcher handles it
+			if (method_exists($this, 'restoring')
+				&& $this->getDeclaringClassName('restoring') !== __CLASS__
+				&& empty($this->dispatchesEvents['restoring'])
+				&& empty(EventDispatcher::getListeners(\MJ\WPORM\Events\Restoring::class))
+			) {
 				$this->restoring();
 			}
 			global $wpdb;
@@ -1401,7 +1429,12 @@ protected function castSet($key, $value) {
 			$this->exists = true;
 			// restored after-hook
 			$this->fireModelEvent('restored');
-			if (method_exists($this, 'restored')) {
+			// Legacy hook kept for back-compat — only fire if no dispatcher handles it
+			if (method_exists($this, 'restored')
+				&& $this->getDeclaringClassName('restored') !== __CLASS__
+				&& empty($this->dispatchesEvents['restored'])
+				&& empty(EventDispatcher::getListeners(\MJ\WPORM\Events\Restored::class))
+			) {
 				$this->restored();
 			}
 			return true;
@@ -1414,7 +1447,12 @@ public function forceDelete() {
         if ($this->fireModelEvent('deleting') === false) {
             return false;
         }
-        if (method_exists($this, 'deleting')) {
+        // Legacy hook kept for back-compat — only fire if no dispatcher handles it
+        if (method_exists($this, 'deleting')
+            && $this->getDeclaringClassName('deleting') !== __CLASS__
+            && empty($this->dispatchesEvents['deleting'])
+            && empty(EventDispatcher::getListeners(\MJ\WPORM\Events\Deleting::class))
+        ) {
             $this->deleting();
         }
         global $wpdb;
@@ -1422,7 +1460,12 @@ public function forceDelete() {
         $wpdb->delete($this->getTable(), [$pk => $this->attributes[$pk]]);
         $this->exists = false;
         $this->fireModelEvent('deleted');
-        if (method_exists($this, 'deleted')) {
+        // Legacy hook kept for back-compat — only fire if no dispatcher handles it
+        if (method_exists($this, 'deleted')
+            && $this->getDeclaringClassName('deleted') !== __CLASS__
+            && empty($this->dispatchesEvents['deleted'])
+            && empty(EventDispatcher::getListeners(\MJ\WPORM\Events\Deleted::class))
+        ) {
             $this->deleted();
         }
         return true;
