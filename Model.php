@@ -546,10 +546,21 @@ abstract class Model implements \ArrayAccess {
             return (bool) $value;
         case 'array':
             if (empty($value)) return [];
-            return is_array($value) ? $value : json_decode($value, true);
+            if (is_array($value)) return $value;
+            $decoded = json_decode($value, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                error_log('WPORM cast error [' . static::class . '.' . $key . ']: ' . json_last_error_msg());
+                return [];
+            }
+            return $decoded;
         case 'json':
             if (empty($value)) return [];
-            return json_decode($value, true);
+            $decoded = json_decode($value, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                error_log('WPORM cast error [' . static::class . '.' . $key . ']: ' . json_last_error_msg());
+                return [];
+            }
+            return $decoded;
         case 'datetime':
             return $value ? new \DateTime($value) : null;
         case 'timestamp':
