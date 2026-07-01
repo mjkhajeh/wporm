@@ -11,6 +11,11 @@ class JsonCast implements CastableInterface {
         return $decoded;
     }
     public function set($value) {
-        return json_encode($value);
+        $encoded = json_encode($value);
+        if ($encoded === false) {
+            error_log('WPORM JsonCast: json_encode failed - ' . json_last_error_msg());
+            return null;
+        }
+        return $encoded;
     }
 }
