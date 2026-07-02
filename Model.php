@@ -2741,11 +2741,14 @@ public function forceDelete() {
      * @return QueryBuilder
      */
     public static function when($value, callable $callback, ?callable $default = null) {
-        $query = static::query();
         if ($value) {
+            $query = static::query();
             $callback($query, $value);
         } elseif ($default) {
+            $query = static::query();
             $default($query, $value);
+        } else {
+            $query = static::query();
         }
         return $query;
     }
