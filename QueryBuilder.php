@@ -1023,12 +1023,12 @@ class QueryBuilder {
     }
 
     public function limit($limit) {
-        $this->limit = (int) $limit;
+        $this->limit = abs((int)$limit);
         return $this;
     }
 
     public function offset($offset) {
-        $this->offset = (int) $offset;
+        $this->offset = abs((int)$offset);
         return $this;
     }
 
