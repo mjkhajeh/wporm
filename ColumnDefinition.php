@@ -102,14 +102,14 @@ class ColumnDefinition
             //   CURRENT_TIMESTAMP
             //   CURRENT_TIMESTAMP(3)
             //   current_timestamp ON UPDATE CURRENT_TIMESTAMP
-            if (preg_match('/^' . preg_quote($keyword, '/') . '(\s*\(.*\))?$/i', $trimmed)) {
+            if (preg_match('/^' . preg_quote($keyword, '/') . '(\s*\(\d+(?:\s*,\s*\d+)?\))?$/i', $trimmed)) {
                 return true;
             }
         }
 
         // Also treat "<KEYWORD> ON UPDATE <KEYWORD>(...)" style compound
         // defaults as raw, since they're SQL expressions, not literals.
-        if (preg_match('/^(CURRENT_TIMESTAMP|NOW)(\s*\([^)]*\))?\s+ON\s+UPDATE\s+(CURRENT_TIMESTAMP|NOW)(\s*\([^)]*\))?$/i', $trimmed)) {
+        if (preg_match('/^(CURRENT_TIMESTAMP|NOW)(\s*\(\d+(?:\s*,\s*\d+)?\))?\s+ON\s+UPDATE\s+(CURRENT_TIMESTAMP|NOW)(\s*\(\d+(?:\s*,\s*\d+)?\))?$/i', $trimmed)) {
             return true;
         }
 
