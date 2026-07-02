@@ -460,7 +460,22 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
      */
     public function unique($key = null) {
         if ($key === null) {
-            return new static(array_values(array_unique($this->items, SORT_REGULAR)));
+            $seen = [];
+            $result = [];
+            foreach ($this->items as $itemKey => $item) {
+                if (is_object($item)) {
+                    $hash = spl_object_id($item);
+                } elseif (is_array($item)) {
+                    $hash = json_encode($item);
+                } else {
+                    $hash = $item;
+                }
+                if (!array_key_exists($hash, $seen)) {
+                    $seen[$hash] = true;
+                    $result[$itemKey] = $item;
+                }
+            }
+            return new static(array_values($result));
         }
         $seen = [];
         $result = [];

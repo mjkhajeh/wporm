@@ -3284,7 +3284,7 @@ $byEmail = $users->keyBy('email'); // ['a@test.com' => User, ...]
 ```
 
 ### unique($key = null)
-**Description:** Get the unique items in the collection. Without `$key`, uniqueness is determined across the whole item. With a `$key` (column name or callback), only the first item per distinct extracted value is kept.
+**Description:** Get the unique items in the collection. Without `$key`, uniqueness is determined by object identity for objects, by value for scalars, and by JSON encoding for arrays — so two different model instances with the same attributes are NOT deduplicated. With a `$key` (column name or callback), only the first item per distinct extracted value is kept.
 
 **Example:**
 ```php
