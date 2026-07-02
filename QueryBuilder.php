@@ -3801,8 +3801,13 @@ class QueryBuilder {
         $count = max((int) $count, 1);
         $page = 1;
 
-        $originalLimit  = $this->limit;
-        $originalOffset = $this->offset;
+        $originalLimit        = $this->limit;
+        $originalOffset       = $this->offset;
+        $originalSoftDelete   = $this->softDeleteScopeApplied;
+
+        // Apply the soft-delete scope once up-front so get() doesn't
+        // re-evaluate it on every iteration of the loop.
+        $this->applySoftDeleteScope();
 
         try {
             while (true) {
@@ -3827,8 +3832,9 @@ class QueryBuilder {
 
             return true;
         } finally {
-            $this->limit  = $originalLimit;
-            $this->offset = $originalOffset;
+            $this->limit                = $originalLimit;
+            $this->offset               = $originalOffset;
+            $this->softDeleteScopeApplied = $originalSoftDelete;
         }
     }
 
