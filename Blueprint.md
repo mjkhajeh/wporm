@@ -239,6 +239,8 @@ $table->double('amount', 16, 8);
 $table->decimal('balance', 16, 2);
 ```
 
+**Note:** `precision` must be a positive integer and `scale` must be non-negative with `scale <= precision`. Invalid combinations throw `\InvalidArgumentException` at definition time rather than producing silent DDL failures at runtime.
+
 ---
 
 ## Date & Time Types
@@ -265,7 +267,7 @@ $table->datetime('created_at');
 ```
 
 ### datetimeTz($column)
-**Description:** Adds a DATETIME WITH TIME ZONE column.
+**Description:** Adds a DATETIME column. On MySQL/MariaDB the `WITH TIME ZONE` suffix is omitted since those drivers do not support it; timezone handling is managed at the application layer.
 **Example:**
 ```php
 $table->datetimeTz('event_time');
@@ -279,14 +281,14 @@ $table->timestamp('updated_at');
 ```
 
 ### timestampTz($column)
-**Description:** Adds a TIMESTAMP WITH TIME ZONE column.
+**Description:** Adds a TIMESTAMP column (timezone handled at the application layer on MySQL).
 **Example:**
 ```php
 $table->timestampTz('expires_at');
 ```
 
 ### timestampTzWithDefault($column)
-**Description:** Adds a TIMESTAMP WITH TIME ZONE column with default CURRENT_TIMESTAMP.
+**Description:** Adds a TIMESTAMP column with default CURRENT_TIMESTAMP (timezone handled at the application layer on MySQL).
 **Example:**
 ```php
 $table->timestampTzWithDefault('created_at');
@@ -307,14 +309,14 @@ $table->dateTimeWithDefault('created_at');
 ```
 
 ### dateTimeTzWithDefault($column)
-**Description:** Adds a DATETIME WITH TIME ZONE column with default CURRENT_TIMESTAMP.
+**Description:** Adds a DATETIME column with default CURRENT_TIMESTAMP (timezone handled at the application layer on MySQL).
 **Example:**
 ```php
 $table->dateTimeTzWithDefault('created_at');
 ```
 
 ### dateTimeTzWithDefaultCurrentOnUpdate($column)
-**Description:** Adds a DATETIME WITH TIME ZONE column with default CURRENT_TIMESTAMP and ON UPDATE CURRENT_TIMESTAMP.
+**Description:** Adds a DATETIME column with default CURRENT_TIMESTAMP and ON UPDATE CURRENT_TIMESTAMP (timezone handled at the application layer on MySQL).
 **Example:**
 ```php
 $table->dateTimeTzWithDefaultCurrentOnUpdate('updated_at');
@@ -328,21 +330,21 @@ $table->dateTimeWithDefaultCurrentOnUpdate('updated_at');
 ```
 
 ### timeTz($column)
-**Description:** Adds a TIME WITH TIME ZONE column.
+**Description:** Adds a TIME column (timezone handled at the application layer on MySQL).
 **Example:**
 ```php
 $table->timeTz('event_time');
 ```
 
 ### timeTzWithDefault($column)
-**Description:** Adds a TIME WITH TIME ZONE column with default CURRENT_TIMESTAMP.
+**Description:** Adds a TIME column with default CURRENT_TIMESTAMP (timezone handled at the application layer on MySQL).
 **Example:**
 ```php
 $table->timeTzWithDefault('event_time');
 ```
 
 ### timeTzWithDefaultCurrentOnUpdate($column)
-**Description:** Adds a TIME WITH TIME ZONE column with default CURRENT_TIMESTAMP and ON UPDATE CURRENT_TIMESTAMP.
+**Description:** Adds a TIME column with default CURRENT_TIMESTAMP and ON UPDATE CURRENT_TIMESTAMP (timezone handled at the application layer on MySQL).
 **Example:**
 ```php
 $table->timeTzWithDefaultCurrentOnUpdate('event_time');
@@ -577,10 +579,11 @@ $table->integer('user_id')->unique('custom_index_name');
 ## Timestamps & Soft Deletes
 
 ### timestamps()
-**Description:** Adds `created_at` and `updated_at` TIMESTAMP columns.
+**Description:** Adds `created_at` and `updated_at` TIMESTAMP columns. Returns `$this` for fluent chaining.
 **Example:**
 ```php
 $table->timestamps();
+$table->timestamps()->softDeletes(); // fluent chaining
 ```
 
 ### softDeletes($column = 'deleted_at')

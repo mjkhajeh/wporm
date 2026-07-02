@@ -34,6 +34,8 @@ Casts the attribute to an array when accessed. When saving, the array is JSON-en
 **Description:**
 Casts the attribute to an array when accessed (by decoding JSON). When saving, the value is JSON-encoded. Useful for storing structured data.
 
+**Error handling:** If the value is empty or `json_decode()` fails on read (malformed JSON), `null` is returned. If `json_encode()` fails on write (e.g. malformed UTF-8), the error is logged and `null` is stored instead of a corrupt value.
+
 ---
 
 ### datetime

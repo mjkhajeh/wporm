@@ -425,6 +425,15 @@ $users = User::query()->oldest('id')->get();
 $users = User::query()->inRandomOrder()->get();
 ```
 
+### orderBy($column, $direction = 'asc')
+**Description:** Add an ORDER BY clause. The `$direction` parameter must be `'asc'` or `'desc'` (case-insensitive); any other value throws an `\InvalidArgumentException`.
+
+**Example:**
+```php
+$users = User::query()->orderBy('name', 'desc')->get();
+$users = User::query()->orderBy('created_at')->get(); // defaults to 'asc'
+```
+
 ### orderByRaw($sql, array $bindings = [])
 **Description:** Add a raw SQL ORDER BY clause with optional bindings. Useful for custom sorting or SQL functions.
 
@@ -1208,11 +1217,15 @@ try {
 
 **Example:**
 ```php
+// With attributes — first record matching the given conditions
 try {
     $user = User::firstOrFail(['email' => 'foo@bar.com']);
 } catch (\MJ\WPORM\ModelNotFoundException $e) {
     // handle not-found
 }
+
+// Without attributes — first record overall, or throw
+$user = User::firstOrFail();
 
 // Equivalent, built on the query builder directly:
 $user = User::query()->where('email', 'foo@bar.com')->firstOrFail();
@@ -1607,7 +1620,7 @@ if ($user->wasRecentlyCreated) {
 
 **Notes:**
 - Resets to `false` at the start of every `save()` call.
-- Only set to `true` by `insert()` — updates, `forceSetAttribute()`, and direct attribute assignment do not affect it.
+- Only set to `true` by `insert()` — updates, `_forceSetAttribute()`, and direct attribute assignment do not affect it.
 - Works with `firstOrCreate()`, `updateOrCreate()`, and similar methods that call `save()` internally.
 
 ---
@@ -2225,7 +2238,7 @@ try {
 - If the model has no primary key value, `fresh()` returns `null` and `refresh()` throws `ModelNotFoundException` immediately, without querying.
 
 ### replicate(array $except = [])
-**Description:** Create a new, unsaved copy of the model with all attributes carried over except the primary key, timestamp columns, and soft-delete column (Eloquent-style). This is the standard way to duplicate a record — modify the clone, then `save()`. Accepts an optional array of additional attribute names to exclude from the clone.
+**Description:** Create a new, unsaved copy of the model with all attributes carried over except the primary key, timestamp columns, and soft-delete column (Eloquent-style). This is the standard way to duplicate a record — modify the clone, then `save()`. Accepts an optional array of additional attribute names to exclude from the clone. All attributes are copied directly, bypassing `$fillable`/`$guarded` mass-assignment protection, since the source data is already trusted.
 
 **Example:**
 ```php
@@ -2352,6 +2365,18 @@ $comment->getTouches(); // ['post']
 - The parent model must have `timestamps = true` (default)
 - Touching happens after a successful save (insert or update)
 - Prevents infinite loops — only one level of touching
+
+**touchWithEvents()**
+**Description:** Like `touch()`, but fires the full lifecycle event pipeline (`saving`/`saved`/`updating`/`updated`) so that registered listeners and observers are notified. Use this for user-initiated timestamp updates where event side-effects are expected.
+
+**Example:**
+```php
+$post->touchWithEvents(); // fires saving → updating → updated → saved
+```
+
+**Notes:**
+- Do **not** use inside `$touches` callbacks — it will cause infinite recursion on circular references
+- `touch()` (no events) is used internally by `$touches` to avoid that recursion
 
 ---
 
@@ -2786,7 +2811,7 @@ $name = $user['name'];
 ```
 
 ### offsetSet($offset, $value)
-**Description:** Set an attribute value (for array access).
+**Description:** Set an attribute value (for array access). Respects `$fillable`/`$guarded` mass-assignment protection, just like direct property assignment.
 
 **Example:**
 ```php
@@ -2946,7 +2971,7 @@ $user->delete();
 ```
 
 ### forceDelete()
-**Description:** Permanently deletes the model from the database, even if soft deletes are enabled.
+**Description:** Permanently deletes the model from the database, even if soft deletes are enabled. Fires `deleting` and `deleted` lifecycle events (both `fireModelEvent()` and direct method hooks), so observers and listeners are notified just like a regular `delete()`.
 
 **Example:**
 ```php

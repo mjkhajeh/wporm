@@ -846,7 +846,7 @@ All multi-result queries (`get()`, `all()`, etc.) return a `Collection` instance
 | Method | Returns | Description |
 |---|---|---|
 | `all()` | `array` | Get the underlying array of items |
-| `first()` | `mixed` | Get the first item |
+| `first()` | `mixed` | Get the first item, or `null` if the collection is empty. Falsy values (0, false, '') are returned correctly. |
 | `firstOrFail()` | `mixed` | Get the first item, or throw `ModelNotFoundException` if the collection is empty |
 | `last()` | `mixed` | Get the last item |
 | `count()` | `int` | Number of items |
@@ -2269,10 +2269,12 @@ WPORM supports two soft delete strategies:
   - `delete()` sets `deleted_at` to the current datetime.
   - `restore()` sets `deleted_at` to `null`.
   - Queries exclude rows where `deleted_at` is not null (unless `withTrashed()` or `onlyTrashed()` is used).
+  - Bulk `update()` and `delete()` on the query builder also exclude soft-deleted rows.
 - **Boolean mode:**
   - `delete()` sets `deleted` to `1` (true).
   - `restore()` sets `deleted` to `0` (false).
   - Queries exclude rows where `deleted` is true (unless `withTrashed()` or `onlyTrashed()` is used).
+  - Bulk `update()` and `delete()` on the query builder also exclude soft-deleted rows.
 
 #### Example Usage
 ```php
