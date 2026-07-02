@@ -48,6 +48,12 @@ class SchemaBuilder
 ) {$charsetCollate};";
 
         \dbDelta($sql);
+
+        if (!empty($this->db->last_error)) {
+            throw new \RuntimeException(
+                "Failed to create table {$fullTable}: " . $this->db->last_error
+            );
+        }
     }
 
     public function drop(string $table)
