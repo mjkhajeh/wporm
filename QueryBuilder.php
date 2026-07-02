@@ -3694,10 +3694,18 @@ class QueryBuilder {
      * ]
      * Usage: ->paginate(10, 2) // 10 per page, page 2
      */
+    protected function resolvePageFromRequest(): int
+    {
+        if (!is_array($_GET)) {
+            return 1;
+        }
+        return isset($_GET['page']) ? abs((int)$_GET['page']) : 1;
+    }
+
     public function paginate($perPage = 15, $page = null) {
         $perPage = (int)$perPage;
         if ($page === null) {
-            $page = isset($_GET['page']) ? abs((int)$_GET['page']) : 1;
+            $page = $this->resolvePageFromRequest();
         }
         $page = max((int)$page, 1);
 
@@ -3751,7 +3759,7 @@ class QueryBuilder {
     public function simplePaginate($perPage = 15, $page = null) {
         $perPage = (int)$perPage;
         if ($page === null) {
-            $page = isset($_GET['page']) ? abs((int)$_GET['page']) : 1;
+            $page = $this->resolvePageFromRequest();
         }
         $page = max((int)$page, 1);
         $savedLimit = $this->limit;
