@@ -48,6 +48,16 @@ class QueryBuilder {
     protected $relationContext = [];
 
     /**
+     * Cached quoted SELECT columns, keyed by the raw selects array.
+     * Avoids re-quoting identifiers on every buildSelectQuery() call
+     * (e.g. when pluck() / count() / aggregate() all invoke it on
+     * the same builder instance).
+     *
+     * @var array{selects: array, quoted: array}|null
+     */
+    protected $quotedSelectsCache = null;
+
+    /**
      * Cache of relation context arrays keyed by "ModelClass::relation".
      * The context (type, keys, related class) is static metadata determined
      * by the model class and relation name — it does not change between queries.
@@ -2346,13 +2356,21 @@ class QueryBuilder {
 
     protected function buildSelectQuery() {
         $where = $this->buildWhereClause();
-        // Quote columns in SELECT, passing raw entries through as-is
-        $selects = array_map(function($col) {
-            if (is_array($col) && isset($col['raw'])) {
-                return $col['raw'];
-            }
-            return Helpers::quoteIdentifier($col);
-        }, $this->selects);
+        // Quote columns in SELECT, passing raw entries through as-is.
+        // Cache the result so repeated buildSelectQuery() calls on the
+        // same builder (e.g. pluck → get → count) skip re-quoting.
+        if ($this->quotedSelectsCache === null || $this->quotedSelectsCache['selects'] !== $this->selects) {
+            $this->quotedSelectsCache = [
+                'selects' => $this->selects,
+                'quoted' => array_map(function($col) {
+                    if (is_array($col) && isset($col['raw'])) {
+                        return $col['raw'];
+                    }
+                    return Helpers::quoteIdentifier($col);
+                }, $this->selects),
+            ];
+        }
+        $selects = $this->quotedSelectsCache['quoted'];
         $sql = "SELECT ";
         if ($this->isDistinct) {
             $sql .= "DISTINCT ";
