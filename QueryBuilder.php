@@ -123,7 +123,7 @@ class QueryBuilder {
      *
      * @return static
      */
-    public function clone(): static {
+    public function clone() {
         return clone $this;
     }
 
