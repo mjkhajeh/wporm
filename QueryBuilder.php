@@ -2770,31 +2770,33 @@ class QueryBuilder {
                 }
             }
 
+            $hasPivotData = !empty($pivotColumns) || $pivotTimestamps;
             $grouped = [];
             foreach ($query->get() as $rel) {
                 $pivotFk = $rel->_pivot_fk ?? null;
                 if ($pivotFk !== null) {
                     $rel->forgetAttribute('_pivot_fk');
 
-                    $pivotData = [$foreignPivotKey => $pivotFk];
+                    if ($hasPivotData) {
+                        $pivotData = [$foreignPivotKey => $pivotFk];
 
-                    foreach ($pivotColumns as $col) {
-                        $pivotKey = "_pivot_$col";
-                        $pivotData[$col] = $rel->$pivotKey ?? null;
-                        $rel->forgetAttribute($pivotKey);
-                    }
+                        foreach ($pivotColumns as $col) {
+                            $pivotKey = "_pivot_$col";
+                            $pivotData[$col] = $rel->$pivotKey ?? null;
+                            $rel->forgetAttribute($pivotKey);
+                        }
 
-                    if ($pivotTimestamps && !in_array('created_at', $pivotColumns, true)) {
-                        $pivotData['created_at'] = $rel->_pivot_created_at ?? null;
-                        $rel->forgetAttribute('_pivot_created_at');
-                    }
-                    if ($pivotTimestamps && !in_array('updated_at', $pivotColumns, true)) {
-                        $pivotData['updated_at'] = $rel->_pivot_updated_at ?? null;
-                        $rel->forgetAttribute('_pivot_updated_at');
-                    }
+                        if ($pivotTimestamps && !in_array('created_at', $pivotColumns, true)) {
+                            $pivotData['created_at'] = $rel->_pivot_created_at ?? null;
+                            $rel->forgetAttribute('_pivot_created_at');
+                        }
+                        if ($pivotTimestamps && !in_array('updated_at', $pivotColumns, true)) {
+                            $pivotData['updated_at'] = $rel->_pivot_updated_at ?? null;
+                            $rel->forgetAttribute('_pivot_updated_at');
+                        }
 
-                    $pivot = new $pivotClass(null, $pivotData, $rel);
-                    $rel->setEagerLoaded('pivot', $pivot);
+                        $rel->setEagerLoaded('pivot', new $pivotClass(null, $pivotData, $rel));
+                    }
 
                     $grouped[$pivotFk][] = $rel;
                 }

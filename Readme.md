@@ -111,6 +111,8 @@ $schema->create('parts', function($table) {
 > `CREATE TABLE {prefix}parts (...) {charset_collate};` statement (using `$wpdb->get_charset_collate()`)
 > before handing it to WordPress's `dbDelta()`, and prefixes the table name for you — you only
 > need to supply the bare table name and build columns on `$table`, as shown above.
+>
+> Throws a `\RuntimeException` if `dbDelta()` reports a failure (check `$wpdb->last_error` for details).
 
 ### Unique Indexes (Eloquent-style)
 

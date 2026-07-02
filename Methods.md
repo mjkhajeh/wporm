@@ -442,6 +442,22 @@ $query = User::query()->orderBy('name');
 $unorderedUsers = $query->reorder()->get();
 ```
 
+### limit($limit)
+**Description:** Set the maximum number of records to return. The `$limit` argument must be an integer; passing a non-integer value (e.g. a float like `1.9`) throws an `\InvalidArgumentException`.
+
+**Example:**
+```php
+$users = User::query()->limit(10)->get();
+```
+
+### offset($offset)
+**Description:** Set the number of records to skip before returning results. The `$offset` argument must be an integer; passing a non-integer value throws an `\InvalidArgumentException`.
+
+**Example:**
+```php
+$users = User::query()->limit(10)->offset(20)->get();
+```
+
 ### groupBy($columns)
 **Description:** Add GROUP BY clause(s) to the query. Accepts a string, array, or multiple arguments.
 
