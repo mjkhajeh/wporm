@@ -509,7 +509,10 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
      */
     public function diff($items) {
         $compare = $items instanceof self ? $items->all() : $items;
-        return new static(array_values(array_diff($this->items, $compare)));
+        $result = array_filter($this->items, function($item) use ($compare) {
+            return !in_array($item, $compare, true);
+        });
+        return new static(array_values($result));
     }
 
     /**
@@ -521,7 +524,10 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
      */
     public function intersect($items) {
         $compare = $items instanceof self ? $items->all() : $items;
-        return new static(array_values(array_intersect($this->items, $compare)));
+        $result = array_filter($this->items, function($item) use ($compare) {
+            return in_array($item, $compare, true);
+        });
+        return new static(array_values($result));
     }
 
     /**

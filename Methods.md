@@ -3309,7 +3309,7 @@ $ids = $usersById->keys(); // Collection of the keyed-by values
 ```
 
 ### diff($items) / intersect($items)
-**Description:** Get the items that are NOT present (`diff`) or ARE present (`intersect`) in the given array or `Collection`, compared via `array_diff()`/`array_intersect()` semantics. For model items, comparison relies on `Model::__toString()` (JSON) for string coercion — for predictable results with models, prefer comparing on `pluck()`-extracted scalars instead of whole model objects.
+**Description:** Get the items that are NOT present (`diff`) or ARE present (`intersect`) in the given array or `Collection`. Uses strict (`===`) comparison, so `1` and `"1"` are treated as different values.
 
 **Example:**
 ```php
