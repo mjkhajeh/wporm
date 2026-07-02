@@ -1412,9 +1412,10 @@ class QueryBuilder {
         );
         if (!$results) return new \MJ\WPORM\Collection([]);
         $modelClass = get_class($this->model);
-        $models = array_map(function ($row) use ($modelClass) {
+        $hasRetrieved = method_exists($modelClass, 'retrieved');
+        $models = array_map(function ($row) use ($modelClass, $hasRetrieved) {
             $instance = (new $modelClass)->newFromBuilder($row);
-            if (method_exists($instance, 'retrieved')) {
+            if ($hasRetrieved) {
                 $instance->retrieved();
             }
             return $instance;
@@ -1477,9 +1478,10 @@ class QueryBuilder {
             return;
         }
         $modelClass = get_class($this->model);
+        $hasRetrieved = method_exists($modelClass, 'retrieved');
         foreach ($results as $row) {
             $instance = (new $modelClass)->newFromBuilder($row);
-            if (method_exists($instance, 'retrieved')) {
+            if ($hasRetrieved) {
                 $instance->retrieved();
             }
             yield $instance;
