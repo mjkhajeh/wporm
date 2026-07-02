@@ -3208,21 +3208,21 @@ class QueryBuilder {
 
         if (!empty($bindings)) {
             $rows = $this->executeWithLogging(
-                fn() => $this->wpdb->get_results($this->wpdb->prepare($sql, ...$bindings), ARRAY_A),
+                fn() => $this->wpdb->get_results($this->wpdb->prepare($sql, ...$bindings), OBJECT_K),
                 $sql,
                 $bindings
             );
         } else {
             $rows = $this->executeWithLogging(
-                fn() => $this->wpdb->get_results($sql, ARRAY_A),
+                fn() => $this->wpdb->get_results($sql, OBJECT_K),
                 $sql
             );
         }
 
         $counts = [];
         if ($rows) {
-            foreach ($rows as $row) {
-                $counts[$row['_wporm_count_key']] = (int) $row['_wporm_count'];
+            foreach ($rows as $key => $row) {
+                $counts[$key] = (int) $row->_wporm_count;
             }
         }
         return $counts;
@@ -3415,21 +3415,21 @@ class QueryBuilder {
 
         if (!empty($bindings)) {
             $rows = $this->executeWithLogging(
-                fn() => $this->wpdb->get_results($this->wpdb->prepare($sql, ...$bindings), ARRAY_A),
+                fn() => $this->wpdb->get_results($this->wpdb->prepare($sql, ...$bindings), OBJECT_K),
                 $sql,
                 $bindings
             );
         } else {
             $rows = $this->executeWithLogging(
-                fn() => $this->wpdb->get_results($sql, ARRAY_A),
+                fn() => $this->wpdb->get_results($sql, OBJECT_K),
                 $sql
             );
         }
 
         $map = [];
         if ($rows) {
-            foreach ($rows as $row) {
-                $map[$row['_wporm_agg_key']] = $row['_wporm_agg_value'] === null ? null : (float) $row['_wporm_agg_value'];
+            foreach ($rows as $key => $row) {
+                $map[$key] = $row->_wporm_agg_value === null ? null : (float) $row->_wporm_agg_value;
             }
         }
         return $map;
