@@ -56,6 +56,7 @@ abstract class Model implements \ArrayAccess {
 
 	// Boot / lifecycle
 	protected static $booted = [];
+	protected static $modelEvents = [];
 
 	// Global scopes & observers
 	protected static $globalScopes = [];
@@ -69,7 +70,6 @@ abstract class Model implements \ArrayAccess {
 	// Caches
 	protected static $tableChecked = [];
 	protected static $queryModelInstances = [];
-	protected static $declaringClassCache = [];
 	protected static $tableNameCache = [];
 	protected static $accessorCache = [];
 
@@ -635,44 +635,63 @@ protected function castSet($key, $value) {
     }
 }
 
+	// ── Boot lifecycle & model events ─────────────────────────────────────
+
 	/**
-	 * Called after a model is retrieved from the database (get/first/find).
-	 * Override in your model to add custom logic. The base implementation fires
-	 * the 'retrieved' event via $dispatchesEvents / EventDispatcher automatically.
-	 *
-	 * @return void
+	 * Boot the model class once. Called automatically on first use.
+	 * Subclasses may override booted() to register event callbacks.
 	 */
-	public function retrieved() {
-		$this->fireModelEvent('retrieved');
+	public static function boot() {
+		$class = static::class;
+		if (isset(static::$booted[$class])) {
+			return;
+		}
+		static::$booted[$class] = true;
+		static::booted();
 	}
 
-    /**
-     * Called before a model is soft deleted (softDeletes only).
-     * Override in your model to add custom logic.
-     * @return void
-     */
-    protected function softDeleting() {}
+	/**
+	 * Register model event callbacks via static::creating(), static::saving(), etc.
+	 * Override in your model class.
+	 */
+	protected static function booted() {}
 
-    /**
-     * Called after a model is soft deleted (softDeletes only).
-     * Override in your model to add custom logic.
-     * @return void
-     */
-    protected function softDeleted() {}
+	/**
+	 * Register a model event callback for this model class.
+	 *
+	 * @param string   $event    Event short-name (creating, saving, retrieved, etc.)
+	 * @param callable $callback
+	 */
+	public static function registerModelEvent(string $event, callable $callback): void {
+		static::boot();
+		$class = static::class;
+		static::$modelEvents[$class][$event][] = $callback;
+	}
 
-    /**
-     * Called before a model is restored from soft delete.
-     * Override in your model to add custom logic.
-     * @return void
-     */
-    protected function restoring() {}
+	/**
+	 * Retrieve all registered model event callbacks for the given event.
+	 *
+	 * @param string $event
+	 * @return callable[]
+	 */
+	protected static function getModelEvents(string $event): array {
+		$class = static::class;
+		return static::$modelEvents[$class][$event] ?? [];
+	}
 
-    /**
-     * Called after a model is restored from soft delete.
-     * Override in your model to add custom logic.
-     * @return void
-     */
-    protected function restored() {}
+	/**
+	 * Magic static methods: static::creating(fn), static::saving(fn), etc.
+	 * Delegates to registerModelEvent().
+	 */
+	public static function __callStatic($method, $args) {
+		if (in_array($method, ['creating','created','updating','updated','saving','saved','deleting','deleted','softDeleting','softDeleted','restoring','restored','retrieved'], true)) {
+			if (!empty($args[0]) && is_callable($args[0])) {
+				static::registerModelEvent($method, $args[0]);
+				return;
+			}
+		}
+		trigger_error("Call to undefined static method " . static::class . "::{$method}()", E_USER_ERROR);
+	}
 
 	public static function query($applyGlobalScopes = true) {
 		$instance = static::getQueryModel();
@@ -1236,15 +1255,6 @@ protected function castSet($key, $value) {
 			return false;
 		}
 
-		// Legacy hook kept for back-compat — only fire if no dispatcher handles it
-		if (method_exists($this, 'creating')
-			&& $this->getDeclaringClassName('creating') !== __CLASS__
-			&& empty($this->dispatchesEvents['creating'])
-			&& empty(EventDispatcher::getListeners(\MJ\WPORM\Events\Creating::class))
-		) {
-			$this->creating();
-		}
-
 		global $wpdb;
 		if ($this->timestamps) {
 			$now = current_time('mysql');
@@ -1270,15 +1280,6 @@ protected function castSet($key, $value) {
 		// updating (before-hook — halts on false)
 		if ($this->fireModelEvent('updating') === false) {
 			return false;
-		}
-
-		// Legacy hook kept for back-compat — only fire if no dispatcher handles it
-		if (method_exists($this, 'updating')
-			&& $this->getDeclaringClassName('updating') !== __CLASS__
-			&& empty($this->dispatchesEvents['updating'])
-			&& empty(EventDispatcher::getListeners(\MJ\WPORM\Events\Updating::class))
-		) {
-			$this->updating();
 		}
 
 		global $wpdb;
@@ -1394,28 +1395,12 @@ protected function castSet($key, $value) {
 			if ($this->fireModelEvent('softDeleting') === false) {
 				return false;
 			}
-			// Legacy hook kept for back-compat — only fire if no dispatcher handles it
-			if (method_exists($this, 'softDeleting')
-				&& $this->getDeclaringClassName('softDeleting') !== __CLASS__
-				&& empty($this->dispatchesEvents['softDeleting'])
-				&& empty(EventDispatcher::getListeners(\MJ\WPORM\Events\SoftDeleting::class))
-			) {
-				$this->softDeleting();
-			}
 			global $wpdb;
 			$this->attributes[$this->deletedAtColumn] = $this->softDeleteType === 'boolean' ? 1 : current_time('mysql');
 			$wpdb->update($this->getTable(), [$this->deletedAtColumn => $this->attributes[$this->deletedAtColumn]], [$pk => $this->attributes[$pk]]);
 			$this->exists = true;
 			// softDeleted after-hook
 			$this->fireModelEvent('softDeleted');
-			// Legacy hook kept for back-compat — only fire if no dispatcher handles it
-			if (method_exists($this, 'softDeleted')
-				&& $this->getDeclaringClassName('softDeleted') !== __CLASS__
-				&& empty($this->dispatchesEvents['softDeleted'])
-				&& empty(EventDispatcher::getListeners(\MJ\WPORM\Events\SoftDeleted::class))
-			) {
-				$this->softDeleted();
-			}
 			return true;
 		}
 
@@ -1423,27 +1408,11 @@ protected function castSet($key, $value) {
 		if ($this->fireModelEvent('deleting') === false) {
 			return false;
 		}
-		// Legacy hook kept for back-compat — only fire if no dispatcher handles it
-		if (method_exists($this, 'deleting')
-			&& $this->getDeclaringClassName('deleting') !== __CLASS__
-			&& empty($this->dispatchesEvents['deleting'])
-			&& empty(EventDispatcher::getListeners(\MJ\WPORM\Events\Deleting::class))
-		) {
-			$this->deleting();
-		}
 		global $wpdb;
 		$wpdb->delete($this->getTable(), [$this->primaryKey => $this->attributes[$this->primaryKey]]);
 		$this->exists = false;
 		// deleted (after-hook)
 		$this->fireModelEvent('deleted');
-		// Legacy hook kept for back-compat — only fire if no dispatcher handles it
-		if (method_exists($this, 'deleted')
-			&& $this->getDeclaringClassName('deleted') !== __CLASS__
-			&& empty($this->dispatchesEvents['deleted'])
-			&& empty(EventDispatcher::getListeners(\MJ\WPORM\Events\Deleted::class))
-		) {
-			$this->deleted();
-		}
 		return true;
 	}
 
@@ -1575,28 +1544,12 @@ protected function castSet($key, $value) {
 			if ($this->fireModelEvent('restoring') === false) {
 				return false;
 			}
-			// Legacy hook kept for back-compat — only fire if no dispatcher handles it
-			if (method_exists($this, 'restoring')
-				&& $this->getDeclaringClassName('restoring') !== __CLASS__
-				&& empty($this->dispatchesEvents['restoring'])
-				&& empty(EventDispatcher::getListeners(\MJ\WPORM\Events\Restoring::class))
-			) {
-				$this->restoring();
-			}
 			global $wpdb;
 			$this->attributes[$this->deletedAtColumn] = $this->softDeleteType === 'boolean' ? 0 : null;
 			$wpdb->update($this->getTable(), [$this->deletedAtColumn => $this->attributes[$this->deletedAtColumn]], [$pk => $this->attributes[$pk]]);
 			$this->exists = true;
 			// restored after-hook
 			$this->fireModelEvent('restored');
-			// Legacy hook kept for back-compat — only fire if no dispatcher handles it
-			if (method_exists($this, 'restored')
-				&& $this->getDeclaringClassName('restored') !== __CLASS__
-				&& empty($this->dispatchesEvents['restored'])
-				&& empty(EventDispatcher::getListeners(\MJ\WPORM\Events\Restored::class))
-			) {
-				$this->restored();
-			}
 			return true;
 		}
 		return false;
@@ -1612,46 +1565,13 @@ public function forceDelete() {
         if ($this->fireModelEvent('deleting') === false) {
             return false;
         }
-        // Legacy hook kept for back-compat — only fire if no dispatcher handles it
-        if (method_exists($this, 'deleting')
-            && $this->getDeclaringClassName('deleting') !== __CLASS__
-            && empty($this->dispatchesEvents['deleting'])
-            && empty(EventDispatcher::getListeners(\MJ\WPORM\Events\Deleting::class))
-        ) {
-            $this->deleting();
-        }
         global $wpdb;
         $wpdb->delete($this->getTable(), [$pk => $this->attributes[$pk]]);
         $this->exists = false;
         $this->fireModelEvent('deleted');
-        // Legacy hook kept for back-compat — only fire if no dispatcher handles it
-        if (method_exists($this, 'deleted')
-            && $this->getDeclaringClassName('deleted') !== __CLASS__
-            && empty($this->dispatchesEvents['deleted'])
-            && empty(EventDispatcher::getListeners(\MJ\WPORM\Events\Deleted::class))
-        ) {
-            $this->deleted();
-        }
         return true;
     }
     return $this->delete();
-	}
-
-	/**
-	 * Get the declaring class name for a method, cached per model class.
-	 * Used to check whether a legacy hook (creating, updating, etc.) is
-	 * defined on the subclass vs. the base Model class.
-	 *
-	 * @param string $method
-	 * @return string
-	 */
-	protected function getDeclaringClassName(string $method): string {
-		$class = static::class;
-		if (!isset(static::$declaringClassCache[$class][$method])) {
-			static::$declaringClassCache[$class][$method] =
-				(new \ReflectionMethod($this, $method))->getDeclaringClass()->getName();
-		}
-		return static::$declaringClassCache[$class][$method];
 	}
 
 	/**
@@ -2411,18 +2331,20 @@ public function forceDelete() {
 	/**
 	 * Fire a model lifecycle event via $dispatchesEvents + EventDispatcher.
 	 *
-	 * Maps event short-names to their event classes:
-	 *   retrieved, creating, created, updating, updated, saving, saved,
-	 *   deleting, deleted, softDeleting, softDeleted, restoring, restored.
+	 * Dispatch order (matching Eloquent):
+	 *   1. $dispatchesEvents class mapping
+	 *   2. Global EventDispatcher::listen() listeners
+	 *   3. Closures registered via static::creating(fn), etc.
+	 *   4. Observers
 	 *
 	 * Returns false if any before-hook listener halted the event; returns the
-	 * event object (truthy) on success; returns null if no event class exists
-	 * for the given name.
+	 * event class name (truthy) on success; returns null if no event class
+	 * exists for the given name.
 	 *
 	 * @param string $event  Lowercase event short-name.
 	 * @return mixed
 	 */
-	protected function fireModelEvent(string $event)
+	public function fireModelEvent(string $event)
 	{
 		static $eventMap = [
 			'retrieved'    => \MJ\WPORM\Events\Retrieved::class,
@@ -2444,12 +2366,16 @@ public function forceDelete() {
 			return null;
 		}
 
-		$eventClass = $eventMap[$event];
-		$observers  = static::getObservers();
+		static::boot();
 
-		// Fast-path: no dispatchesEvents, no global listeners, no observers.
+		$eventClass      = $eventMap[$event];
+		$observers       = static::getObservers();
+		$modelEvents     = static::getModelEvents($event);
+
+		// Fast-path: nothing registered.
 		if (empty($this->dispatchesEvents[$event])
 			&& empty(EventDispatcher::getListeners($eventClass))
+			&& empty($modelEvents)
 			&& empty($observers)
 		) {
 			return null;
@@ -2461,7 +2387,15 @@ public function forceDelete() {
 			return false;
 		}
 
-		// 2. Call observers — Eloquent-style: $observer->$event($model)
+		// 2. Call model-registered closures (static::creating(fn), etc.)
+		foreach ($modelEvents as $callback) {
+			$result = $callback($this);
+			if ($result === false) {
+				return false;
+			}
+		}
+
+		// 3. Call observers — Eloquent-style: $observer->$event($model)
 		foreach ($observers as $observer) {
 			if (is_string($observer)) {
 				if (!isset(static::$observerInstances[$observer])) {

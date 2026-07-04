@@ -2505,45 +2505,37 @@ $users = $query->orWhereJsonLength('options->languages', '>=', 3)->get();
 
 ## Event Hooks
 
-### retrieved()
-**Description:** Called after a model is retrieved from the database (get/first/find). Override in your model to add custom logic. The base implementation fires the `retrieved` event via `$dispatchesEvents` / `EventDispatcher` automatically.
+### boot() / booted()
+
+**Description:** WPORM uses a boot lifecycle matching Eloquent. Override `booted()` in your model to register event closures. The model class is booted once, on first use.
 
 **Example:**
 ```php
-protected function retrieved() {
-    parent::retrieved(); // fires the event — call this if you override
-    // Custom logic after retrieval
+class User extends Model {
+    protected static function booted() {
+        static::creating(function ($user) {
+            $user->slug = Str::slug($user->name);
+        });
+
+        static::saving(function ($user) {
+            $user->email = strtolower($user->email);
+        });
+
+        static::retrieved(function ($user) {
+            // Runs after model is fetched from DB
+        });
+    }
 }
 ```
 
-### creating(), updating(), deleting()
-**Description:** Event hooks called before insert, update, or delete. Override in your model to add custom logic (e.g., data sanitization). If you also use `$dispatchesEvents` or `EventDispatcher::listen()` for the same event, the override hook is skipped to avoid double-firing — use one approach per event.
+### registerModelEvent($event, $callback)
 
-**Example:**
-```php
-protected function creating() {
-    $this->name = sanitize_text_field($this->name);
-}
-```
+**Description:** Register a model event callback programmatically. Typically called from `booted()` via the static helper methods (`static::creating(fn)`, `static::saving(fn)`, etc.).
 
-### softDeleting(), softDeleted(), restoring(), restored()
-**Description:** Event hooks for soft deletes. Override these in your model to add custom logic before/after soft delete and restore.
+**Supported events:**
+`retrieved`, `creating`, `created`, `updating`, `updated`, `saving`, `saved`, `deleting`, `deleted`, `softDeleting`, `softDeleted`, `restoring`, `restored`.
 
-**Example:**
-```php
-protected function softDeleting() {
-    // Called before soft delete
-}
-protected function softDeleted() {
-    // Called after soft delete
-}
-protected function restoring() {
-    // Called before restore
-}
-protected function restored() {
-    // Called after restore
-}
-```
+**Before-events** (`saving`, `creating`, `updating`, `deleting`, `softDeleting`, `restoring`) halt the operation if a callback returns `false`. After-events are informational only.
 
 ---
 

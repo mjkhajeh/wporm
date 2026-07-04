@@ -26,7 +26,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Raw SQL expressions**: `selectRaw()`, `whereRaw()`/`orWhereRaw()`, `groupByRaw()`, `havingRaw()`/`orHavingRaw()`, and `orderByRaw()` for dropping down to raw SQL with safe, bound placeholders.
 - **Subqueries**: `fromSub()` / `from()` for derived tables, `selectSub()` for scalar subselects in the SELECT list, and `whereSub()`/`whereInSub()`/`whereNotInSub()` (plus OR variants) for subqueries in WHERE — all accepting a `QueryBuilder`, `Closure`, or raw SQL string, Eloquent-style.
 - **Combining queries**: `union()`/`unionAll()` to combine two or more queries' result sets, Eloquent-style.
-- **Events**: Model lifecycle event hooks (`creating`, `updating`, `deleting`, etc.) via overridable methods, Eloquent-style `$dispatchesEvents` property mapping, and a standalone `EventDispatcher` for global listeners — no Laravel dependency required.
+- **Events**: Model lifecycle events via `booted()` + `static::creating(fn)`, Eloquent-style `$dispatchesEvents` property mapping, observers, and a standalone `EventDispatcher` for global listeners — no Laravel dependency required.
 - **Functional chaining**: `tap()` for inline side-effects (logging, debugging) that leave the builder unchanged, and `pipe()` to hand the builder off to a callback and return its result — both Eloquent-style, and available on `QueryBuilder`, `Collection`, **and `Model`** instances.
 - **Rich Collections**: `Collection` supports Eloquent-style `sortBy()`/`sortByDesc()`, `groupBy()`, `keyBy()`, `unique()`, `flatMap()`, `mapToGroups()`, `each()`, `reduce()`, `values()`, `keys()`, `diff()`/`intersect()`/`merge()`, `push()`/`pull()`/`put()`, `implode()`, `when()`/`unless()`, `firstWhere()`, and in-memory `sum()`/`avg()`/`min()`/`max()`.
 - **Global scopes**: Add global query constraints to models.
@@ -1424,19 +1424,26 @@ Same as `withCount()`: `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasMa
 
 ## Model Events and $dispatchesEvents
 
-WPORM provides four complementary ways to respond to model lifecycle events.
+WPORM provides four complementary ways to respond to model lifecycle events, matching Eloquent's event architecture.
 
-### 1. Method overrides (back-compat)
+### 1. boot() / booted() + static event helpers (Eloquent-style)
 
-Override `creating()`, `updating()`, `deleting()` (and the soft-delete variants) directly on the model:
+Override `booted()` in your model to register event closures. The model class is booted once, on first use:
 
 ```php
 class User extends Model {
-    protected function creating() {
-        $this->name = sanitize_text_field($this->name);
-    }
-    protected function deleting() {
-        // clean up related data
+    protected static function booted() {
+        static::creating(function ($user) {
+            $user->slug = Str::slug($user->name);
+        });
+
+        static::saving(function ($user) {
+            $user->email = strtolower($user->email);
+        });
+
+        static::retrieved(function ($user) {
+            // Runs after model is fetched from DB
+        });
     }
 }
 ```
@@ -1608,7 +1615,7 @@ public function getUserAttribute() {
 
 - Appended attributes are included in `toArray()` and JSON output.
 - The value is resolved via a `get{AttributeName}Attribute()` accessor or, if not present, by a public property.
-- Do **not** set appended attributes in `retrieved()`; use accessors instead.
+- Do **not** set appended attributes in a `retrieved` event callback; use accessors instead.
 
 ## Transactions
 
@@ -2430,7 +2437,7 @@ $result = User::query()
 - **Schema Changes:** Your model's `up(Blueprint $blueprint)` method is the single source of truth for the table schema — WPORM reads it via `$blueprint->toSql()` automatically, so you no longer need to assign `$this->schema` yourself. If you change `up()`, you may need to drop and recreate the table or use the `SchemaBuilder`'s `table()` method for migrations.
 - **Reusing a Query Builder:** It's safe to call `toSql()`, `count()`, `get()`, etc. multiple times (or in combination, as `paginate()` does internally) on the same query instance — soft-delete constraints and HAVING bindings are only applied once per instance and won't duplicate or misalign bindings on repeat calls.
 - **Constructing Models:** `new Model(['id' => 5])` (or any attributes) only fills the model's attributes in memory — it does **not** query the database. Use `Model::find($id)` to load an existing record.
-- **Events:** WPORM supports three complementary event approaches. (1) Override `creating()`, `updating()`, `deleting()` etc. directly on the model. (2) Use `$dispatchesEvents` to map event names to listener classes — the listener must expose a `handle(\MJ\WPORM\Events\ModelEvent $event)` method. (3) Register global listeners via `EventDispatcher::listen(EventClass::class, $listener)` to respond to any model's events. All three fire in that order per event. Any before-hook listener can cancel an operation by returning `false`. See [Methods.md]($dispatchesEvents-and-eventdispatcher) for full API.
+- **Events:** WPORM supports four complementary event approaches. (1) Override `booted()` and use `static::creating(fn)`, `static::saving(fn)`, etc. to register event closures — this is the recommended Eloquent-style approach. (2) Use `$dispatchesEvents` to map event names to listener classes — the listener must expose a `handle(\MJ\WPORM\Events\ModelEvent $event)` method. (3) Register global listeners via `EventDispatcher::listen(EventClass::class, $listener)` to respond to any model's events. (4) Use observers via `Model::observe()`. All fire in that order per event. Any before-hook listener can cancel an operation by returning `false`. See [Methods.md](./Methods.md#dispatchesevents-and-eventdispatcher) for full API.
 - **Extending Casts:** Implement `MJ\WPORM\Casts\CastableInterface` for custom attribute casting logic.
 - **Testing:** Always test your queries and schema changes on a staging environment before deploying to production.
 

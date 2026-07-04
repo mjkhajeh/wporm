@@ -1422,12 +1422,9 @@ class QueryBuilder {
         );
         if (!$results) return new \MJ\WPORM\Collection([]);
         $modelClass = get_class($this->model);
-        $hasRetrieved = method_exists($modelClass, 'retrieved');
-        $models = array_map(function ($row) use ($modelClass, $hasRetrieved) {
+        $models = array_map(function ($row) use ($modelClass) {
             $instance = (new $modelClass)->newFromBuilder($row);
-            if ($hasRetrieved) {
-                $instance->retrieved();
-            }
+            $instance->fireModelEvent('retrieved');
             return $instance;
         }, $results);
         // Eager load relations if requested
@@ -1488,12 +1485,9 @@ class QueryBuilder {
             return;
         }
         $modelClass = get_class($this->model);
-        $hasRetrieved = method_exists($modelClass, 'retrieved');
         foreach ($results as $row) {
             $instance = (new $modelClass)->newFromBuilder($row);
-            if ($hasRetrieved) {
-                $instance->retrieved();
-            }
+            $instance->fireModelEvent('retrieved');
             yield $instance;
         }
     }
