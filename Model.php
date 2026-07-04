@@ -488,7 +488,7 @@ abstract class Model implements \ArrayAccess {
 			return $value;
 		}
 		if (property_exists($this, $key)) {
-			return $this->$key;
+			return $this->{$key};
 		}
 		return null;
 	}
