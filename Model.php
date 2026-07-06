@@ -562,9 +562,28 @@ abstract class Model implements \ArrayAccess {
             }
             return $decoded;
         case 'datetime':
-            return $value ? new \DateTime($value) : null;
+            if (empty($value)) return null;
+            if ($value instanceof \DateTime) return $value;
+            if ($value instanceof \DateTimeImmutable) return \DateTime::createFromImmutable($value);
+            if (is_numeric($value)) return (new \DateTime())->setTimestamp((int) $value);
+            if (is_string($value)) {
+                try {
+                    return new \DateTime($value);
+                } catch (\Exception $e) {
+                    return null;
+                }
+            }
+            return null;
         case 'timestamp':
-            return $value ? (new \DateTime())->setTimestamp((int)$value) : null;
+            if (empty($value)) return null;
+            if ($value instanceof \DateTime) return $value;
+            if ($value instanceof \DateTimeImmutable) return \DateTime::createFromImmutable($value);
+            if (is_numeric($value)) return (new \DateTime())->setTimestamp((int) $value);
+            if (is_string($value)) {
+                $ts = strtotime($value);
+                return $ts !== false ? (new \DateTime())->setTimestamp($ts) : null;
+            }
+            return null;
         default:
             $cast_input = '';
             if( is_array( $cast ) ) {
@@ -602,8 +621,10 @@ protected function castSet($key, $value) {
         case 'datetime':
             if ($value instanceof \DateTime) {
                 return $value->format('Y-m-d H:i:s');
+            } elseif ($value instanceof \DateTimeImmutable) {
+                return $value->format('Y-m-d H:i:s');
             } elseif (is_numeric($value)) {
-                return date('Y-m-d H:i:s', (int)$value);
+                return date('Y-m-d H:i:s', (int) $value);
             } elseif (is_string($value)) {
                 $ts = strtotime($value);
                 return $ts !== false ? date('Y-m-d H:i:s', $ts) : null;
@@ -612,8 +633,10 @@ protected function castSet($key, $value) {
         case 'timestamp':
             if ($value instanceof \DateTime) {
                 return $value->getTimestamp();
+            } elseif ($value instanceof \DateTimeImmutable) {
+                return $value->getTimestamp();
             } elseif (is_numeric($value)) {
-                return (int)$value;
+                return (int) $value;
             } elseif (is_string($value)) {
                 $ts = strtotime($value);
                 return $ts !== false ? $ts : null;

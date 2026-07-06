@@ -42,11 +42,25 @@ Casts the attribute to an array when accessed (by decoding JSON). When saving, t
 **Description:**
 Casts the attribute to a `DateTime` object when accessed. When saving, the value is formatted as a MySQL datetime string (`Y-m-d H:i:s`).
 
+**Accepted input formats (on read and write):**
+- `DateTime` object — returned as-is on read; formatted to `Y-m-d H:i:s` on write.
+- `DateTimeImmutable` object — converted to `DateTime` on read; formatted to `Y-m-d H:i:s` on write.
+- Numeric value (Unix timestamp integer/float) — interpreted as a Unix timestamp.
+- String value (e.g. `"2026-03-19 23:40:42"`, `"2026-03-19T23:40:42"`, `"March 19, 2026"`) — parsed via `strtotime()`.
+- `null` or empty value — returns `null`.
+
 ---
 
 ### timestamp
 **Description:**
 Casts the attribute to a `DateTime` object (from a Unix timestamp) when accessed. When saving, the value is stored as a Unix timestamp (integer).
+
+**Accepted input formats (on read and write):**
+- `DateTime` object — returned as-is on read; `getTimestamp()` on write.
+- `DateTimeImmutable` object — converted to `DateTime` on read; `getTimestamp()` on write.
+- Numeric value (Unix timestamp integer/float) — used directly as a Unix timestamp.
+- String value (e.g. `"2026-03-19 23:40:42"`) — parsed via `strtotime()` to a Unix timestamp.
+- `null` or empty value — returns `null`.
 
 ---
 
