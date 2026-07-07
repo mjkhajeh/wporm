@@ -6,7 +6,11 @@
     "autoload": {
         "psr-4": {
             "MJ\\WPORM\\": ""
-        }
+        },
+        "classmap": [
+            "Events.php",
+            "ModelEvent.php"
+        ]
     },
     "authors": [
         {

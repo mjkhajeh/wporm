@@ -2394,9 +2394,11 @@ public function forceDelete() {
 		$eventClass      = $eventMap[$event];
 		$observers       = static::getObservers();
 		$modelEvents     = static::getModelEvents($event);
+		$hasInstanceMethod = method_exists($this, $event);
 
 		// Fast-path: nothing registered.
-		if (empty($this->dispatchesEvents[$event])
+		if (!$hasInstanceMethod
+			&& empty($this->dispatchesEvents[$event])
 			&& empty(EventDispatcher::getListeners($eventClass))
 			&& empty($modelEvents)
 			&& empty($observers)
@@ -2404,13 +2406,21 @@ public function forceDelete() {
 			return null;
 		}
 
-		// 1. Fire event through dispatcher (dispatchesEvents + global listeners)
+		// 1. Call the model's own instance method (retrieved, saving, creating, etc.)
+		if ($hasInstanceMethod) {
+			$result = $this->$event();
+			if ($result === false) {
+				return false;
+			}
+		}
+
+		// 2. Fire event through dispatcher (dispatchesEvents + global listeners)
 		$result = EventDispatcher::dispatch(new $eventClass($this));
 		if ($result === false) {
 			return false;
 		}
 
-		// 2. Call model-registered closures (static::creating(fn), etc.)
+		// 3. Call model-registered closures (static::creating(fn), etc.)
 		foreach ($modelEvents as $callback) {
 			$result = $callback($this);
 			if ($result === false) {
@@ -2418,7 +2428,7 @@ public function forceDelete() {
 			}
 		}
 
-		// 3. Call observers — Eloquent-style: $observer->$event($model)
+		// 4. Call observers — Eloquent-style: $observer->$event($model)
 		foreach ($observers as $observer) {
 			if (is_string($observer)) {
 				if (!isset(static::$observerInstances[$observer])) {
