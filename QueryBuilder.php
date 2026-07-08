@@ -95,10 +95,29 @@ class QueryBuilder {
     public $debug = false;
 
     /**
+     * Maximum allowed page number for paginate()/simplePaginate().
+     * Prevents performance issues from deep OFFSET queries.
+     *
+     * @var int
+     */
+    protected $maxPage = 10000;
+
+    /**
      * Set debug mode for this query instance.
      */
     public function setDebug($debug = true) {
         $this->debug = (bool)$debug;
+        return $this;
+    }
+
+    /**
+     * Set the maximum allowed page number for pagination.
+     *
+     * @param int $maxPage
+     * @return $this
+     */
+    public function setMaxPage(int $maxPage) {
+        $this->maxPage = max(1, $maxPage);
         return $this;
     }
 
@@ -3716,7 +3735,9 @@ class QueryBuilder {
         if (!is_array($_GET)) {
             return 1;
         }
-        return isset($_GET['page']) ? abs((int)$_GET['page']) : 1;
+        $page = isset($_GET['page']) ? abs((int)$_GET['page']) : 1;
+        $page = max(1, $page);
+        return min($page, $this->maxPage);
     }
 
     public function paginate($perPage = 15, $page = null) {
@@ -3724,7 +3745,7 @@ class QueryBuilder {
         if ($page === null) {
             $page = $this->resolvePageFromRequest();
         }
-        $page = max((int)$page, 1);
+        $page = max(1, min((int)$page, $this->maxPage));
 
         // Save mutable state that count() / applySoftDeleteScope() may alter,
         // then restore after the count query so get() applies the same scopes.
@@ -3778,7 +3799,7 @@ class QueryBuilder {
         if ($page === null) {
             $page = $this->resolvePageFromRequest();
         }
-        $page = max((int)$page, 1);
+        $page = max(1, min((int)$page, $this->maxPage));
         $savedLimit = $this->limit;
         $savedOffset = $this->offset;
         $this->limit($perPage + 1)->offset(($page - 1) * $perPage);

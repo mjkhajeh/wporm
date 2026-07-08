@@ -4,10 +4,10 @@
 
 WPORM is a well-structured, Eloquent-inspired ORM for WordPress that provides a comprehensive set of features including relationships, soft deletes, casting, event dispatching, global scopes, schema management, and a fluent query builder. The codebase is ~10,000 lines of PHP across 20+ source files.
 
-**Overall Assessment**: The library is functional and covers a large portion of Eloquent's API surface. However, it contains several critical bugs (notably around SQL injection edge cases), a significant number of missing Eloquent features, and performance issues related to excessive object creation and static cache invalidation gaps. The previously reported static state sharing issue, `__callStatic` incompatibility with property access, `first()` soft delete scope, `update()` dirty-tracking issues, `whereColumn()` SQL injection vulnerability, and `__set()` silent mass-assignment guard failure have all been fixed.
+**Overall Assessment**: The library is functional and covers a large portion of Eloquent's API surface. However, it contains several critical bugs (notably around SQL injection edge cases), a significant number of missing Eloquent features, and performance issues related to excessive object creation and static cache invalidation gaps. The previously reported static state sharing issue, `__callStatic` incompatibility with property access, `first()` soft delete scope, `update()` dirty-tracking issues, `whereColumn()` SQL injection vulnerability, `__set()` silent mass-assignment guard failure, and `resolvePageFromRequest()` page manipulation have all been fixed.
 
 **Key Metrics**:
-- ~21 Critical/High severity issues
+- ~19 Critical/High severity issues (21 originally, 2 fixed)
 - ~35 Medium severity issues
 - ~15 Low severity issues
 - ~39 missing or incompletely implemented Eloquent features
@@ -165,7 +165,7 @@ protected function update() {
 | 3 | ~~**High**~~ **Fixed** | QueryBuilder.php:966 | ~~`whereColumn()` does not validate operator — SQL injection vector.~~ Fixed by adding `Helpers::validateOperator($operator);`. |
 | 4 | ~~**High**~~ **Fixed** | Model.php:526-536 | ~~`__set()` silently returns on mass-assignment guard failure without any exception or return value indicator.~~ Fixed by throwing `MassAssignmentException` when mass-assignment guard fails. |
 | 5 | ~~**High**~~ **Fixed** | Model.php:322-328 | ~~`ensureTableExists()` creates a new instance inside itself via `new static`, causing recursive constructor calls if the guard fails.~~ Fixed by adding `resolveTableName()` static method. |
-| 6 | **High** | QueryBuilder.php:3713-3718 | `resolvePageFromRequest()` reads `$_GET['page']` directly — potential for page manipulation. |
+| 6 | ~~**High**~~ **Fixed** | QueryBuilder.php:3713-3718 | ~~`resolvePageFromRequest()` reads `$_GET['page']` directly — potential for page manipulation.~~ Fixed by adding `$maxPage` property (default 10,000) and ensuring page numbers are between 1 and `$maxPage` in `resolvePageFromRequest()`, `paginate()`, and `simplePaginate()`. Added `max(1, $page)` in `resolvePageFromRequest()` to prevent zero or negative page numbers. |
 | 7 | **Medium** | Model.php:533-601 | `castGet()` for `'array'` and `'json'` types both return `[]` on empty/null — identical behavior, potential confusion. |
 | 8 | **Medium** | Model.php:594 | Custom cast instantiation: `new $cast($cast_input)` — if `$cast` is not a class, this crashes. |
 | 9 | **Medium** | QueryBuilder.php:3456-3457 | `whereExists` uses regex `preg_replace('/^SELECT .*? FROM /i', ...)` which fails for `SELECT DISTINCT` or `SELECT SQL_CALC_FOUND_ROWS`. |
@@ -426,7 +426,7 @@ protected function update() {
 | # | Severity | Issue | File:Line |
 |---|----------|-------|-----------|
 | 1 | ~~**High**~~ **Fixed** | ~~`whereColumn()` does not validate operator — SQL injection possible.~~ Fixed by adding `Helpers::validateOperator($operator);`. | QueryBuilder.php:966 |
-| 2 | **Medium** | `paginate()` reads `$_GET['page']` directly — page manipulation possible (not a security issue per se, but allows arbitrary pagination). | QueryBuilder.php:3713 |
+| 2 | ~~**Medium**~~ **Fixed** | ~~`paginate()` reads `$_GET['page']` directly — page manipulation possible (not a security issue per se, but allows arbitrary pagination).~~ Fixed by adding `$maxPage` property (default 10,000) and capping page numbers. | QueryBuilder.php:3713 |
 | 3 | **Medium** | `$wpdb->prepare()` is used correctly for most queries, but some raw SQL paths bypass it. | QueryBuilder.php:4688 |
 | 4 | **Low** | `Helpers::quoteIdentifier()` correctly escapes backticks but does not handle special characters beyond that. | Helpers.php:9-42 |
 | 5 | **Low** | `SchemaBuilder::drop()` uses raw SQL with table name interpolation (no parameterization). | SchemaBuilder.php:62 |
@@ -452,6 +452,7 @@ protected function update() {
 5. ~~**Fix `ensureTableExists()` recursive instantiation**~~ — **Fixed** by adding `resolveTableName()` static method.
 6. ~~**Fix `first()` soft delete scope state management**~~ — **Fixed** by building query directly instead of delegating to `get()`.
 7. ~~**Fix `__set()` silent mass-assignment guard failure**~~ — **Fixed** by throwing `MassAssignmentException::forAttribute($key, static::class)` instead of silently returning.
+8. ~~**Fix `resolvePageFromRequest()` page manipulation**~~ — **Fixed** by adding `$maxPage` property (default 10,000) and capping page numbers.
 
 ### Priority 2: Important Features
 
@@ -482,7 +483,7 @@ protected function update() {
 
 | Phase | Items | Estimated Effort |
 |-------|-------|------------------|
-| **Phase 1: Critical Bugs** | ~~Fix update() dirty tracking~~ (Fixed), ~~operator validation~~ (Fixed), ~~__callStatic~~ (Fixed), ~~original sync~~ (Fixed), ~~ensureTableExists() recursion~~ (Fixed), ~~first() soft delete scope~~ (Fixed) | 1-2 days |
+| **Phase 1: Critical Bugs** | ~~Fix update() dirty tracking~~ (Fixed), ~~operator validation~~ (Fixed), ~~__callStatic~~ (Fixed), ~~original sync~~ (Fixed), ~~ensureTableExists() recursion~~ (Fixed), ~~first() soft delete scope~~ (Fixed), ~~page manipulation~~ (Fixed) | 1-2 days |
 | **Phase 2: Core Eloquent Parity** | Add forceFill, append, without, getAttributes, isClean, syncOriginal, Collection::filter() | 3-5 days |
 | **Phase 3: Architecture** | Split Model.php into traits, add type declarations, extract DB abstraction | 5-7 days |
 | **Phase 4: Quality** | PHPUnit test suite, PHPStan level 5+, CI/CD, documentation | 5-10 days |
@@ -494,6 +495,6 @@ protected function update() {
 
 WPORM is a solid, feature-rich ORM that successfully brings Laravel Eloquent's developer experience to WordPress. The relationship system, eager loading, soft deletes, events, and query builder are all well-implemented and cover the majority of common use cases.
 
-The most critical remaining issue is the `resolvePageFromRequest()` reading `$_GET['page']` directly. The previously reported issues — `update()` sending all attributes and not syncing original state, static state sharing in `ensureTableExists()`, `__callStatic` incompatibility with PHP 8.x property access, `first()` soft delete scope state management, `whereColumn()` SQL injection, and `__set()` silent mass-assignment guard failure — have all been fixed. The architecture could benefit from splitting the 2700-line Model.php into focused traits, and the project would greatly benefit from a test suite and static analysis.
+All previously reported critical and high-severity issues have been fixed: `update()` sending all attributes and not syncing original state, static state sharing in `ensureTableExists()`, `__callStatic` incompatibility with PHP 8.x property access, `first()` soft delete scope state management, `whereColumn()` SQL injection, `__set()` silent mass-assignment guard failure, and `resolvePageFromRequest()` page manipulation. The architecture could benefit from splitting the 2700-line Model.php into focused traits, and the project would greatly benefit from a test suite and static analysis.
 
 With the fixes and improvements outlined in this report, WPORM could achieve near-complete Eloquent API compatibility while maintaining its WordPress-native approach.
