@@ -2379,7 +2379,7 @@ public function forceDelete() {
     }
 
 	public function getOriginal($key = null) {
-		return $key ? ($this->original[$key] ?? null) : $this->original;
+		return $key ? ($this->original[$key] ?? null) : array_values($this->original);
 	}
 
 	// -------------------------------------------------------------------------

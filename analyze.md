@@ -152,20 +152,16 @@ public function whereColumn($first, $operator, $second = null) {
 
 **Status**: Fixed in current version.
 
-### 8. `getOriginal()` Returns Reference to Internal Array
+### 8. ~~`getOriginal()` Returns Reference to Internal Array~~ FIXED
 
-**Severity**: Medium
-**File**: `Model.php:2346-2348`
+**Severity**: ~~Medium~~ **Fixed**
+**File**: `Model.php:2381-2383`
 
-```php
-public function getOriginal($key = null) {
-    return $key ? ($this->original[$key] ?? null) : $this->original;
-}
-```
+**Previous Issue**: When called without arguments, returned the internal `$this->original` array **by reference**. External code could modify the model's internal state.
 
-When called without arguments, returns the internal `$this->original` array **by reference**. External code can modify the model's internal state.
+**Fix Applied**: Changed to return `array_values($this->original)` which creates a new array, ensuring the internal state cannot be modified externally.
 
-**Suggested Fix**: Return `clone $this->original` or `array_clone($this->original)`.
+**Status**: Fixed in current version.
 
 ---
 
@@ -234,7 +230,7 @@ When called without arguments, returns the internal `$this->original` array **by
 | `$model->touch()` / `touchWithEvents()` | ✅ Compatible |
 | `$model->toArray()` / `toJson()` | ✅ Compatible |
 | `$model->isDirty()` / `getChanges()` | ⚠️ Broken (see bug #5) |
-| `$model->getOriginal()` | ⚠️ Returns reference |
+| `$model->getOriginal()` | ✅ Compatible |
 | `$model->makeHidden()` / `makeVisible()` | ✅ Compatible |
 | `$model->append()` | ⚠️ Property `$appends` exists but `append()` method missing |
 | `$model->fill()` | ⚠️ Silently fails on guarded attributes |
