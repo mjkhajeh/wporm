@@ -1296,7 +1296,6 @@ protected function castSet($key, $value) {
 		}
 
 		$this->attributes[$this->updatedAtColumn] = current_time('mysql');
-		$this->original[$this->updatedAtColumn] = $this->attributes[$this->updatedAtColumn];
 
 		return $this->save();
 	}
@@ -1345,10 +1344,17 @@ protected function castSet($key, $value) {
 		if (!isset($this->attributes[$pk])) {
 			return false;
 		}
-		$result = $wpdb->update($this->getTable(), $this->attributes, [$pk => $this->attributes[$pk]]);
+		$dirty = $this->getDirty();
+		if (empty($dirty)) {
+			return true;
+		}
+		$result = $wpdb->update($this->getTable(), $dirty, [$pk => $this->attributes[$pk]]);
 		if ($result === false) {
 			return false;
 		}
+
+		// Sync original state after successful update
+		$this->original = $this->attributes;
 
 		// updated (after-hook)
 		$this->fireModelEvent('updated');
@@ -2492,6 +2498,21 @@ public function forceDelete() {
 			return $this->attributes[$attribute] !== $this->original[$attribute];
 		}
 		return !empty($this->getChanges());
+	}
+
+	/**
+	 * Get the attributes that have been changed since last save.
+	 *
+	 * @return array
+	 */
+	public function getDirty() {
+		$dirty = [];
+		foreach ($this->attributes as $key => $value) {
+			if (!array_key_exists($key, $this->original) || $value !== $this->original[$key]) {
+				$dirty[$key] = $value;
+			}
+		}
+		return $dirty;
 	}
 
 	public function getChanges() {

@@ -2172,6 +2172,19 @@ $original = $user->getOriginal();
 if ($user->isDirty('name')) { /* ... */ }
 ```
 
+### getDirty()
+**Description:** Get the attributes that have been changed since the last save. Returns an associative array of attribute names to their new values. This is used internally by `update()` to only send changed columns to the database, preventing unnecessary write amplification.
+
+**Example:**
+```php
+$user = User::find(1);
+$user->name = 'New Name';
+$user->email = 'new@example.com';
+
+$dirty = $user->getDirty();
+// ['name' => 'New Name', 'email' => 'new@example.com']
+```
+
 ### getChanges()
 **Description:** Get the changed attributes of the model.
 

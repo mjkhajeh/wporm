@@ -4,13 +4,13 @@
 
 WPORM is a well-structured, Eloquent-inspired ORM for WordPress that provides a comprehensive set of features including relationships, soft deletes, casting, event dispatching, global scopes, schema management, and a fluent query builder. The codebase is ~10,000 lines of PHP across 20+ source files.
 
-**Overall Assessment**: The library is functional and covers a large portion of Eloquent's API surface. However, it contains several critical bugs (notably around SQL injection edge cases), a significant number of missing Eloquent features, and performance issues related to excessive object creation and static cache invalidation gaps. The previously reported static state sharing issue and `__callStatic` incompatibility with property access have been fixed.
+**Overall Assessment**: The library is functional and covers a large portion of Eloquent's API surface. However, it contains several critical bugs (notably around SQL injection edge cases), a significant number of missing Eloquent features, and performance issues related to excessive object creation and static cache invalidation gaps. The previously reported static state sharing issue, `__callStatic` incompatibility with property access, `first()` soft delete scope, and `update()` dirty-tracking issues have all been fixed.
 
 **Key Metrics**:
-- ~25 Critical/High severity issues
+- ~22 Critical/High severity issues
 - ~35 Medium severity issues
 - ~15 Low severity issues
-- ~40 missing or incompletely implemented Eloquent features
+- ~39 missing or incompletely implemented Eloquent features
 
 ---
 
@@ -66,60 +66,58 @@ In PHP 8.x, `__callStatic` is invoked for static property access attempts like `
 
 **Status**: Fixed in current version.
 
-### 3. `first()` Calls `get()` Which Re-applies Soft Delete Scope
+### 3. ~~`first()` Calls `get()` Which Re-applies Soft Delete Scope~~ FIXED
 
-**Severity**: High
-**File**: `QueryBuilder.php:1495-1504`
+**Severity**: ~~High~~ **Fixed**
+**File**: `QueryBuilder.php:1495-1520`
 
-```php
-public function first() {
-    $previousLimit = $this->limit;
-    $this->limit = 1;
-    try {
-        $results = $this->get();
-        return $results[0] ?? null;
-    } finally {
-        $this->limit = $previousLimit;
-    }
-}
-```
+**Previous Issue**: `first()` delegated to `get()`, which calls `applySoftDeleteScope()`. The `$softDeleteScopeApplied` guard is never reset between calls, meaning if you call `first()` then modify the query and call `first()` again, the soft delete scope from the first call persists.
 
-`first()` calls `get()`, which calls `applySoftDeleteScope()`. If `first()` is called multiple times on the same builder instance, the soft delete scope is only applied once (due to the `$softDeleteScopeApplied` guard). However, the guard is **never reset** between calls, meaning if you call `first()` then modify the query and call `first()` again, the soft delete scope from the first call persists. This is partially mitigated by the guard, but the state management is fragile.
+**Fix Applied** (two phases):
+1. Refactored `first()` to build and execute its own query directly (like `count()`, `exists()`, and `delete()` already do) instead of delegating to `get()`. This avoids Collection wrapping overhead and hydrates a single model via `$wpdb->get_row()`.
+2. Added save/restore of `$this->softDeleteScopeApplied` in the `finally` block (matching the pattern used by `paginate()`). After `first()` completes, the guard returns to its pre-call state, so subsequent calls to `first()`, `get()`, `count()`, etc. correctly re-apply the soft delete scope.
 
-**Impact**: Potential for stale soft-delete constraints in long-lived query builder chains.
+**Status**: Fixed in current version.
 
-### 4. `save()` Updates ALL Columns Including Unchanged Ones
+### 4. ~~`save()` Updates ALL Columns Including Unchanged Ones~~ FIXED
 
-**Severity**: High
-**File**: `Model.php:1302-1328`
+**Severity**: ~~High~~ **Fixed**
+**File**: `Model.php:1330-1362`
 
-```php
-protected function update() {
-    // ...
-    $result = $wpdb->update($this->getTable(), $this->attributes, [$pk => $this->attributes[$pk]]);
-    // ...
-}
-```
-
-The `update()` method sends **all** attributes to `$wpdb->update()`, not just the changed (dirty) ones. `$wpdb->update()` will generate SET clauses for every column, even unchanged ones. This causes:
+**Previous Issue**: The `update()` method sent **all** attributes to `$wpdb->update()`, not just the changed (dirty) ones. `$wpdb->update()` would generate SET clauses for every column, even unchanged ones. This caused:
 - Unnecessary write amplification
 - Potential trigger/audit log noise
 - Race conditions if two requests read the same row and one updates a different column
 
-**Laravel Eloquent**: Only sends dirty attributes via `$this->getDirty()`.
+**Fix Applied**: Refactored `update()` to:
+1. Call `$this->getDirty()` to get only changed attributes
+2. Return `true` early when no dirty attributes exist (no-op save)
+3. Pass only dirty attributes to `$wpdb->update()`
 
-**Suggested Fix**: Use `$wpdb->update($this->getTable(), $this->getDirty(), [$pk => $this->attributes[$pk]])` instead.
+```php
+protected function update() {
+    // ...
+    $dirty = $this->getDirty();
+    if (empty($dirty)) {
+        return true;
+    }
+    $result = $wpdb->update($this->getTable(), $dirty, [$pk => $this->attributes[$pk]]);
+    // ...
+}
+```
 
-### 5. `update()` Sets `original` to Current State Before DB Write
+**Status**: Fixed in current version.
 
-**Severity**: High
-**File**: `Model.php:1302-1328`
+### 5. ~~`update()` Does Not Sync `$this->original` After Save~~ FIXED
 
-After a successful `$wpdb->update()`, the method does NOT update `$this->original` to match `$this->attributes`. This means `isDirty()` will continue returning `true` for attributes that were just saved, and `getChanges()` will show stale changes.
+**Severity**: ~~High~~ **Fixed**
+**File**: `Model.php:1356-1357`
 
-**Impact**: `isDirty()` and `getChanges()` are unreliable after `save()` on existing models.
+**Previous Issue**: After a successful `$wpdb->update()`, the method did NOT update `$this->original` to match `$this->attributes`. This meant `isDirty()` would continue returning `true` for attributes that were just saved, and `getChanges()` would show stale changes.
 
-**Suggested Fix**: Add `$this->original = $this->attributes;` after a successful update.
+**Fix Applied**: Added `$this->original = $this->attributes;` after a successful update, restoring the dirty-tracking contract.
+
+**Status**: Fixed in current version.
 
 ### 6. SQL Injection via `whereColumn` Missing Operator Validation
 
@@ -143,14 +141,16 @@ public function whereColumn($first, $operator, $second = null) {
 
 **Suggested Fix**: Add `Helpers::validateOperator($operator);` before interpolating.
 
-### 7. `update()` Does Not Sync `$this->original` After Save
+### 7. ~~`update()` Does Not Sync `$this->original` After Save~~ FIXED
 
-**Severity**: High
-**File**: `Model.php:1302-1328`
+**Severity**: ~~High~~ **Fixed**
+**File**: `Model.php:1356-1357`
 
-After `$wpdb->update()` succeeds, `$this->original` is never updated to match the new state. This breaks the contract: `isDirty()` compares `$this->attributes` against `$this->original`, so after saving, the model will appear to still have dirty changes.
+**Previous Issue**: After `$wpdb->update()` succeeded, `$this->original` was never updated to match the new state. This broke the contract: `isDirty()` compares `$this->attributes` against `$this->original`, so after saving, the model would appear to still have dirty changes.
 
-**Impact**: `isDirty()` returns true after `save()`. `getChanges()` returns stale data.
+**Fix Applied**: Added `$this->original = $this->attributes;` after a successful update (same fix as issue #5).
+
+**Status**: Fixed in current version.
 
 ### 8. `getOriginal()` Returns Reference to Internal Array
 
@@ -175,8 +175,8 @@ When called without arguments, returns the internal `$this->original` array **by
 
 | # | Severity | File:Line | Description |
 |---|----------|-----------|-------------|
-| 1 | **Critical** | Model.php:1302 | `update()` sends all attributes to DB, not just dirty ones. Causes write amplification and race conditions. |
-| 2 | **Critical** | Model.php:1302 | `update()` does not sync `$this->original` after successful save. `isDirty()` broken post-save. |
+| 1 | ~~**Critical**~~ **Fixed** | Model.php:1347-1351 | ~~`update()` sends all attributes to DB, not just dirty ones. Causes write amplification and race conditions.~~ Fixed by using `$this->getDirty()` and returning early when empty. |
+| 2 | ~~**Critical**~~ **Fixed** | Model.php:1356-1357 | ~~`update()` does not sync `$this->original` after successful save. `isDirty()` broken post-save.~~ Fixed by adding `$this->original = $this->attributes` after successful update. |
 | 3 | **High** | QueryBuilder.php:966 | `whereColumn()` does not validate operator — SQL injection vector. |
 | 4 | **High** | Model.php:506-508 | `__set()` silently returns on mass-assignment guard failure without any exception or return value indicator. |
 | 5 | ~~**High**~~ **Fixed** | Model.php:322-328 | ~~`ensureTableExists()` creates a new instance inside itself via `new static`, causing recursive constructor calls if the guard fails.~~ Fixed by adding `resolveTableName()` static method. |
@@ -193,7 +193,7 @@ When called without arguments, returns the internal `$this->original` array **by
 | # | Description |
 |---|-------------|
 | 1 | `increment()`/`decrement()` on Model instance: if the column is cast as `'int'`, the in-memory sync may produce floating-point values. |
-| 2 | `paginate()` calls `count()` which calls `applySoftDeleteScope()`, then restores state — but the scope's `$softDeleteScopeApplied` guard may prevent re-application on the subsequent `get()`. |
+| 2 | `paginate()` calls `count()` which calls `applySoftDeleteScope()`, then restores state — the guard is correctly reset so `get()` re-applies the scope. Similarly, `first()` now saves/restores the guard. |
 | 3 | `chunk()` / `each()` modify and restore `$this->limit`/`$this->offset`/`$this->softDeleteScopeApplied` — if an exception occurs during callback, state may be corrupted. |
 | 4 | `belongsTo()` with null FK: returns an always-empty query via `whereIn($ownerKey, [])` — but eager loading doesn't apply this same guard. |
 | 5 | `upsert()` with empty `$values` returns `0` but doesn't validate column consistency across rows. |
@@ -319,7 +319,7 @@ When called without arguments, returns the internal `$this->original` array **by
 
 | # | Feature | Priority | Notes |
 |---|---------|----------|-------|
-| 1 | `$model->update()` (instance method that only updates dirty attrs) | **Critical** | Current `update()` sends all attributes. Should diff against original. |
+| 1 | ~~`$model->update()` (instance method that only updates dirty attrs)~~ | ~~**Critical**~~ **Fixed** | ~~Current `update()` sends all attributes. Should diff against original.~~ Fixed by using `$this->getDirty()`. |
 | 2 | `Model::forceFill()` | **Important** | Bypasses `$fillable`/`$guarded` for trusted internal data. |
 | 3 | `$model->append()` method | **Important** | `$appends` property exists but no `append()` method to add at runtime. |
 | 4 | `$model->setAppends()` | **Important** | No method to replace appends array. |
@@ -370,7 +370,7 @@ When called without arguments, returns the internal `$this->original` array **by
 |---|----------|-----------|-------|--------|
 | 1 | **High** | Model.php:301-305 | Every `new Model()` call runs `bootIfNotBooted()` + `ensureTableExists()` + `fill()`. Even cached instances via `getQueryModel()` go through this once. | O(n) constructor overhead per static call chain. |
 | 2 | **High** | QueryBuilder.php:1424-1429 | `get()` creates a `new $modelClass` for EVERY row via `newFromBuilder()`. No instance pooling. | Memory + GC pressure on large result sets. |
-| 3 | **High** | QueryBuilder.php:1495-1504 | `first()` calls `get()` which hydrates ALL results, then discards all but the first. Should use `LIMIT 1` directly. | Actually, it does set `$this->limit = 1` — but the overhead of Collection wrapping is unnecessary. |
+| 3 | ~~**High**~~ **Fixed** | QueryBuilder.php:1495-1520 | ~~`first()` calls `get()` which hydrates ALL results, then discards all but the first.~~ Fixed — `first()` now builds its own query with LIMIT 1 and uses `$wpdb->get_row()` directly. | Eliminated Collection wrapping overhead. |
 | 4 | **Medium** | Model.php:1131-1212 | `eagerLoadTouchedRelations()` creates `new $modelClass` for EACH relation to get context. | N object allocations per touch relation. |
 | 5 | **Medium** | QueryBuilder.php:2351-2441 | `buildSelectQuery()` re-quotes all SELECT columns on every call (mitigated by cache, but cache invalidation is based on array identity). | O(n) column quoting per query build. |
 | 6 | **Medium** | Model.php:461-468 | Accessor cache lookup uses `method_exists()` on every `__get()` call before hitting the cache. | Minor overhead per attribute access. |
@@ -460,11 +460,12 @@ When called without arguments, returns the internal `$this->original` array **by
 
 ### Priority 1: Critical Fixes
 
-1. **Fix `update()` to only send dirty attributes** — prevents write amplification and race conditions.
-2. **Sync `$this->original` after save** — fixes `isDirty()` and `getChanges()`.
+1. ~~**Fix `update()` to only send dirty attributes**~~ — **Fixed** by using `$this->getDirty()` and returning early when empty.
+2. ~~**Sync `$this->original` after save**~~ — **Fixed** by adding `$this->original = $this->attributes` after successful update.
 3. **Add operator validation to `whereColumn()`** — prevents SQL injection.
 4. ~~**Remove `trigger_error` in `__callStatic`**~~ — **Fixed** by removing the `trigger_error` call.
 5. ~~**Fix `ensureTableExists()` recursive instantiation**~~ — **Fixed** by adding `resolveTableName()` static method.
+6. ~~**Fix `first()` soft delete scope state management**~~ — **Fixed** by building query directly instead of delegating to `get()`.
 
 ### Priority 2: Important Features
 
@@ -495,7 +496,7 @@ When called without arguments, returns the internal `$this->original` array **by
 
 | Phase | Items | Estimated Effort |
 |-------|-------|------------------|
-| **Phase 1: Critical Bugs** | Fix update() dirty tracking, operator validation, ~~__callStatic~~ (Fixed), original sync, ~~ensureTableExists() recursion~~ (Fixed) | 1-2 days |
+| **Phase 1: Critical Bugs** | ~~Fix update() dirty tracking~~ (Fixed), operator validation, ~~__callStatic~~ (Fixed), ~~original sync~~ (Fixed), ~~ensureTableExists() recursion~~ (Fixed), ~~first() soft delete scope~~ (Fixed) | 1-2 days |
 | **Phase 2: Core Eloquent Parity** | Add forceFill, append, without, getAttributes, isClean, syncOriginal, Collection::filter() | 3-5 days |
 | **Phase 3: Architecture** | Split Model.php into traits, add type declarations, extract DB abstraction | 5-7 days |
 | **Phase 4: Quality** | PHPUnit test suite, PHPStan level 5+, CI/CD, documentation | 5-10 days |
@@ -507,6 +508,6 @@ When called without arguments, returns the internal `$this->original` array **by
 
 WPORM is a solid, feature-rich ORM that successfully brings Laravel Eloquent's developer experience to WordPress. The relationship system, eager loading, soft deletes, events, and query builder are all well-implemented and cover the majority of common use cases.
 
-The most critical issues are in the `update()` method (sending all attributes, not syncing original state) and the missing operator validation in `whereColumn()`. These should be addressed immediately. The previously reported static state sharing issue in `ensureTableExists()` has been fixed by adding a `resolveTableName()` static method, and the `__callStatic` incompatibility with PHP 8.x property access has been fixed by removing the `trigger_error` call. The architecture could benefit from splitting the 2700-line Model.php into focused traits, and the project would greatly benefit from a test suite and static analysis.
+The most critical remaining issue is the missing operator validation in `whereColumn()`. The previously reported issues — `update()` sending all attributes and not syncing original state, static state sharing in `ensureTableExists()`, `__callStatic` incompatibility with PHP 8.x property access, and `first()` soft delete scope state management — have all been fixed. The architecture could benefit from splitting the 2700-line Model.php into focused traits, and the project would greatly benefit from a test suite and static analysis.
 
 With the fixes and improvements outlined in this report, WPORM could achieve near-complete Eloquent API compatibility while maintaining its WordPress-native approach.
