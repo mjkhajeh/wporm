@@ -968,6 +968,7 @@ class QueryBuilder {
             $second = $operator;
             $operator = '=';
         }
+        Helpers::validateOperator($operator);
     $this->wheres[] = Helpers::quoteIdentifier($first) . " $operator " . Helpers::quoteIdentifier($second);
         return $this;
     }

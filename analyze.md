@@ -4,7 +4,7 @@
 
 WPORM is a well-structured, Eloquent-inspired ORM for WordPress that provides a comprehensive set of features including relationships, soft deletes, casting, event dispatching, global scopes, schema management, and a fluent query builder. The codebase is ~10,000 lines of PHP across 20+ source files.
 
-**Overall Assessment**: The library is functional and covers a large portion of Eloquent's API surface. However, it contains several critical bugs (notably around SQL injection edge cases), a significant number of missing Eloquent features, and performance issues related to excessive object creation and static cache invalidation gaps. The previously reported static state sharing issue, `__callStatic` incompatibility with property access, `first()` soft delete scope, and `update()` dirty-tracking issues have all been fixed.
+**Overall Assessment**: The library is functional and covers a large portion of Eloquent's API surface. However, it contains several critical bugs (notably around SQL injection edge cases), a significant number of missing Eloquent features, and performance issues related to excessive object creation and static cache invalidation gaps. The previously reported static state sharing issue, `__callStatic` incompatibility with property access, `first()` soft delete scope, `update()` dirty-tracking issues, and `whereColumn()` SQL injection vulnerability have all been fixed.
 
 **Key Metrics**:
 - ~22 Critical/High severity issues
@@ -119,27 +119,16 @@ protected function update() {
 
 **Status**: Fixed in current version.
 
-### 6. SQL Injection via `whereColumn` Missing Operator Validation
+### 6. ~~SQL Injection via `whereColumn` Missing Operator Validation~~ FIXED
 
-**Severity**: High
+**Severity**: ~~High~~ **Fixed**
 **File**: `QueryBuilder.php:966-973`
 
-```php
-public function whereColumn($first, $operator, $second = null) {
-    if ($second === null) {
-        $second = $operator;
-        $operator = '=';
-    }
-    $this->wheres[] = Helpers::quoteIdentifier($first) . " $operator " . Helpers::quoteIdentifier($second);
-    return $this;
-}
-```
+**Previous Issue**: `whereColumn` did NOT call `Helpers::validateOperator($operator)`. A malicious or accidental operator value like `1=1; DROP TABLE users; --` would be interpolated directly into SQL. While `$second` was quoted as an identifier, the operator was raw.
 
-`whereColumn` does NOT call `Helpers::validateOperator($operator)`. A malicious or accidental operator value like `1=1; DROP TABLE users; --` would be interpolated directly into SQL. While `$second` is quoted as an identifier, the operator is raw.
+**Fix Applied**: Added `Helpers::validateOperator($operator);` after the operator resolution logic, matching the pattern used in `orWhereColumn()` and all other `where*` methods. This ensures only allowed SQL operators (`=`, `!=`, `<>`, `<`, `>`, `<=`, `>=`, `LIKE`, `IN`, `BETWEEN`, `IS`, etc.) are accepted, and throws an `InvalidArgumentException` for anything else.
 
-**Impact**: Potential SQL injection if user input reaches the operator parameter.
-
-**Suggested Fix**: Add `Helpers::validateOperator($operator);` before interpolating.
+**Status**: Fixed in current version.
 
 ### 7. ~~`update()` Does Not Sync `$this->original` After Save~~ FIXED
 
@@ -173,7 +162,7 @@ public function whereColumn($first, $operator, $second = null) {
 |---|----------|-----------|-------------|
 | 1 | ~~**Critical**~~ **Fixed** | Model.php:1347-1351 | ~~`update()` sends all attributes to DB, not just dirty ones. Causes write amplification and race conditions.~~ Fixed by using `$this->getDirty()` and returning early when empty. |
 | 2 | ~~**Critical**~~ **Fixed** | Model.php:1356-1357 | ~~`update()` does not sync `$this->original` after successful save. `isDirty()` broken post-save.~~ Fixed by adding `$this->original = $this->attributes` after successful update. |
-| 3 | **High** | QueryBuilder.php:966 | `whereColumn()` does not validate operator — SQL injection vector. |
+| 3 | ~~**High**~~ **Fixed** | QueryBuilder.php:966 | ~~`whereColumn()` does not validate operator — SQL injection vector.~~ Fixed by adding `Helpers::validateOperator($operator);`. |
 | 4 | **High** | Model.php:506-508 | `__set()` silently returns on mass-assignment guard failure without any exception or return value indicator. |
 | 5 | ~~**High**~~ **Fixed** | Model.php:322-328 | ~~`ensureTableExists()` creates a new instance inside itself via `new static`, causing recursive constructor calls if the guard fails.~~ Fixed by adding `resolveTableName()` static method. |
 | 6 | **High** | QueryBuilder.php:3713-3718 | `resolvePageFromRequest()` reads `$_GET['page']` directly — potential for page manipulation. |
@@ -261,7 +250,7 @@ public function whereColumn($first, $operator, $second = null) {
 | `whereIn()` / `whereNotIn()` | ✅ Compatible |
 | `whereBetween()` / `whereNotBetween()` | ✅ Compatible |
 | `whereNull()` / `whereNotNull()` | ✅ Compatible |
-| `whereColumn()` | ⚠️ Missing operator validation |
+| `whereColumn()` | ✅ Compatible |
 | `whereDate()` / `whereMonth()` / `whereDay()` / `whereYear()` / `whereTime()` | ✅ Compatible |
 | `whereRaw()` / `orWhereRaw()` | ✅ Compatible |
 | `select()` / `selectRaw()` | ✅ Compatible |
@@ -436,7 +425,7 @@ public function whereColumn($first, $operator, $second = null) {
 
 | # | Severity | Issue | File:Line |
 |---|----------|-------|-----------|
-| 1 | **High** | `whereColumn()` does not validate operator — SQL injection possible. | QueryBuilder.php:966 |
+| 1 | ~~**High**~~ **Fixed** | ~~`whereColumn()` does not validate operator — SQL injection possible.~~ Fixed by adding `Helpers::validateOperator($operator);`. | QueryBuilder.php:966 |
 | 2 | **Medium** | `paginate()` reads `$_GET['page']` directly — page manipulation possible (not a security issue per se, but allows arbitrary pagination). | QueryBuilder.php:3713 |
 | 3 | **Medium** | `$wpdb->prepare()` is used correctly for most queries, but some raw SQL paths bypass it. | QueryBuilder.php:4688 |
 | 4 | **Low** | `Helpers::quoteIdentifier()` correctly escapes backticks but does not handle special characters beyond that. | Helpers.php:9-42 |
@@ -458,7 +447,7 @@ public function whereColumn($first, $operator, $second = null) {
 
 1. ~~**Fix `update()` to only send dirty attributes**~~ — **Fixed** by using `$this->getDirty()` and returning early when empty.
 2. ~~**Sync `$this->original` after save**~~ — **Fixed** by adding `$this->original = $this->attributes` after successful update.
-3. **Add operator validation to `whereColumn()`** — prevents SQL injection.
+3. ~~**Add operator validation to `whereColumn()`**~~ — **Fixed** by adding `Helpers::validateOperator($operator);`.
 4. ~~**Remove `trigger_error` in `__callStatic`**~~ — **Fixed** by removing the `trigger_error` call.
 5. ~~**Fix `ensureTableExists()` recursive instantiation**~~ — **Fixed** by adding `resolveTableName()` static method.
 6. ~~**Fix `first()` soft delete scope state management**~~ — **Fixed** by building query directly instead of delegating to `get()`.
@@ -492,7 +481,7 @@ public function whereColumn($first, $operator, $second = null) {
 
 | Phase | Items | Estimated Effort |
 |-------|-------|------------------|
-| **Phase 1: Critical Bugs** | ~~Fix update() dirty tracking~~ (Fixed), operator validation, ~~__callStatic~~ (Fixed), ~~original sync~~ (Fixed), ~~ensureTableExists() recursion~~ (Fixed), ~~first() soft delete scope~~ (Fixed) | 1-2 days |
+| **Phase 1: Critical Bugs** | ~~Fix update() dirty tracking~~ (Fixed), ~~operator validation~~ (Fixed), ~~__callStatic~~ (Fixed), ~~original sync~~ (Fixed), ~~ensureTableExists() recursion~~ (Fixed), ~~first() soft delete scope~~ (Fixed) | 1-2 days |
 | **Phase 2: Core Eloquent Parity** | Add forceFill, append, without, getAttributes, isClean, syncOriginal, Collection::filter() | 3-5 days |
 | **Phase 3: Architecture** | Split Model.php into traits, add type declarations, extract DB abstraction | 5-7 days |
 | **Phase 4: Quality** | PHPUnit test suite, PHPStan level 5+, CI/CD, documentation | 5-10 days |
@@ -504,6 +493,6 @@ public function whereColumn($first, $operator, $second = null) {
 
 WPORM is a solid, feature-rich ORM that successfully brings Laravel Eloquent's developer experience to WordPress. The relationship system, eager loading, soft deletes, events, and query builder are all well-implemented and cover the majority of common use cases.
 
-The most critical remaining issue is the missing operator validation in `whereColumn()`. The previously reported issues — `update()` sending all attributes and not syncing original state, static state sharing in `ensureTableExists()`, `__callStatic` incompatibility with PHP 8.x property access, and `first()` soft delete scope state management — have all been fixed. The architecture could benefit from splitting the 2700-line Model.php into focused traits, and the project would greatly benefit from a test suite and static analysis.
+The most critical remaining issues are the `__set()` silent mass-assignment guard failure and the `resolvePageFromRequest()` reading `$_GET['page']` directly. The previously reported issues — `update()` sending all attributes and not syncing original state, static state sharing in `ensureTableExists()`, `__callStatic` incompatibility with PHP 8.x property access, `first()` soft delete scope state management, and `whereColumn()` SQL injection — have all been fixed. The architecture could benefit from splitting the 2700-line Model.php into focused traits, and the project would greatly benefit from a test suite and static analysis.
 
 With the fixes and improvements outlined in this report, WPORM could achieve near-complete Eloquent API compatibility while maintaining its WordPress-native approach.
