@@ -4,10 +4,10 @@
 
 WPORM is a well-structured, Eloquent-inspired ORM for WordPress that provides a comprehensive set of features including relationships, soft deletes, casting, event dispatching, global scopes, schema management, and a fluent query builder. The codebase is ~10,000 lines of PHP across 20+ source files.
 
-**Overall Assessment**: The library is functional and covers a large portion of Eloquent's API surface. However, it contains several critical bugs (notably around SQL injection edge cases), a significant number of missing Eloquent features, and performance issues related to excessive object creation and static cache invalidation gaps. The previously reported static state sharing issue, `__callStatic` incompatibility with property access, `first()` soft delete scope, `update()` dirty-tracking issues, and `whereColumn()` SQL injection vulnerability have all been fixed.
+**Overall Assessment**: The library is functional and covers a large portion of Eloquent's API surface. However, it contains several critical bugs (notably around SQL injection edge cases), a significant number of missing Eloquent features, and performance issues related to excessive object creation and static cache invalidation gaps. The previously reported static state sharing issue, `__callStatic` incompatibility with property access, `first()` soft delete scope, `update()` dirty-tracking issues, `whereColumn()` SQL injection vulnerability, and `__set()` silent mass-assignment guard failure have all been fixed.
 
 **Key Metrics**:
-- ~22 Critical/High severity issues
+- ~21 Critical/High severity issues
 - ~35 Medium severity issues
 - ~15 Low severity issues
 - ~39 missing or incompletely implemented Eloquent features
@@ -163,7 +163,7 @@ protected function update() {
 | 1 | ~~**Critical**~~ **Fixed** | Model.php:1347-1351 | ~~`update()` sends all attributes to DB, not just dirty ones. Causes write amplification and race conditions.~~ Fixed by using `$this->getDirty()` and returning early when empty. |
 | 2 | ~~**Critical**~~ **Fixed** | Model.php:1356-1357 | ~~`update()` does not sync `$this->original` after successful save. `isDirty()` broken post-save.~~ Fixed by adding `$this->original = $this->attributes` after successful update. |
 | 3 | ~~**High**~~ **Fixed** | QueryBuilder.php:966 | ~~`whereColumn()` does not validate operator — SQL injection vector.~~ Fixed by adding `Helpers::validateOperator($operator);`. |
-| 4 | **High** | Model.php:506-508 | `__set()` silently returns on mass-assignment guard failure without any exception or return value indicator. |
+| 4 | ~~**High**~~ **Fixed** | Model.php:526-536 | ~~`__set()` silently returns on mass-assignment guard failure without any exception or return value indicator.~~ Fixed by throwing `MassAssignmentException` when mass-assignment guard fails. |
 | 5 | ~~**High**~~ **Fixed** | Model.php:322-328 | ~~`ensureTableExists()` creates a new instance inside itself via `new static`, causing recursive constructor calls if the guard fails.~~ Fixed by adding `resolveTableName()` static method. |
 | 6 | **High** | QueryBuilder.php:3713-3718 | `resolvePageFromRequest()` reads `$_GET['page']` directly — potential for page manipulation. |
 | 7 | **Medium** | Model.php:533-601 | `castGet()` for `'array'` and `'json'` types both return `[]` on empty/null — identical behavior, potential confusion. |
@@ -451,6 +451,7 @@ protected function update() {
 4. ~~**Remove `trigger_error` in `__callStatic`**~~ — **Fixed** by removing the `trigger_error` call.
 5. ~~**Fix `ensureTableExists()` recursive instantiation**~~ — **Fixed** by adding `resolveTableName()` static method.
 6. ~~**Fix `first()` soft delete scope state management**~~ — **Fixed** by building query directly instead of delegating to `get()`.
+7. ~~**Fix `__set()` silent mass-assignment guard failure**~~ — **Fixed** by throwing `MassAssignmentException::forAttribute($key, static::class)` instead of silently returning.
 
 ### Priority 2: Important Features
 
@@ -493,6 +494,6 @@ protected function update() {
 
 WPORM is a solid, feature-rich ORM that successfully brings Laravel Eloquent's developer experience to WordPress. The relationship system, eager loading, soft deletes, events, and query builder are all well-implemented and cover the majority of common use cases.
 
-The most critical remaining issues are the `__set()` silent mass-assignment guard failure and the `resolvePageFromRequest()` reading `$_GET['page']` directly. The previously reported issues — `update()` sending all attributes and not syncing original state, static state sharing in `ensureTableExists()`, `__callStatic` incompatibility with PHP 8.x property access, `first()` soft delete scope state management, and `whereColumn()` SQL injection — have all been fixed. The architecture could benefit from splitting the 2700-line Model.php into focused traits, and the project would greatly benefit from a test suite and static analysis.
+The most critical remaining issue is the `resolvePageFromRequest()` reading `$_GET['page']` directly. The previously reported issues — `update()` sending all attributes and not syncing original state, static state sharing in `ensureTableExists()`, `__callStatic` incompatibility with PHP 8.x property access, `first()` soft delete scope state management, `whereColumn()` SQL injection, and `__set()` silent mass-assignment guard failure — have all been fixed. The architecture could benefit from splitting the 2700-line Model.php into focused traits, and the project would greatly benefit from a test suite and static analysis.
 
 With the fixes and improvements outlined in this report, WPORM could achieve near-complete Eloquent API compatibility while maintaining its WordPress-native approach.

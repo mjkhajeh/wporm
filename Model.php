@@ -525,14 +525,7 @@ abstract class Model implements \ArrayAccess {
 
 	public function __set($key, $value) {
 		if (!$this->isFillableAttribute($key)) {
-			error_log(sprintf(
-				'WPORM: Mass-assignment guard blocked setting "%s" on %s. '
-				. 'Add "%s" to $fillable or set $guarded to [] to allow this.',
-				$key,
-				static::class,
-				$key
-			));
-			return;
+			throw MassAssignmentException::forAttribute($key, static::class);
 		}
 
 		$this->setAttributeDirectly($key, $value);

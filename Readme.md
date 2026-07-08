@@ -737,7 +737,9 @@ class User extends Model {
 }
 
 $user = new User(['name' => 'Jane', 'is_admin' => true]);
-$user->is_admin; // null — not in $fillable, so it was never set
+$user->is_admin; // null — 'is_admin' was silently ignored during construction
+
+$user->is_admin = true; // Throws MassAssignmentException
 
 // Or, blacklist style:
 class Post extends Model {

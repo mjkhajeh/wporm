@@ -2283,10 +2283,10 @@ $clone->save();
 
 ## Mass Assignment Protection
 
-WPORM guards against unintended mass assignment, just like Eloquent, via `$fillable` and `$guarded` on the model. These are enforced by `isFillableAttribute()` for **every** mass-assignment path: `fill()`, `__set()` (and therefore array access like `$user['name'] = ...`), `new Model([...])`, `updateOrCreate()`, `firstOrCreate()`, and `firstOrNew()`.
+WPORM guards against unintended mass assignment, just like Eloquent, via `$fillable` and `$guarded` on the model. These are enforced by `isFillableAttribute()` for **every** mass-assignment path: `fill()`, `__set()` (and therefore array access like `$user['name'] = ...`), `new Model([...])`, `updateOrCreate()`, `firstOrCreate()`, and `firstOrNew()`. Note: `fill()` and the constructor silently skip blocked attributes, while `__set()` and array access throw a `MassAssignmentException`.
 
 ### $fillable
-**Description:** A whitelist of attribute names that may be mass-assigned. If `$fillable` is non-empty, only the listed keys can be set via `fill()`/constructor/`__set()`; everything else is silently ignored.
+**Description:** A whitelist of attribute names that may be mass-assigned. If `$fillable` is non-empty, only the listed keys can be set via `fill()`/constructor/`__set()`; everything else is either silently ignored (for `fill()`/constructor) or throws a `MassAssignmentException` (for `__set()` and array access).
 
 **Example:**
 ```php
@@ -2295,7 +2295,9 @@ class User extends Model {
 }
 
 $user = new User(['name' => 'Jane', 'email' => 'jane@example.com', 'is_admin' => true]);
-$user->is_admin; // null — 'is_admin' was not in $fillable, so it was never set
+$user->is_admin; // null — 'is_admin' was silently ignored during construction
+
+$user->is_admin = true; // Throws MassAssignmentException
 ```
 
 ### $guarded
@@ -2308,14 +2310,15 @@ class User extends Model {
 }
 
 $user = new User(['name' => 'Jane', 'is_admin' => true]);
-$user->is_admin; // null — 'is_admin' is guarded
+$user->is_admin; // null — 'is_admin' was silently ignored during construction
+
+$user->is_admin = true; // Throws MassAssignmentException because 'is_admin' is guarded
 
 // Block all mass assignment:
 class StrictUser extends Model {
     protected $guarded = ['*'];
 }
-$user = new StrictUser(['name' => 'Jane']); // 'name' is silently ignored
-$user->name = 'Jane'; // works fine — direct property assignment still bypasses $guarded by design only for explicit single-attribute sets
+$user = new StrictUser(['name' => 'Jane']); // 'name' silently ignored during construction
 ```
 
 **Notes:**
@@ -2816,7 +2819,7 @@ $name = $user['name'];
 ```
 
 ### offsetSet($offset, $value)
-**Description:** Set an attribute value (for array access). Respects `$fillable`/`$guarded` mass-assignment protection, just like direct property assignment.
+**Description:** Set an attribute value (for array access). Respects `$fillable`/`$guarded` mass-assignment protection, just like direct property assignment. Throws `MassAssignmentException` if the attribute is not mass-assignable.
 
 **Example:**
 ```php
