@@ -1440,7 +1440,7 @@ class QueryBuilder {
             $sql,
             $bindings
         );
-        if (!$results) return new \MJ\WPORM\Collection([]);
+        if (!$results) return new \MJ\WPORM\Collection([], get_class($this->model));
         $modelClass = get_class($this->model);
         $models = array_map(function ($row) use ($modelClass) {
             $instance = (new $modelClass)->newFromBuilder($row);
@@ -1469,7 +1469,7 @@ class QueryBuilder {
                 $this->loadRelationAggregate($models, $relation, $spec['column'], $spec['function'], $spec['alias'], $spec['constraint']);
             }
         }
-        return new \MJ\WPORM\Collection($models);
+        return new \MJ\WPORM\Collection($models, $modelClass);
     }
 
     /**
@@ -2752,7 +2752,7 @@ class QueryBuilder {
                 $grouped[$rel->$foreignKey][] = $rel;
             }
             foreach ($models as $m) {
-                $m->setEagerLoaded($relation, new \MJ\WPORM\Collection($grouped[$m->$localKey] ?? []));
+                $m->setEagerLoaded($relation, new \MJ\WPORM\Collection($grouped[$m->$localKey] ?? [], $relClass));
             }
             return;
         }
@@ -2834,7 +2834,7 @@ class QueryBuilder {
                 }
             }
             foreach ($models as $m) {
-                $m->setEagerLoaded($relation, new \MJ\WPORM\Collection($grouped[$m->$localKey] ?? []));
+                $m->setEagerLoaded($relation, new \MJ\WPORM\Collection($grouped[$m->$localKey] ?? [], $relClass));
             }
             return;
         }
@@ -2871,7 +2871,7 @@ class QueryBuilder {
                 }
             }
             foreach ($models as $m) {
-                $m->setEagerLoaded($relation, new \MJ\WPORM\Collection($grouped[$m->$localKey] ?? []));
+                $m->setEagerLoaded($relation, new \MJ\WPORM\Collection($grouped[$m->$localKey] ?? [], $relClass));
             }
             return;
         }
@@ -2969,7 +2969,7 @@ class QueryBuilder {
                 $grouped[$rel->$morphId][] = $rel;
             }
             foreach ($models as $m) {
-                $m->setEagerLoaded($relation, new \MJ\WPORM\Collection($grouped[$m->$localKey] ?? []));
+                $m->setEagerLoaded($relation, new \MJ\WPORM\Collection($grouped[$m->$localKey] ?? [], $relClass));
             }
             return;
         }
@@ -4279,7 +4279,7 @@ class QueryBuilder {
         $primaryKey = $this->model->getPrimaryKey();
         if (is_array($id)) {
             if (empty($id)) {
-                return new \MJ\WPORM\Collection([]);
+                return new \MJ\WPORM\Collection([], get_class($this->model));
             }
             return $this->whereIn($primaryKey, $id)->get();
         }

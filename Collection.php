@@ -7,8 +7,16 @@ namespace MJ\WPORM;
 class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
     protected $items = [];
 
-    public function __construct(array $items = []) {
+    /**
+     * The model class associated with this collection's items, if known.
+     * Used by firstOrFail() to throw a meaningful ModelNotFoundException.
+     * @var string|null
+     */
+    protected $modelClass;
+
+    public function __construct(array $items = [], $modelClass = null) {
         $this->items = $items;
+        $this->modelClass = $modelClass;
     }
 
     /**
@@ -21,9 +29,9 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
     {
         $index = array_search($value, $this->items, $strict);
         if ($index === false) {
-            return new static([]);
+            return new static([], $this->modelClass);
         }
-        return new static(array_slice($this->items, $index + 1));
+        return new static(array_slice($this->items, $index + 1), $this->modelClass);
     }
 
     public function toArray() {
@@ -74,11 +82,11 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
      * @return static
      */
     public function reverse() {
-        return new static(array_reverse($this->items));
+        return new static(array_reverse($this->items), $this->modelClass);
     }
 
     public function slice($offset, $length = null) {
-        return new static(array_slice($this->items, $offset, $length));
+        return new static(array_slice($this->items, $offset, $length), $this->modelClass);
     }
 
     // Countable
@@ -135,10 +143,8 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
      */
     public function firstOrFail() {
         if ($this->isEmpty()) {
-            // The collection has no model context of its own (it's just a
-            // plain bag of items), so the exception names the Collection
-            // class itself rather than a specific model.
-            throw (new ModelNotFoundException())->setModel(static::class);
+            $modelClass = $this->modelClass ?? static::class;
+            throw (new ModelNotFoundException())->setModel($modelClass);
         }
 
         return $this->first();
@@ -184,14 +190,14 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
      * Filter items using a callback.
      */
     public function filter(callable $callback) {
-        return new static(array_filter($this->items, $callback));
+        return new static(array_filter($this->items, $callback), $this->modelClass);
     }
 
     /**
      * Map items using a callback.
      */
     public function map(callable $callback) {
-        return new static(array_map($callback, $this->items));
+        return new static(array_map($callback, $this->items), $this->modelClass);
     }
 
     /**
@@ -352,7 +358,7 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
                 $result[] = $mapped;
             }
         }
-        return new static($result);
+        return new static($result, $this->modelClass);
     }
 
     /**
@@ -379,7 +385,7 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
         if ($descending) {
             $items = array_reverse($items, true);
         }
-        return new static($items);
+        return new static($items, $this->modelClass);
     }
 
     /**
@@ -417,7 +423,7 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
             }
             $groups[$groupKey][] = $item;
         }
-        return new static(array_map(fn($g) => new static($g), $groups));
+        return new static(array_map(fn($g) => new static($g, $this->modelClass), $groups), $this->modelClass);
     }
 
     /**
@@ -441,7 +447,7 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
             }
             $result[$itemKey] = $item;
         }
-        return new static($result);
+        return new static($result, $this->modelClass);
     }
 
     /**
@@ -475,7 +481,7 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
                     $result[$itemKey] = $item;
                 }
             }
-            return new static(array_values($result));
+            return new static(array_values($result), $this->modelClass);
         }
         $seen = [];
         $result = [];
@@ -487,7 +493,7 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
                 $result[$itemKey] = $item;
             }
         }
-        return new static(array_values($result));
+        return new static(array_values($result), $this->modelClass);
     }
 
     /**
@@ -498,7 +504,7 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
      * @return static
      */
     public function values() {
-        return new static(array_values($this->items));
+        return new static(array_values($this->items), $this->modelClass);
     }
 
     /**
@@ -508,7 +514,7 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
      * @return static
      */
     public function keys() {
-        return new static(array_keys($this->items));
+        return new static(array_keys($this->items), $this->modelClass);
     }
 
     /**
@@ -527,7 +533,7 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
         $result = array_filter($this->items, function($item) use ($compare) {
             return !in_array($item, $compare, true);
         });
-        return new static(array_values($result));
+        return new static(array_values($result), $this->modelClass);
     }
 
     /**
@@ -542,7 +548,7 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
         $result = array_filter($this->items, function($item) use ($compare) {
             return in_array($item, $compare, true);
         });
-        return new static(array_values($result));
+        return new static(array_values($result), $this->modelClass);
     }
 
     /**
@@ -556,7 +562,7 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
      */
     public function merge($items) {
         $merge = $items instanceof self ? $items->all() : $items;
-        return new static(array_merge($this->items, $merge));
+        return new static(array_merge($this->items, $merge), $this->modelClass);
     }
 
     /**
@@ -745,7 +751,7 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
                 break; // only one pair per item, matching Eloquent's contract
             }
         }
-        return new static(array_map(fn($g) => new static($g), $groups));
+        return new static(array_map(fn($g) => new static($g, $this->modelClass), $groups), $this->modelClass);
     }
 
     /**

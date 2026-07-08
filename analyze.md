@@ -4,12 +4,12 @@
 
 WPORM is a well-structured, Eloquent-inspired ORM for WordPress that provides a comprehensive set of features including relationships, soft deletes, casting, event dispatching, global scopes, schema management, and a fluent query builder. The codebase is ~10,000 lines of PHP across 20+ source files.
 
-**Overall Assessment**: The library is functional and covers a large portion of Eloquent's API surface. However, it contains several critical bugs (notably around SQL injection edge cases), a significant number of missing Eloquent features, and performance issues related to excessive object creation and static cache invalidation gaps. The previously reported static state sharing issue, `__callStatic` incompatibility with property access, `first()` soft delete scope, `update()` dirty-tracking issues, `whereColumn()` SQL injection vulnerability, `__set()` silent mass-assignment guard failure, `resolvePageFromRequest()` page manipulation, custom cast instantiation crash, and `whereExists` regex failure for `SELECT DISTINCT`/`SELECT SQL_CALC_FOUND_ROWS` have all been fixed.
+**Overall Assessment**: The library is functional and covers a large portion of Eloquent's API surface. However, it contains several critical bugs (notably around SQL injection edge cases), a significant number of missing Eloquent features, and performance issues related to excessive object creation and static cache invalidation gaps. The previously reported static state sharing issue, `__callStatic` incompatibility with property access, `first()` soft delete scope, `update()` dirty-tracking issues, `whereColumn()` SQL injection vulnerability, `__set()` silent mass-assignment guard failure, `resolvePageFromRequest()` page manipulation, custom cast instantiation crash, `whereExists` regex failure for `SELECT DISTINCT`/`SELECT SQL_CALC_FOUND_ROWS`, and `Collection::firstOrFail()` meaningless model name have all been fixed.
 
 **Key Metrics**:
 - ~19 Critical/High severity issues (21 originally, 2 fixed)
 - ~33 Medium severity issues (35 originally, 2 fixed)
-- ~15 Low severity issues
+- ~14 Low severity issues (15 originally, 1 fixed)
 - ~39 missing or incompletely implemented Eloquent features
 
 ---
@@ -171,7 +171,7 @@ protected function update() {
 | 9 | ~~**Medium**~~ **Fixed** | QueryBuilder.php:3476-3503 | ~~`whereExists` uses regex `preg_replace('/^SELECT .*? FROM /i', ...)` which fails for `SELECT DISTINCT` or `SELECT SQL_CALC_FOUND_ROWS`.~~ Fixed by updating the regex in all four `whereExists`/`whereNotExists`/`orWhereExists`/`orWhereNotExists` methods to handle optional SQL keywords (`DISTINCT`, `STRAIGHT_JOIN`, `HIGH_PRIORITY`, `SQL_CALC_FOUND_ROWS`, `SQL_NO_CACHE`, `SQL_BUFFER_RESULT`) between `SELECT` and the column list. |
 | 10 | **Medium** | Model.php:1671-1674 | `getTable()` always prepends `$wpdb->prefix` even if the table name already includes it. |
 | 11 | **Medium** | Model.php:2130-2143 | `newFromBuilder()` sets `$instance->original = $attributes` with raw DB values, but attributes go through `castGet()`. `original` and `attributes` are out of sync for casted columns. |
-| 12 | **Low** | Collection.php:136-145 | `firstOrFail()` on Collection throws `ModelNotFoundException` with `Collection::class` as the model name — meaningless. |
+| 12 | ~~**Low**~~ **Fixed** | Collection.php:136-145 | ~~`firstOrFail()` on Collection throws `ModelNotFoundException` with `Collection::class` as the model name — meaningless.~~ Fixed by adding `$modelClass` property to Collection, passing it from QueryBuilder when creating Collections, and using `$this->modelClass ?? static::class` in the exception. |
 
 ### Edge Cases Not Handled
 
@@ -495,6 +495,6 @@ protected function update() {
 
 WPORM is a solid, feature-rich ORM that successfully brings Laravel Eloquent's developer experience to WordPress. The relationship system, eager loading, soft deletes, events, and query builder are all well-implemented and cover the majority of common use cases.
 
-All previously reported critical and high-severity issues have been fixed: `update()` sending all attributes and not syncing original state, static state sharing in `ensureTableExists()`, `__callStatic` incompatibility with PHP 8.x property access, `first()` soft delete scope state management, `whereColumn()` SQL injection, `__set()` silent mass-assignment guard failure, `resolvePageFromRequest()` page manipulation, and custom cast instantiation crash with non-existent classes. Additionally, the `whereExists` regex has been fixed to handle `SELECT DISTINCT`, `SELECT SQL_CALC_FOUND_ROWS`, and other SQL keywords between `SELECT` and the column list. The architecture could benefit from splitting the 2700-line Model.php into focused traits, and the project would greatly benefit from a test suite and static analysis.
+All previously reported critical and high-severity issues have been fixed: `update()` sending all attributes and not syncing original state, static state sharing in `ensureTableExists()`, `__callStatic` incompatibility with PHP 8.x property access, `first()` soft delete scope state management, `whereColumn()` SQL injection, `__set()` silent mass-assignment guard failure, `resolvePageFromRequest()` page manipulation, and custom cast instantiation crash with non-existent classes. Additionally, the `whereExists` regex has been fixed to handle `SELECT DISTINCT`, `SELECT SQL_CALC_FOUND_ROWS`, and other SQL keywords between `SELECT` and the column list, and `Collection::firstOrFail()` now throws a meaningful `ModelNotFoundException` with the correct model class name. The architecture could benefit from splitting the 2700-line Model.php into focused traits, and the project would greatly benefit from a test suite and static analysis.
 
 With the fixes and improvements outlined in this report, WPORM could achieve near-complete Eloquent API compatibility while maintaining its WordPress-native approach.

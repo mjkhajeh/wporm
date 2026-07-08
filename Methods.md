@@ -1255,6 +1255,7 @@ try {
 **Notes (all methods above):**
 - `MJ\WPORM\ModelNotFoundException` extends PHP's built-in `\RuntimeException`, so it can be caught broadly (`catch (\RuntimeException $e)`) or specifically.
 - `getModel()` returns the fully-qualified model class name that was queried; `getIds()` returns the id(s) passed to `findOrFail()` (a single value, or an array when any ids were missing from an array lookup; `null` for `firstOrFail()`).
+- `Collection::firstOrFail()` uses the model class passed to the Collection constructor (when created from a QueryBuilder) rather than `Collection::class`, so the exception message is meaningful.
 - None of these methods issue any additional queries beyond what `find()`/`first()`/`get()` already perform — the "OrFail" behavior is purely a check on the already-fetched result plus a throw, so there is no performance cost over the non-failing variants.
 
 ### getWithEvent($query)
@@ -3225,6 +3226,11 @@ $dto = User::find(1)->pipe(fn($u) => $userPresenter->toDto($u));
 ## Collection Methods
 
 `MJ\WPORM\Collection` is the Eloquent-style collection returned by `get()`, `all()`, `find([...])`, and every other multi-row query method. Beyond the methods documented inline in the [Readme](./Readme.md#collections) (`all()`, `first()`, `firstOrFail()`, `last()`, `count()`, `isEmpty()`, `toArray()`, `toJson()`, `__toString()`, `filter()`, `map()`, `transform()`, `tap()`, `pipe()`, `pluck()`, `contains()`, `slice()`, `reverse()`, `after()`), this section documents the additional Eloquent-parity methods.
+
+### Constructor
+`__construct(array $items = [], ?string $modelClass = null)`
+
+The optional `$modelClass` parameter specifies the model class that produced this collection. It is automatically passed by the QueryBuilder when creating Collections from `get()` and similar methods. This enables `firstOrFail()` to throw a meaningful `ModelNotFoundException` with the correct model class name (e.g., `User`) rather than the generic `Collection` class name.
 
 All transformation methods (`sortBy()`, `groupBy()`, `keyBy()`, `unique()`, `flatMap()`, `values()`, `keys()`, `diff()`, `intersect()`, `merge()`, `mapToGroups()`) return a **new** `Collection` and leave the original untouched, exactly like `map()`/`filter()`. The mutating methods (`push()`, `pull()`, `put()`) modify the collection in place, exactly like `transform()`. Where a `$key` parameter is accepted, you can pass either a string column name (read via array access for plain arrays, or property access for objects/models) or a callable that receives the item and returns the value to use.
 
