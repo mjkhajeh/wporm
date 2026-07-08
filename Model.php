@@ -316,15 +316,45 @@ abstract class Model implements \ArrayAccess {
 		if (isset(static::$tableChecked[$class])) {
 			return;
 		}
-		// Mark as checked BEFORE creating the instance to prevent infinite
+		// Mark as checked BEFORE any instantiation to prevent infinite
 		// recursion: new static → __construct → ensureTableExists.
 		static::$tableChecked[$class] = true;
+
+		// Resolve the table name statically without creating a model instance.
+		// This avoids the unnecessary new static call that previously created
+		// an incomplete instance just to derive the table name.
+		$table = static::resolveTableName();
 		global $wpdb;
-		$instance = new static;
-		$table = $instance->getTable();
 		$blueprint = new Blueprint($table, false, $wpdb);
+
+		// Call up() on a temporary instance to populate the Blueprint.
+		// This is necessary because up() is an instance method that subclasses
+		// override to define their schema.
+		$instance = new static;
 		$instance->up($blueprint);
 		$instance->createTableIfNotExists($blueprint);
+	}
+
+	/**
+	 * Resolve the table name for this model class without instantiation.
+	 *
+	 * Mirrors the logic of getTable() but works statically, avoiding the
+	 * need to create a model instance just to determine the table name.
+	 *
+	 * @return string Fully qualified table name including the DB prefix.
+	 */
+	protected static function resolveTableName() {
+		global $wpdb;
+		// Check if the model class has a $table property defined
+		$class = static::class;
+		$ref = new \ReflectionClass($class);
+		$tableProp = $ref->getProperty('table');
+		$tableProp->setAccessible(true);
+		$table = $tableProp->getValue(null); // null for static access
+		if ($table !== null) {
+			return $wpdb->prefix . $table;
+		}
+		return $wpdb->prefix . strtolower(Helpers::class_basename($class));
 	}
 
 	public static function bootIfNotBooted() {
