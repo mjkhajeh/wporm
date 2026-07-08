@@ -345,12 +345,12 @@ abstract class Model implements \ArrayAccess {
 	 */
 	protected static function resolveTableName() {
 		global $wpdb;
-		// Check if the model class has a $table property defined
+		// Check if the model class has a $table property explicitly declared with a value.
+		// We use getDefaultProperties() because $table is an instance property,
+		// not a static one, so ReflectionProperty::getValue() requires an object.
 		$class = static::class;
-		$ref = new \ReflectionClass($class);
-		$tableProp = $ref->getProperty('table');
-		$tableProp->setAccessible(true);
-		$table = $tableProp->getValue(null); // null for static access
+		$defaults = (new \ReflectionClass($class))->getDefaultProperties();
+		$table = $defaults['table'] ?? null;
 		if ($table !== null) {
 			return $wpdb->prefix . $table;
 		}
