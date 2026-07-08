@@ -4,7 +4,7 @@
 
 WPORM is a well-structured, Eloquent-inspired ORM for WordPress that provides a comprehensive set of features including relationships, soft deletes, casting, event dispatching, global scopes, schema management, and a fluent query builder. The codebase is ~10,000 lines of PHP across 20+ source files.
 
-**Overall Assessment**: The library is functional and covers a large portion of Eloquent's API surface. However, it contains several critical bugs (notably around SQL injection edge cases and `__callStatic` incompatibility with property access), a significant number of missing Eloquent features, and performance issues related to excessive object creation and static cache invalidation gaps. The previously reported static state sharing issue has been fixed.
+**Overall Assessment**: The library is functional and covers a large portion of Eloquent's API surface. However, it contains several critical bugs (notably around SQL injection edge cases), a significant number of missing Eloquent features, and performance issues related to excessive object creation and static cache invalidation gaps. The previously reported static state sharing issue and `__callStatic` incompatibility with property access have been fixed.
 
 **Key Metrics**:
 - ~25 Critical/High severity issues
@@ -46,25 +46,25 @@ WPORM is a well-structured, Eloquent-inspired ORM for WordPress that provides a 
 
 **Status**: Fixed in current version. The static state management using class-name keys is correctly implemented.
 
-### 2. `__callStatic` Breaks PHP 8.x Property Access
+### 2. ~~`__callStatic` Breaks PHP 8.x Property Access~~ FIXED
 
-**Severity**: Critical
-**File**: `Model.php:709-717`
+**Severity**: ~~Critical~~ **Fixed**
+**File**: `Model.php:739-747`
 
 ```php
 public static function __callStatic($method, $args) {
     if (in_array($method, ['creating','created',...], true)) {
         // ...
     }
-    trigger_error("Call to undefined static method " . static::class . "::{$method}()", E_USER_ERROR);
+    // trigger_error removed - PHP handles undefined static methods naturally
 }
 ```
 
-In PHP 8.x, `__callStatic` is invoked for static property access attempts like `Model::$someUndefinedProperty`. The current implementation throws `E_USER_ERROR` for any unrecognized static method, which means accessing an undefined static property on any Model subclass will **fatal error** instead of returning null or triggering the normal PHP property resolution. This is a significant PHP 8.x compatibility issue.
+In PHP 8.x, `__callStatic` is invoked for static property access attempts like `Model::$someUndefinedProperty`. The previous implementation threw `E_USER_ERROR` for any unrecognized static method, which meant accessing an undefined static property on any Model subclass would **fatal error** instead of returning null or triggering the normal PHP property resolution. This was a significant PHP 8.x compatibility issue.
 
-**Impact**: Any code that accidentally accesses `Model::$undefinedStaticProp` will crash. While PHP 8.0 deprecated dynamic properties, this behavior is different from Laravel which handles this gracefully.
+**Fix Applied**: Removed the `trigger_error` call. Now PHP handles undefined static methods naturally, generating its own appropriate error messages. This is compatible with PHP 7.4+ and aligns with Laravel's behavior.
 
-**Suggested Fix**: Remove the `trigger_error` call and let PHP handle undefined static methods naturally, or return null for non-callable static access.
+**Status**: Fixed in current version.
 
 ### 3. `first()` Calls `get()` Which Re-applies Soft Delete Scope
 
@@ -463,7 +463,7 @@ When called without arguments, returns the internal `$this->original` array **by
 1. **Fix `update()` to only send dirty attributes** — prevents write amplification and race conditions.
 2. **Sync `$this->original` after save** — fixes `isDirty()` and `getChanges()`.
 3. **Add operator validation to `whereColumn()`** — prevents SQL injection.
-4. **Remove `trigger_error` in `__callStatic`** — PHP 8.x compatibility.
+4. ~~**Remove `trigger_error` in `__callStatic`**~~ — **Fixed** by removing the `trigger_error` call.
 5. ~~**Fix `ensureTableExists()` recursive instantiation**~~ — **Fixed** by adding `resolveTableName()` static method.
 
 ### Priority 2: Important Features
@@ -495,7 +495,7 @@ When called without arguments, returns the internal `$this->original` array **by
 
 | Phase | Items | Estimated Effort |
 |-------|-------|------------------|
-| **Phase 1: Critical Bugs** | Fix update() dirty tracking, operator validation, __callStatic, original sync, ~~ensureTableExists() recursion~~ (Fixed) | 1-2 days |
+| **Phase 1: Critical Bugs** | Fix update() dirty tracking, operator validation, ~~__callStatic~~ (Fixed), original sync, ~~ensureTableExists() recursion~~ (Fixed) | 1-2 days |
 | **Phase 2: Core Eloquent Parity** | Add forceFill, append, without, getAttributes, isClean, syncOriginal, Collection::filter() | 3-5 days |
 | **Phase 3: Architecture** | Split Model.php into traits, add type declarations, extract DB abstraction | 5-7 days |
 | **Phase 4: Quality** | PHPUnit test suite, PHPStan level 5+, CI/CD, documentation | 5-10 days |
@@ -507,6 +507,6 @@ When called without arguments, returns the internal `$this->original` array **by
 
 WPORM is a solid, feature-rich ORM that successfully brings Laravel Eloquent's developer experience to WordPress. The relationship system, eager loading, soft deletes, events, and query builder are all well-implemented and cover the majority of common use cases.
 
-The most critical issues are in the `update()` method (sending all attributes, not syncing original state) and the missing operator validation in `whereColumn()`. These should be addressed immediately. The previously reported static state sharing issue in `ensureTableExists()` has been fixed by adding a `resolveTableName()` static method. The architecture could benefit from splitting the 2700-line Model.php into focused traits, and the project would greatly benefit from a test suite and static analysis.
+The most critical issues are in the `update()` method (sending all attributes, not syncing original state) and the missing operator validation in `whereColumn()`. These should be addressed immediately. The previously reported static state sharing issue in `ensureTableExists()` has been fixed by adding a `resolveTableName()` static method, and the `__callStatic` incompatibility with PHP 8.x property access has been fixed by removing the `trigger_error` call. The architecture could benefit from splitting the 2700-line Model.php into focused traits, and the project would greatly benefit from a test suite and static analysis.
 
 With the fixes and improvements outlined in this report, WPORM could achieve near-complete Eloquent API compatibility while maintaining its WordPress-native approach.

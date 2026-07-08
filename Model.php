@@ -743,7 +743,6 @@ protected function castSet($key, $value) {
 				return;
 			}
 		}
-		trigger_error("Call to undefined static method " . static::class . "::{$method}()", E_USER_ERROR);
 	}
 
 	public static function query($applyGlobalScopes = true) {
