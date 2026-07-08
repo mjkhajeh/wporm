@@ -3473,7 +3473,7 @@ class QueryBuilder {
         $callback($sub);
         $sql = $sub->buildSelectQuery();
         // Remove SELECT ... FROM ... to just the subquery
-        $sql = preg_replace('/^SELECT .*? FROM /i', 'SELECT 1 FROM ', $sql);
+        $sql = preg_replace('/^SELECT\s+(?:DISTINCT\s+|STRAIGHT_JOIN\s+|HIGH_PRIORITY\s+|SQL_CALC_FOUND_ROWS\s+|SQL_NO_CACHE\s+|SQL_BUFFER_RESULT\s+)*(.*?)\s+FROM\s/i', 'SELECT 1 FROM ', $sql, 1);
         $this->wheres[] = "EXISTS ($sql)";
         $this->bindings = array_merge($this->bindings, $sub->getBindings());
         return $this;
@@ -3482,7 +3482,7 @@ class QueryBuilder {
         $sub = new self($this->model);
         $callback($sub);
         $sql = $sub->buildSelectQuery();
-        $sql = preg_replace('/^SELECT .*? FROM /i', 'SELECT 1 FROM ', $sql);
+        $sql = preg_replace('/^SELECT\s+(?:DISTINCT\s+|STRAIGHT_JOIN\s+|HIGH_PRIORITY\s+|SQL_CALC_FOUND_ROWS\s+|SQL_NO_CACHE\s+|SQL_BUFFER_RESULT\s+)*(.*?)\s+FROM\s/i', 'SELECT 1 FROM ', $sql, 1);
         $this->wheres[] = "OR EXISTS ($sql)";
         $this->bindings = array_merge($this->bindings, $sub->getBindings());
         return $this;
@@ -3491,7 +3491,7 @@ class QueryBuilder {
         $sub = new self($this->model);
         $callback($sub);
         $sql = $sub->buildSelectQuery();
-        $sql = preg_replace('/^SELECT .*? FROM /i', 'SELECT 1 FROM ', $sql);
+        $sql = preg_replace('/^SELECT\s+(?:DISTINCT\s+|STRAIGHT_JOIN\s+|HIGH_PRIORITY\s+|SQL_CALC_FOUND_ROWS\s+|SQL_NO_CACHE\s+|SQL_BUFFER_RESULT\s+)*(.*?)\s+FROM\s/i', 'SELECT 1 FROM ', $sql, 1);
         $this->wheres[] = "NOT EXISTS ($sql)";
         $this->bindings = array_merge($this->bindings, $sub->getBindings());
         return $this;
@@ -3500,7 +3500,7 @@ class QueryBuilder {
         $sub = new self($this->model);
         $callback($sub);
         $sql = $sub->buildSelectQuery();
-        $sql = preg_replace('/^SELECT .*? FROM /i', 'SELECT 1 FROM ', $sql);
+        $sql = preg_replace('/^SELECT\s+(?:DISTINCT\s+|STRAIGHT_JOIN\s+|HIGH_PRIORITY\s+|SQL_CALC_FOUND_ROWS\s+|SQL_NO_CACHE\s+|SQL_BUFFER_RESULT\s+)*(.*?)\s+FROM\s/i', 'SELECT 1 FROM ', $sql, 1);
         $this->wheres[] = "OR NOT EXISTS ($sql)";
         $this->bindings = array_merge($this->bindings, $sub->getBindings());
         return $this;
