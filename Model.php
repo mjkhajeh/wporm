@@ -613,7 +613,12 @@ abstract class Model implements \ArrayAccess {
                 $cast_input = $cast[1];
                 $cast = $cast[0];
             }
-            if (class_exists($cast) && !in_array($cast, ['int','integer','float','double','bool','boolean','array','json','datetime','timestamp'])) {
+            if (!class_exists($cast)) {
+                throw new \InvalidArgumentException(
+                    "Custom cast class '{$cast}' does not exist (used by " . static::class . ".{$key})"
+                );
+            }
+            if (!in_array($cast, ['int','integer','float','double','bool','boolean','array','json','datetime','timestamp'])) {
                 $castInstance = new $cast( $cast_input );
                 if ($castInstance instanceof \MJ\WPORM\Casts\CastableInterface) {
                     return $castInstance->get($value);
@@ -671,7 +676,12 @@ protected function castSet($key, $value) {
                 $cast_input = $cast[1];
                 $cast = $cast[0];
             }
-            if (class_exists($cast) && !in_array($cast, ['int','integer','float','double','bool','boolean','array','json','datetime','timestamp'])) {
+            if (!class_exists($cast)) {
+                throw new \InvalidArgumentException(
+                    "Custom cast class '{$cast}' does not exist (used by " . static::class . ".{$key})"
+                );
+            }
+            if (!in_array($cast, ['int','integer','float','double','bool','boolean','array','json','datetime','timestamp'])) {
                 $castInstance = new $cast( $cast_input );
                 if ($castInstance instanceof \MJ\WPORM\Casts\CastableInterface) {
                     return $castInstance->set($value);
