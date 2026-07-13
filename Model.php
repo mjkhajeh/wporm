@@ -2196,6 +2196,20 @@ public function forceDelete() {
 	}
 
 	/**
+	 * Add the given attributes to the list of appended attributes for this model.
+	 * Mirrors Eloquent's append() behavior: the attributes are appended to the
+	 * runtime list of computed attributes and will be included in toArray()/toJson().
+	 *
+	 * @param array|string $attributes
+	 * @return $this
+	 */
+	public function append($attributes) {
+		$attributes = is_array($attributes) ? $attributes : func_get_args();
+		$this->appends = array_values(array_unique(array_merge($this->appends, $attributes)));
+		return $this;
+	}
+
+	/**
 	 * Set a computed/internal attribute directly into $attributes, bypassing
 	 * the $fillable/$guarded mass-assignment guard and any set{Attr}Attribute()
 	 * mutator. Used internally by QueryBuilder::loadRelationCount() (i.e.

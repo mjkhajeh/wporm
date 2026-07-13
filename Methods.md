@@ -2127,6 +2127,15 @@ $user->fill(['name' => 'Baz']);
 $array = $user->toArray();
 ```
 
+### append($attributes)
+**Description:** Add one or more attributes to the model's runtime appended-attribute list, mirroring Eloquent's `append()` behavior. The appended values are then included in `toArray()`/`toJson()` output and resolved via `get{AttributeName}Attribute()` accessors or public properties.
+
+**Example:**
+```php
+$user->append('profile_url');
+$user->append(['avatar_url', 'full_name']);
+```
+
 ### toJson($options = 0)
 **Description:** Convert the model to a JSON string (Eloquent-style serialization). Internally calls `toArray()`, so it respects `$hidden`/`$visible` (and any runtime `makeHidden()`/`makeVisible()` overrides) the same way. `$options` is passed straight through to `json_encode()` (e.g. `JSON_PRETTY_PRINT`).
 
