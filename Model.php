@@ -1426,8 +1426,9 @@ protected function castSet($key, $value) {
 		// Sync the new value(s) onto the in-memory model so it reflects the change.
 		$current = (float) ($this->attributes[$column] ?? 0);
 		$newValue = $current + ($direction * $amount);
-		// Preserve int type when possible (most counter columns are integers).
-		$this->attributes[$column] = (floor($newValue) == $newValue) ? (int) $newValue : $newValue;
+		// Route through the standard attribute assignment path so casts and
+		// mutators are applied consistently to the in-memory value.
+		$this->setAttributeDirectly($column, $newValue);
 		$this->original[$column] = $this->attributes[$column];
 
 		foreach ($extra as $key => $value) {
