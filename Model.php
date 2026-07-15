@@ -524,6 +524,10 @@ abstract class Model implements \ArrayAccess {
 	}
 
 	public function __set($key, $value) {
+		if (in_array($key, $this->appends, true)) {
+			$this->setAttributeDirectly($key, $value);
+			return;
+		}
 		if (!$this->isFillableAttribute($key)) {
 			throw MassAssignmentException::forAttribute($key, static::class);
 		}
