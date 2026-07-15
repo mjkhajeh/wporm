@@ -544,6 +544,24 @@ abstract class Model implements \ArrayAccess {
 		$this->setAttributeDirectly($key, $value);
 	}
 
+	public function __isset($key) {
+		if (isset($this->_eagerLoaded[$key])) {
+			return true;
+		}
+		if (isset($this->attributes[$key])) {
+			return true;
+		}
+		$method = 'get' . Helpers::convert_to_pascal_case($key) . 'Attribute';
+		if (method_exists($this, $method)) {
+			return true;
+		}
+		return property_exists($this, $key);
+	}
+
+	public function __unset($key) {
+		unset($this->attributes[$key], $this->original[$key], $this->_eagerLoaded[$key]);
+	}
+
 	protected function setAttributeDirectly($key, $value) {
 		$method = 'set' . Helpers::convert_to_pascal_case($key) . 'Attribute';
 		if (method_exists($this, $method)) {
