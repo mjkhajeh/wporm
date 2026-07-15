@@ -123,6 +123,15 @@ abstract class Model implements \ArrayAccess {
     }
 
     /**
+     * Get the appended attributes for this model.
+     *
+     * @return array<int, string>
+     */
+    public function getAppends(): array {
+        return $this->appends;
+    }
+
+    /**
      * Get the created_at column name.
      * @return string
      */

@@ -2136,6 +2136,18 @@ $user->append('profile_url');
 $user->append(['avatar_url', 'full_name']);
 ```
 
+### getAppends()
+**Description:** Get the list of attributes that are appended to the model's `toArray()`/`toJson()` output. Returns the `$appends` property array.
+
+**Example:**
+```php
+// In your model
+protected $appends = ['profile_url', 'full_name'];
+
+// Get the appended attributes
+$attributes = $user->getAppends(); // ['profile_url', 'full_name']
+```
+
 ### toJson($options = 0)
 **Description:** Convert the model to a JSON string (Eloquent-style serialization). Internally calls `toArray()`, so it respects `$hidden`/`$visible` (and any runtime `makeHidden()`/`makeVisible()` overrides) the same way. `$options` is passed straight through to `json_encode()` (e.g. `JSON_PRETTY_PRINT`).
 
