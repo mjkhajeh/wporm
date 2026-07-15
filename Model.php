@@ -2207,7 +2207,7 @@ public function forceDelete() {
 				$instance->setAttributeDirectly($instance->primaryKey, $value);
 			}
 		}
-		$instance->original = $attributes;
+		$instance->original = $instance->attributes;
 		$instance->exists = true;
 		return $instance;
 	}
