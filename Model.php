@@ -939,6 +939,28 @@ protected function castSet($key, $value) {
 		return $instance;
 	}
 
+	/**
+	 * forceFill: Fill the model with the given attributes, bypassing
+	 * $fillable/$guarded mass-assignment protection. Each attribute is
+	 * still passed through set{Attr}Attribute() mutators and castSet(),
+	 * so custom mutators and casts are honored exactly as they are for
+	 * normal setAttributeDirectly() calls. No INSERT/UPDATE is issued;
+	 * this only populates the in-memory model.
+	 *
+	 * Usage:
+	 *   $user = User::forceFill(['name' => 'Jane', 'email' => 'jane@example.com']);
+	 *
+	 * @param array $attributes
+	 * @return static
+	 */
+	public static function forceFill(array $attributes = []) {
+		$instance = new static;
+		foreach ($attributes as $key => $value) {
+			$instance->setAttributeDirectly($key, $value);
+		}
+		return $instance;
+	}
+
     /**
      * Insert a record, ignoring duplicate key errors (Eloquent-style).
      * Usage: Model::insertOrIgnore(['col' => 'val', ...])

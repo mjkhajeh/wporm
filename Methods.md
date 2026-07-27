@@ -1295,6 +1295,20 @@ echo $user->id; // newly-inserted primary key
 - Returns the model instance regardless of whether the underlying `save()` succeeded; check `$user->exists` if you need to confirm the insert happened.
 - Runs a single `INSERT` query (via `save()` → `insert()`), the same as manually constructing and saving the model — no extra queries.
 
+### forceFill(array $attributes = [])
+**Description:** Fill the model with the given attributes, bypassing `$fillable`/`$guarded` mass-assignment protection (Eloquent-style). Each attribute is still passed through `set{Attr}Attribute()` mutators and `castSet()`, so custom mutators and casts are honored exactly as they are for normal `setAttributeDirectly()` calls. No `INSERT`/`UPDATE` is issued; this only populates the in-memory model. Useful when synchronizing attributes from an external trusted source (e.g. a database replication stream) without modifying mass-assignment configuration.
+
+**Example:**
+```php
+$user = User::forceFill(['name' => 'Jane', 'email' => 'jane@example.com']);
+$user->save(); // persist when ready
+```
+
+**Notes:**
+- Does not query the database and does not call `save()` — you still need to call `save()` if you want the changes persisted.
+- Mutators and casts are still applied, so bad input is caught/retyped the same way as normal attribute assignment.
+- The returned instance is fresh (not yet saved), just like `new static($attributes)`; check `$user->exists` if you need to confirm whether it represents an existing row.
+
 ### firstOrCreate(array $attributes, array $values = [])
 **Description:** Return the first record matching attributes or create it.
 

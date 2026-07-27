@@ -223,7 +223,7 @@ protected function update() {
 | `$model->makeHidden()` / `makeVisible()` | ✅ Compatible |
 | `$model->append()` | ✅ Compatible |
 | `$model->fill()` | ⚠️ Silently fails on guarded attributes |
-| `$model->forceFill()` | ❌ Missing |
+| `$model->forceFill()` | ✅ Compatible |
 | `hasOne()` / `hasMany()` / `belongsTo()` | ✅ Compatible |
 | `belongsToMany()` | ✅ Compatible |
 | `hasManyThrough()` / `hasOneThrough()` | ✅ Compatible |
@@ -305,7 +305,7 @@ protected function update() {
 | # | Feature | Priority | Notes |
 |---|---------|----------|-------|
 | 1 | ~~`$model->update()` (instance method that only updates dirty attrs)~~ | ~~**Critical**~~ **Fixed** | ~~Current `update()` sends all attributes. Should diff against original.~~ Fixed by using `$this->getDirty()`. |
-| 2 | `Model::forceFill()` | **Important** | Bypasses `$fillable`/`$guarded` for trusted internal data. |
+| 2 | `Model::forceFill()` | **Implemented** | ✅ Exists. |
 | 3 | `$model->append()` method | **Implemented** | ✅ Exists. |
 | 4 | `$model->setAppends()` | **Important** | No method to replace appends array. |
 | 5 | `Model::without()` (eager load exclusion) | **Important** | No way to eager-load all except specific relations. |
@@ -457,7 +457,7 @@ protected function update() {
 
 ### Priority 2: Important Features
 
-1. Add `forceFill()` static method.
+1. ~~Add `forceFill()` static method.~~ **Implemented**
 2. Add `setAppends()` runtime method. (`append()` is already implemented.)
 3. Add `without()` for eager load exclusion.
 4. Add `getAttributes()` public method.
@@ -485,7 +485,7 @@ protected function update() {
 | Phase | Items | Estimated Effort |
 |-------|-------|------------------|
 | **Phase 1: Critical Bugs** | ~~Fix update() dirty tracking~~ (Fixed), ~~operator validation~~ (Fixed), ~~__callStatic~~ (Fixed), ~~original sync~~ (Fixed), ~~ensureTableExists() recursion~~ (Fixed), ~~first() soft delete scope~~ (Fixed), ~~page manipulation~~ (Fixed), ~~getTable() double-prefixing~~ (Fixed) | 1-2 days |
-| **Phase 2: Core Eloquent Parity** | Add forceFill, without, getAttributes, isClean, syncOriginal, setAppends, Collection::filter() | 3-5 days |
+| **Phase 2: Core Eloquent Parity** | ~~Add forceFill~~ (Implemented), without, getAttributes, isClean, syncOriginal, setAppends, Collection::filter() | 3-5 days |
 | **Phase 3: Architecture** | Split Model.php into traits, add type declarations, extract DB abstraction | 5-7 days |
 | **Phase 4: Quality** | PHPUnit test suite, PHPStan level 5+, CI/CD, documentation | 5-10 days |
 | **Phase 5: Advanced Features** | Lock for update, Factory support, lazy collections, cursor pagination | 5-10 days |
