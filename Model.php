@@ -578,8 +578,8 @@ abstract class Model implements \ArrayAccess {
             $query = static::query();
             return $this->$method($query, ...$parameters);
         }
-        // Proxy query builder methods to QueryBuilder for fluent API
-        if (method_exists(\MJ\WPORM\QueryBuilder::class, $method)) {
+        // Proxy query builder methods and dynamic wheres for fluent API
+        if (method_exists(\MJ\WPORM\QueryBuilder::class, $method) || strpos($method, 'where') === 0) {
             $query = static::query();
             return $query->$method(...$parameters);
         }
@@ -769,8 +769,12 @@ protected function castSet($key, $value) {
 	}
 
 	/**
-	 * Magic static methods: static::creating(fn), static::saving(fn), etc.
-	 * Delegates to registerModelEvent().
+	 * Handle lifecycle event registration and proxy other static calls to a
+	 * fresh query builder, including query scopes and dynamic where methods.
+	 *
+	 * @param string $method
+	 * @param array $args
+	 * @return mixed
 	 */
 	public static function __callStatic($method, $args) {
 		if (in_array($method, ['creating','created','updating','updated','saving','saved','deleting','deleted','softDeleting','softDeleted','restoring','restored','retrieved'], true)) {
@@ -778,7 +782,11 @@ protected function castSet($key, $value) {
 				static::registerModelEvent($method, $args[0]);
 				return;
 			}
+			return;
 		}
+
+		$query = static::query();
+		return $query->$method(...$args);
 	}
 
 	public static function query($applyGlobalScopes = true) {

@@ -8,6 +8,7 @@ This document describes all public and static methods of the `MJ\WPORM\Model` cl
 - [Global Scopes](#global-scopes)
 - [Constructor](#constructor)
 - [Query Methods](#query-methods)
+- [Dynamic Where Clauses](#dynamic-where-clauses)
 - [Functional Chaining: tap() and pipe()](#functional-chaining-tap-and-pipe)
 - [Subquery Support](#subquery-support)
 - [Combining Queries](#combining-queries)
@@ -202,6 +203,38 @@ $users = User::query()->where('role', 'admin')->get();
 ```php
 $query = User::newQuery();
 ```
+
+### Dynamic Where Clauses
+
+**`where{Column}(...$values)`**
+
+**Description:** Build equality-based WHERE clauses from a method name. Column segments are written in StudlyCase and converted to `snake_case`. Use `And` or `Or` between column segments; provide exactly one value for every parsed column.
+
+**Examples:**
+```php
+// WHERE email = 'dwight@example.com'
+$user = User::whereEmail('dwight@example.com')->first();
+
+// WHERE email = 'dwight@example.com' AND first_name = 'Dwight'
+$user = User::whereEmailAndFirstName(
+    'dwight@example.com',
+    'Dwight'
+)->first();
+
+// WHERE status = 'active' OR role = 'administrator'
+$users = User::query()
+    ->whereStatusOrRole('active', 'administrator')
+    ->get();
+```
+
+**Rules:**
+
+- `Email` becomes `email`, `FirstName` becomes `first_name`, and `APIKey` becomes `a_p_i_key`.
+- `And` and `Or` are case-sensitive separators and are applied in method-name order.
+- Every parsed column requires exactly one argument; missing or extra arguments throw `InvalidArgumentException`.
+- Generated conditions use `=` and normal bound values. Use `where()` when a different operator is required.
+- A model query scope with the same callable name takes precedence, such as `scopeWhereEmail()`.
+- Like ordinary chained `where()` / `orWhere()` calls, mixed dynamic conditions are not automatically wrapped in a nested group.
 
 ### whereIn($column, array $values)
 **Description:** Add a WHERE ... IN (...) clause to the query.
@@ -3552,4 +3585,3 @@ $totalTime = QueryLogger::totalTime();
 ```
 
 ---
-

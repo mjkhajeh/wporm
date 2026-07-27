@@ -185,6 +185,25 @@ $recentUsers = User::query()->where('created_at', '>=', '2025-01-01')->get();
 
 This approach works for any column in your table.
 
+### Dynamic Where Clauses
+
+WPORM supports Eloquent-style dynamic where methods. Write column names in StudlyCase after `where`; WPORM converts them to `snake_case` and binds each value through the normal query builder:
+
+```php
+// WHERE email = ... AND first_name = ...
+$user = User::whereEmailAndFirstName(
+    'dwight@example.com',
+    'Dwight'
+)->first();
+
+// WHERE status = ... OR role = ...
+$users = User::query()
+    ->whereStatusOrRole('active', 'administrator')
+    ->get();
+```
+
+`And` and `Or` are case-sensitive separators and each parsed column requires exactly one argument, in method-name order. Dynamic wheres always use the equality operator; use `where()` for other operators. Model query scopes are resolved before dynamic wheres, so a scope such as `scopeWhereEmail()` takes precedence over the generated clause.
+
 ### Finding a Record or Failing: findOrFail and firstOrFail
 
 When a missing record should be treated as an error rather than handled as `null`, use `findOrFail()` / `firstOrFail()` (Eloquent-style). They behave exactly like `find()` / `first()` — same single query, same `retrieved()` event — except they throw a `MJ\WPORM\ModelNotFoundException` instead of returning `null` when nothing matches.

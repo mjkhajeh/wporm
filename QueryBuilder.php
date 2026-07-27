@@ -76,6 +76,23 @@ class QueryBuilder {
     protected static $scopeInstances = [];
 
     /**
+     * Parsed dynamic where plans, keyed by method name.
+     *
+     * Each plan contains ordered [column, boolean] pairs so repeated calls
+     * avoid running the regular expression and snake-case conversion again.
+     *
+     * @var array<string, array<int, array{0: string, 1: string}>>
+     */
+    protected static $dynamicWhereCache = [];
+
+    /**
+     * Keep the static dynamic where cache bounded for long-running processes.
+     *
+     * @var int
+     */
+    protected const DYNAMIC_WHERE_CACHE_LIMIT = 256;
+
+    /**
      * When set, the FROM clause is a derived table (subquery) instead of a
      * plain table name.  Shape: ['sql' => string, 'alias' => string, 'bindings' => array]
      */
@@ -1732,10 +1749,126 @@ class QueryBuilder {
             array_unshift($parameters, $this);
             return call_user_func_array([$this->model, $scopeMethod], $parameters);
         }
+
+        if (strpos($method, 'where') === 0) {
+            return $this->dynamicWhere($method, $parameters);
+        }
+
         throw new \BadMethodCallException(
             "Method {$method} does not exist. If it's a query scope, "
-            . "check that the model defines scope{$scopeMethod}()."
+            . "check that the model defines {$scopeMethod}()."
         );
+    }
+
+    /**
+     * Add Eloquent-style WHERE clauses derived from a method name.
+     *
+     * StudlyCase column names are converted to snake_case, while "And" and
+     * "Or" join multiple conditions:
+     *   ->whereEmailAndFirstName($email, $firstName)
+     *   ->whereStatusOrRole('active', 'admin')
+     *
+     * @param string $method
+     * @param array $parameters
+     * @return $this
+     * @throws \BadMethodCallException
+     * @throws \InvalidArgumentException
+     */
+    public function dynamicWhere($method, array $parameters) {
+        $plan = $this->parseDynamicWhere($method);
+        $expected = count($plan);
+        $given = count($parameters);
+
+        if ($given !== $expected) {
+            throw new \InvalidArgumentException(
+                "Dynamic where method {$method} expects {$expected} parameter(s), {$given} given."
+            );
+        }
+
+        foreach ($plan as $index => $clause) {
+            [$column, $boolean] = $clause;
+            if ($boolean === 'or') {
+                $this->orWhere($column, '=', $parameters[$index]);
+            } else {
+                $this->where($column, '=', $parameters[$index]);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * Parse and cache a dynamic where method into ordered column conditions.
+     *
+     * @param string $method
+     * @return array<int, array{0: string, 1: string}>
+     * @throws \BadMethodCallException
+     */
+    protected function parseDynamicWhere($method) {
+        if (strpos($method, 'where') !== 0) {
+            throw new \BadMethodCallException(
+                "Dynamic where method {$method} must start with where."
+            );
+        }
+
+        if (isset(static::$dynamicWhereCache[$method])) {
+            return static::$dynamicWhereCache[$method];
+        }
+
+        $finder = substr($method, 5);
+        if ($finder === '') {
+            throw new \BadMethodCallException(
+                "Dynamic where method {$method} must contain at least one column name."
+            );
+        }
+
+        $segments = preg_split(
+            '/(And|Or)(?=[A-Z])/',
+            $finder,
+            -1,
+            PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY
+        );
+
+        $plan = [];
+        $boolean = 'and';
+        $expectsColumn = true;
+
+        foreach ($segments as $segment) {
+            if ($segment === 'And' || $segment === 'Or') {
+                if ($expectsColumn || empty($plan)) {
+                    throw new \BadMethodCallException(
+                        "Dynamic where method {$method} contains an invalid boolean sequence."
+                    );
+                }
+
+                $boolean = strtolower($segment);
+                $expectsColumn = true;
+                continue;
+            }
+
+            if (!$expectsColumn || !preg_match('/^[A-Za-z][A-Za-z0-9]*$/D', $segment)) {
+                throw new \BadMethodCallException(
+                    "Dynamic where method {$method} contains an invalid column segment."
+                );
+            }
+
+            $column = strtolower(preg_replace('/(.)(?=[A-Z])/', '$1_', $segment));
+            $plan[] = [$column, $boolean];
+            $expectsColumn = false;
+        }
+
+        if (empty($plan) || $expectsColumn) {
+            throw new \BadMethodCallException(
+                "Dynamic where method {$method} is not a valid dynamic where."
+            );
+        }
+
+        if (count(static::$dynamicWhereCache) >= static::DYNAMIC_WHERE_CACHE_LIMIT) {
+            static::$dynamicWhereCache = [];
+        }
+
+        static::$dynamicWhereCache[$method] = $plan;
+        return $plan;
     }
 
     // JSON WHERE CLAUSES
