@@ -82,7 +82,7 @@ $topSpenders = DB::table($sub, 'totals')
 - All standard query builder methods work on both forms: `where`, `whereIn`, `whereSub`, `whereInSub`, `selectSub`, `update`, `upsert`, `get`, `delete`, `count`, `paginate`, `orderBy`, `limit`, etc.
 - The underlying anonymous model includes `timestamps`, `softDeletes`, `fillable`, `createdAtColumn`, and `updatedAtColumn` properties (all disabled/empty by default) so features that read them work without errors. Timestamps and soft deletes are off unless you use a real model.
 - No model events, attribute casting, or relationships are available when using `DB::table()`.
-- Table names passed as strings are **not** automatically prefixed; provide the full table name (e.g. `$wpdb->prefix . 'posts'`) or the bare name if WPORM prefixing is not needed for that table.
+- Table names passed as strings are prefixed with `$wpdb->prefix` unless they already start with it. Provide a bare table name (e.g. `'posts'`) or a fully-qualified prefixed name (e.g. `$wpdb->prefix . 'posts'`) — either form works and will not be double-prefixed.
 
 ## When to Use
 - For quick queries on tables without a model class.

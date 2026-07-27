@@ -89,7 +89,7 @@ class Parts extends Model {
 
 > **Note:** Just build your columns on the `$blueprint` passed into `up()` — WPORM reads the schema directly from it via `$blueprint->toSql()`. You do **not** need to (and should not) manually assign `$this->schema` anymore; `up(Blueprint $blueprint)` is now the single source of truth for table schema.
 
-> **Note:** When using `$table` in custom SQL queries, do **not** manually add the WordPress prefix (e.g., `$wpdb->prefix`). The ORM automatically handles table prefixing. Use `$table = (new User)->getTable();` as shown in the next, which returns the fully-prefixed table name.
+> **Note:** When using `$table` in custom SQL queries, do **not** manually add the WordPress prefix (e.g., `$wpdb->prefix`). The ORM automatically handles table prefixing. `getTable()` also safely detects and preserves an already-prefixed table name, so even if a prefixed name is provided it will not be double-prefixed. Use `$table = (new User)->getTable();` as shown below, which returns the fully-prefixed table name.
 
 ## Schema Management
 Create or update tables using the model's `up` method and the `SchemaBuilder`:
@@ -2436,7 +2436,7 @@ $result = User::query()
 
 ## Troubleshooting & Tips
 
-- **Table Prefixing:** Always use `$table = (new ModelName)->getTable();` to get the correct, prefixed table name for custom SQL. Do not manually prepend `$wpdb->prefix`.
+- **Table Prefixing:** Always use `$table = (new ModelName)->getTable();` to get the correct, prefixed table name for custom SQL. `getTable()` safely detects and preserves already-prefixed table names, so passing a bare name or a prefixed name will never double-prefix. Do not manually prepend `$wpdb->prefix`.
 - **Model Booting:** If you add static boot methods or global scopes, ensure you call them before querying if not using the model's constructor.
 - **Schema Changes:** Your model's `up(Blueprint $blueprint)` method is the single source of truth for the table schema — WPORM reads it via `$blueprint->toSql()` automatically, so you no longer need to assign `$this->schema` yourself. If you change `up()`, you may need to drop and recreate the table or use the `SchemaBuilder`'s `table()` method for migrations.
 - **Reusing a Query Builder:** It's safe to call `toSql()`, `count()`, `get()`, etc. multiple times (or in combination, as `paginate()` does internally) on the same query instance — soft-delete constraints and HAVING bindings are only applied once per instance and won't duplicate or misalign bindings on repeat calls.

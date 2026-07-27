@@ -349,18 +349,20 @@ abstract class Model implements \ArrayAccess {
 	 *
 	 * Mirrors the logic of getTable() but works statically, avoiding the
 	 * need to create a model instance just to determine the table name.
+	 * If the declared $table already includes $wpdb->prefix, it is returned
+	 * as-is to avoid double-prefixing.
 	 *
 	 * @return string Fully qualified table name including the DB prefix.
 	 */
 	protected static function resolveTableName() {
 		global $wpdb;
-		// Check if the model class has a $table property explicitly declared with a value.
-		// We use getDefaultProperties() because $table is an instance property,
-		// not a static one, so ReflectionProperty::getValue() requires an object.
 		$class = static::class;
 		$defaults = (new \ReflectionClass($class))->getDefaultProperties();
 		$table = $defaults['table'] ?? null;
 		if ($table !== null) {
+			if (strpos($table, $wpdb->prefix) === 0) {
+				return $table;
+			}
 			return $wpdb->prefix . $table;
 		}
 		return $wpdb->prefix . strtolower(Helpers::class_basename($class));
@@ -1728,10 +1730,8 @@ public function forceDelete() {
 	/**
 	 * Get the table name for the model (instance context).
 	 *
-	 * The $table property should always be declared as a bare name (e.g.
-	 * 'users') without the WordPress prefix. This method applies
-	 * $wpdb->prefix unconditionally to avoid false-positive detection when
-	 * a table name coincidentally starts with the prefix string.
+	 * If $table already starts with $wpdb->prefix, it is returned as-is
+	 * to avoid double-prefixing. Otherwise the prefix is prepended.
 	 *
 	 * @return string Fully qualified table name including the DB prefix.
 	 */
@@ -1739,6 +1739,9 @@ public function forceDelete() {
 	{
 		global $wpdb;
 		if (isset($this->table)) {
+			if (strpos($this->table, $wpdb->prefix) === 0) {
+				return $this->table;
+			}
 			return $wpdb->prefix . $this->table;
 		}
 		return $wpdb->prefix . strtolower(Helpers::class_basename(static::class));
