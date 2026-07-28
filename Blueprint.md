@@ -540,6 +540,15 @@ $table->id();
 
 These methods are chained onto any column definition (the object returned by `$table->string(...)`, `$table->integer(...)`, etc.) to further configure that column.
 
+### after($column)
+**Description:** Places a new column after an existing column when using `SchemaBuilder::table()` on MySQL or MariaDB. The reference column is safely quoted in the generated `ALTER TABLE` statement. This modifier only affects table alterations; column order is not emitted in `CREATE TABLE` definitions.
+**Example:**
+```php
+$schema->table('users', function (Blueprint $table) {
+    $table->string('nickname')->nullable()->after('display_name');
+});
+```
+
 ### nullable($value = true)
 **Description:** Marks the column as `NULL` (nullable). Pass `false` to explicitly force `NOT NULL`.
 **Example:**
@@ -573,6 +582,25 @@ $table->integer('seq')->autoIncrement();
 $table->string('email')->unique();
 $table->integer('user_id')->unique('custom_index_name');
 ```
+
+---
+
+## Column Positioning
+
+### after($column, Closure $callback)
+**Description:** Adds every column declared by the callback after the given existing column. WPORM automatically positions each later column after the column declared immediately before it, preserving callback order like Eloquent. The positioning state is restored even if the callback throws an exception, so nested or subsequent schema operations are not contaminated.
+**Example:**
+```php
+$schema->table('users', function (Blueprint $table) {
+    $table->after('password', function (Blueprint $table) {
+        $table->string('address_line1');
+        $table->string('address_line2');
+        $table->string('city');
+    });
+});
+```
+
+The generated alterations place `address_line1` after `password`, `address_line2` after `address_line1`, and `city` after `address_line2`. Column positioning is supported by MySQL and MariaDB.
 
 ---
 

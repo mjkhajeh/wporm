@@ -114,6 +114,22 @@ $schema->create('parts', function($table) {
 >
 > Throws a `\RuntimeException` if `dbDelta()` reports a failure (check `$wpdb->last_error` for details).
 
+Use `SchemaBuilder::table()` with the Eloquent-style `after()` modifier to position new columns on MySQL or MariaDB:
+
+```php
+$schema->table('users', function (Blueprint $table) {
+    $table->string('nickname')->nullable()->after('display_name');
+
+    $table->after('password', function (Blueprint $table) {
+        $table->string('address_line1');
+        $table->string('address_line2');
+        $table->string('city');
+    });
+});
+```
+
+The callback form preserves declaration order by placing each column after the one declared immediately before it. See [Blueprint column modifiers](./Blueprint.md#aftercolumn) for details.
+
 ### Unique Indexes (Eloquent-style)
 
 You can add a unique index to a column using Eloquent-style chaining:

@@ -10,6 +10,7 @@ class ColumnDefinition
     public bool $autoIncrement = false;
     public bool $primary = false;
     public $default = null;
+    public ?string $after = null;
     protected $blueprint;
     protected string $rawName;
 
@@ -35,6 +36,28 @@ class ColumnDefinition
     public function autoIncrement(bool $value = true)
     {
         $this->autoIncrement = $value;
+        return $this;
+    }
+
+    /**
+     * Place the column after another column when altering a table.
+     *
+     * @param string $column
+     * @return $this
+     */
+    public function after(string $column)
+    {
+        if (strpos($column, "\0") !== false) {
+            throw new \InvalidArgumentException('The column passed to after() must be a valid, non-empty identifier.');
+        }
+
+        $column = trim($column);
+
+        if ($column === '') {
+            throw new \InvalidArgumentException('The column passed to after() must be a valid, non-empty identifier.');
+        }
+
+        $this->after = $column;
         return $this;
     }
 

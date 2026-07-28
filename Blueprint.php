@@ -15,6 +15,7 @@ class Blueprint
     protected array $keys = [];
     protected array $foreigns = [];
     protected array $primaryKeys = [];
+    protected ?string $after = null;
 
     public function __construct(string $table, bool $alter, wpdb $db)
     {
@@ -38,9 +39,49 @@ class Blueprint
     public function addColumn(string $type, string $name): ColumnDefinition
     {
         $col = new ColumnDefinition($name, $type);
-        $col->setBlueprint($this); // Inject reference to Blueprint
+        $col->setBlueprint($this);
+
+        if ($this->after !== null) {
+            $col->after($this->after);
+            $this->after = $name;
+        }
+
         $this->columns[] = $col;
         return $col;
+    }
+
+    /**
+     * Add the columns from the callback after the given column.
+     *
+     * Each column is positioned after the column added immediately before it,
+     * preserving the callback's declaration order.
+     *
+     * @param string $column
+     * @param \Closure $callback
+     * @return $this
+     */
+    public function after(string $column, \Closure $callback): self
+    {
+        if (strpos($column, "\0") !== false) {
+            throw new \InvalidArgumentException('The column passed to after() must be a valid, non-empty identifier.');
+        }
+
+        $column = trim($column);
+
+        if ($column === '') {
+            throw new \InvalidArgumentException('The column passed to after() must be a valid, non-empty identifier.');
+        }
+
+        $previousAfter = $this->after;
+        $this->after = $column;
+
+        try {
+            $callback($this);
+        } finally {
+            $this->after = $previousAfter;
+        }
+
+        return $this;
     }
 
     public function string(string $column, int $length = 255) { return $this->addColumn("VARCHAR($length)", $column); }
@@ -358,7 +399,13 @@ class Blueprint
         $sql = [];
 
         foreach ($this->columns as $col) {
-            $sql[] = "ALTER TABLE {$this->table} ADD " . $col->toSql();
+            $definition = $col->toSql();
+
+            if ($col->after !== null) {
+                $definition .= " AFTER " . Helpers::quoteIdentifier($col->after);
+            }
+
+            $sql[] = "ALTER TABLE {$this->table} ADD " . $definition;
         }
 
         foreach ($this->keys as $key) {

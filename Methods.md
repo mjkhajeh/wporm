@@ -3110,6 +3110,30 @@ $trashed = User::query()->onlyTrashed()->get();
 
 ---
 
+### ColumnDefinition::after($column)
+**Description:** Places a new column after an existing column in MySQL/MariaDB `ALTER TABLE` SQL. Chain it directly onto any column definition created inside `SchemaBuilder::table()`.
+**Example:**
+```php
+$schema->table('users', function (Blueprint $table) {
+    $table->string('nickname')->nullable()->after('display_name');
+});
+```
+
+### Blueprint::after($column, Closure $callback)
+**Description:** Adds an ordered group of columns after an existing column, matching Eloquent's column-order API. The first callback column is placed after `$column`; every later callback column is placed after the previously declared column.
+**Example:**
+```php
+$schema->table('users', function (Blueprint $table) {
+    $table->after('password', function (Blueprint $table) {
+        $table->string('address_line1');
+        $table->string('address_line2');
+        $table->string('city');
+    });
+});
+```
+
+Both forms apply only to table alterations and require MySQL or MariaDB.
+
 ### Blueprint::softDeletes($column = 'deleted_at')
 **Description:** Adds a nullable DATETIME column for soft deletes (Eloquent-style shortcut). Use this in your schema to enable soft deletes for your model.
 **Example:**
