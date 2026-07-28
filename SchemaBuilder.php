@@ -9,8 +9,12 @@ class SchemaBuilder
     protected wpdb $db;
     protected string $prefix;
 
-    public function __construct(wpdb $db)
+    public function __construct(wpdb $db = null)
     {
+        if( $db === null ) {
+            global $wpdb;
+            $db = $wpdb;
+        }
         $this->db = $db;
         $this->prefix = $db->prefix;
     }
