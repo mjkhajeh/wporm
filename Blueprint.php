@@ -405,7 +405,8 @@ class Blueprint
                 $definition .= " AFTER " . Helpers::quoteIdentifier($col->after);
             }
 
-            $sql[] = "ALTER TABLE {$this->table} ADD " . $definition;
+            $operation = $col->change ? 'MODIFY' : 'ADD';
+            $sql[] = "ALTER TABLE {$this->table} {$operation} " . $definition;
         }
 
         foreach ($this->keys as $key) {

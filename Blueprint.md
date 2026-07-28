@@ -549,6 +549,25 @@ $schema->table('users', function (Blueprint $table) {
 });
 ```
 
+### change()
+**Description:** Modifies an existing MySQL/MariaDB column using an `ALTER TABLE ... MODIFY` statement. Define the column with its complete desired type and attributes, then chain `change()`. Every modifier that must remain — including `nullable()`, `default()`, and `autoIncrement()` — must be repeated because omitted attributes are removed. Existing indexes are not changed unless separate index commands are declared.
+**Example:**
+```php
+$schema->table('products', function (Blueprint $table) {
+    $table->string('name', 150)
+        ->nullable()
+        ->default('Unnamed product')
+        ->change();
+
+    $table->decimal('price', 12, 2)
+        ->default(0)
+        ->after('name')
+        ->change();
+});
+```
+
+Changed and newly added columns may be declared in the same `SchemaBuilder::table()` callback. Changed columns compile to `MODIFY`, new columns compile to `ADD`, and declaration order is preserved. `change()` does not perform a schema-inspection query; the declared definition is sent directly to MySQL/MariaDB.
+
 ### nullable($value = true)
 **Description:** Marks the column as `NULL` (nullable). Pass `false` to explicitly force `NOT NULL`.
 **Example:**

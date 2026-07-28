@@ -130,6 +130,21 @@ $schema->table('users', function (Blueprint $table) {
 
 The callback form preserves declaration order by placing each column after the one declared immediately before it. See [Blueprint column modifiers](./Blueprint.md#aftercolumn) for details.
 
+Use the Eloquent-style `change()` modifier to update the type or attributes of an existing column:
+
+```php
+$schema->table('products', function (Blueprint $table) {
+    $table->string('name', 150)
+        ->nullable()
+        ->default('Unnamed product')
+        ->change();
+});
+```
+
+`change()` defines the column's complete new state. Repeat every modifier that must remain on the column, because omitted attributes such as `nullable()`, `default()`, or `autoIncrement()` are removed by the generated MySQL/MariaDB `MODIFY` statement. Existing indexes are not changed unless you add separate index commands. See [Blueprint column modifiers](./Blueprint.md#change) for details.
+
+`SchemaBuilder::table()` throws a `\RuntimeException` when an `ALTER TABLE` statement fails, so schema changes cannot silently continue after a database error.
+
 ### Unique Indexes (Eloquent-style)
 
 You can add a unique index to a column using Eloquent-style chaining:

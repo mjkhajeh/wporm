@@ -9,6 +9,7 @@ class ColumnDefinition
     public bool $nullable = false;
     public bool $autoIncrement = false;
     public bool $primary = false;
+    public bool $change = false;
     public $default = null;
     public ?string $after = null;
     protected $blueprint;
@@ -36,6 +37,17 @@ class ColumnDefinition
     public function autoIncrement(bool $value = true)
     {
         $this->autoIncrement = $value;
+        return $this;
+    }
+
+    /**
+     * Mark the column as an existing column that should be modified.
+     *
+     * @return $this
+     */
+    public function change()
+    {
+        $this->change = true;
         return $this;
     }
 

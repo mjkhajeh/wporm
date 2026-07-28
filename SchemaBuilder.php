@@ -80,7 +80,17 @@ class SchemaBuilder
         $callback($blueprint);
 
         foreach ($blueprint->toAlterSql() as $sql) {
-            $this->db->query($sql);
+            $result = $this->db->query($sql);
+
+            if ($result === false || !empty($this->db->last_error)) {
+                $error = !empty($this->db->last_error)
+                    ? $this->db->last_error
+                    : 'Unknown database error.';
+
+                throw new \RuntimeException(
+                    "Failed to alter table {$this->prefix}{$table}: {$error}"
+                );
+            }
         }
     }
 }

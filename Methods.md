@@ -3134,6 +3134,20 @@ $schema->table('users', function (Blueprint $table) {
 
 Both forms apply only to table alterations and require MySQL or MariaDB.
 
+### ColumnDefinition::change()
+**Description:** Marks a declared column as an existing column to modify. Inside `SchemaBuilder::table()`, WPORM compiles the complete definition as `ALTER TABLE ... MODIFY` instead of `ADD`. Repeat every modifier that should remain on the column; omitted attributes are removed. Indexes are unchanged unless separate index commands are declared.
+**Example:**
+```php
+$schema->table('products', function (Blueprint $table) {
+    $table->string('name', 150)
+        ->nullable()
+        ->default('Unnamed product')
+        ->change();
+});
+```
+
+The modifier supports MySQL and MariaDB and may be combined with `after()` when the column must also be repositioned. `SchemaBuilder::table()` throws a `\RuntimeException` if the generated alteration fails.
+
 ### Blueprint::softDeletes($column = 'deleted_at')
 **Description:** Adds a nullable DATETIME column for soft deletes (Eloquent-style shortcut). Use this in your schema to enable soft deletes for your model.
 **Example:**
