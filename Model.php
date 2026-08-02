@@ -132,6 +132,17 @@ abstract class Model implements \ArrayAccess {
     }
 
     /**
+     * Replace the appended attributes for this model instance.
+     *
+     * @param array<int, string> $appends
+     * @return $this
+     */
+    public function setAppends(array $appends) {
+        $this->appends = array_values(array_unique($appends));
+        return $this;
+    }
+
+    /**
      * Get the created_at column name.
      * @return string
      */

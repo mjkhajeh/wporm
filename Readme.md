@@ -1668,6 +1668,7 @@ public function getUserAttribute() {
 - Appended attributes are included in `toArray()` and JSON output.
 - The value is resolved via a `get{AttributeName}Attribute()` accessor or, if not present, by a public property.
 - You can add an appended attribute to a single model instance at runtime with `append()`.
+- Replace the appended attributes for a single model instance with `setAppends(['attribute'])`.
 - Retrieve the list of appended attributes with `getAppends()`.
 - Do **not** set appended attributes in a `retrieved` event callback; use accessors instead.
 

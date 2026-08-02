@@ -307,7 +307,7 @@ protected function update() {
 | 1 | ~~`$model->update()` (instance method that only updates dirty attrs)~~ | ~~**Critical**~~ **Fixed** | ~~Current `update()` sends all attributes. Should diff against original.~~ Fixed by using `$this->getDirty()`. |
 | 2 | `Model::forceFill()` | **Implemented** | ✅ Exists. |
 | 3 | `$model->append()` method | **Implemented** | ✅ Exists. |
-| 4 | `$model->setAppends()` | **Important** | No method to replace appends array. |
+| 4 | `$model->setAppends()` | **Implemented** | ✅ Exists and replaces the runtime appends array. |
 | 5 | `Model::without()` (eager load exclusion) | **Important** | No way to eager-load all except specific relations. |
 | 6 | `Model::only()` (select specific columns on relation) | **Important** | No method to limit relation columns. |
 | 7 | `Model::scope()` (binding scope to model instance) | **Important** | Not implemented. |
@@ -458,7 +458,7 @@ protected function update() {
 ### Priority 2: Important Features
 
 1. ~~Add `forceFill()` static method.~~ **Implemented**
-2. Add `setAppends()` runtime method. (`append()` is already implemented.)
+2. ~~Add `setAppends()` runtime method.~~ **Implemented**
 3. Add `without()` for eager load exclusion.
 4. Add `getAttributes()` public method.
 5. Add `isClean()` / `wasChanged()` dirty tracking.
@@ -485,7 +485,7 @@ protected function update() {
 | Phase | Items | Estimated Effort |
 |-------|-------|------------------|
 | **Phase 1: Critical Bugs** | ~~Fix update() dirty tracking~~ (Fixed), ~~operator validation~~ (Fixed), ~~__callStatic~~ (Fixed), ~~original sync~~ (Fixed), ~~ensureTableExists() recursion~~ (Fixed), ~~first() soft delete scope~~ (Fixed), ~~page manipulation~~ (Fixed), ~~getTable() double-prefixing~~ (Fixed) | 1-2 days |
-| **Phase 2: Core Eloquent Parity** | ~~Add forceFill~~ (Implemented), without, getAttributes, isClean, syncOriginal, setAppends, Collection::filter() | 3-5 days |
+| **Phase 2: Core Eloquent Parity** | ~~Add forceFill~~ (Implemented), ~~setAppends~~ (Implemented), without, getAttributes, isClean, syncOriginal, Collection::filter() | 3-5 days |
 | **Phase 3: Architecture** | Split Model.php into traits, add type declarations, extract DB abstraction | 5-7 days |
 | **Phase 4: Quality** | PHPUnit test suite, PHPStan level 5+, CI/CD, documentation | 5-10 days |
 | **Phase 5: Advanced Features** | Lock for update, Factory support, lazy collections, cursor pagination | 5-10 days |
@@ -496,6 +496,6 @@ protected function update() {
 
 WPORM is a solid, feature-rich ORM that successfully brings Laravel Eloquent's developer experience to WordPress. The relationship system, eager loading, soft deletes, events, and query builder are all well-implemented and cover the majority of common use cases.
 
-All previously reported critical and high-severity issues have been fixed: `update()` sending all attributes and not syncing original state, static state sharing in `ensureTableExists()`, `__callStatic` incompatibility with PHP 8.x property access, `first()` soft delete scope state management, `whereColumn()` SQL injection, `__set()` silent mass-assignment guard failure, `resolvePageFromRequest()` page manipulation, custom cast instantiation crash with non-existent classes, and `getTable()` double-prefixing. Additionally, the `whereExists` regex has been fixed to handle `SELECT DISTINCT`, `SELECT SQL_CALC_FOUND_ROWS`, and other SQL keywords between `SELECT` and the column list, `Collection::firstOrFail()` now throws a meaningful `ModelNotFoundException` with the correct model class name, and `append()` runtime method is implemented. The architecture could benefit from splitting the 2700-line Model.php into focused traits, and the project would greatly benefit from a test suite and static analysis.
+All previously reported critical and high-severity issues have been fixed: `update()` sending all attributes and not syncing original state, static state sharing in `ensureTableExists()`, `__callStatic` incompatibility with PHP 8.x property access, `first()` soft delete scope state management, `whereColumn()` SQL injection, `__set()` silent mass-assignment guard failure, `resolvePageFromRequest()` page manipulation, custom cast instantiation crash with non-existent classes, and `getTable()` double-prefixing. Additionally, the `whereExists` regex has been fixed to handle `SELECT DISTINCT`, `SELECT SQL_CALC_FOUND_ROWS`, and other SQL keywords between `SELECT` and the column list, `Collection::firstOrFail()` now throws a meaningful `ModelNotFoundException` with the correct model class name, and the runtime `append()` / `setAppends()` methods are implemented. The architecture could benefit from splitting the 2700-line Model.php into focused traits, and the project would greatly benefit from a test suite and static analysis.
 
 With the fixes and improvements outlined in this report, WPORM could achieve near-complete Eloquent API compatibility while maintaining its WordPress-native approach.

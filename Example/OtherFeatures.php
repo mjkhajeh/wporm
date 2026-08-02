@@ -46,7 +46,13 @@ class ExampleWithAppends extends Model {
     public function getUserAttribute() {
         return get_user_by('id', $this->user_id);
     }
+    public function getUserLabelAttribute() {
+        return 'User #' . $this->user_id;
+    }
 }
+$exampleWithAppends = (new ExampleWithAppends(['user_id' => 1]))
+    ->setAppends(['user_label']);
+$exampleArray = $exampleWithAppends->toArray();
 
 // Example of forceDeleteWith (cascading soft deletes)
 $post = $user->posts()->first();

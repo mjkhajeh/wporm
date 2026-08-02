@@ -2183,6 +2183,14 @@ $user->append('profile_url');
 $user->append(['avatar_url', 'full_name']);
 ```
 
+### setAppends(array $appends)
+**Description:** Replace the model's runtime appended-attribute list. Duplicate names are removed, numeric keys are normalized, and the model instance is returned for chaining.
+
+**Example:**
+```php
+$user->setAppends(['profile_url', 'full_name']);
+```
+
 ### getAppends()
 **Description:** Get the list of attributes that are appended to the model's `toArray()`/`toJson()` output. Returns the `$appends` property array.
 
