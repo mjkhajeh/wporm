@@ -187,10 +187,17 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
     }
 
     /**
-     * Filter items using a callback.
+     * Filter items using a callback, or remove falsy values when omitted.
+     *
+     * @param callable|null $callback
+     * @return static
      */
-    public function filter(callable $callback) {
-        return new static(array_filter($this->items, $callback), $this->modelClass);
+    public function filter(?callable $callback = null) {
+        $items = $callback === null
+            ? array_filter($this->items)
+            : array_filter($this->items, $callback);
+
+        return new static($items, $this->modelClass);
     }
 
     /**

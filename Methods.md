@@ -3348,6 +3348,15 @@ The optional `$modelClass` parameter specifies the model class that produced thi
 
 All transformation methods (`sortBy()`, `groupBy()`, `keyBy()`, `unique()`, `flatMap()`, `values()`, `keys()`, `diff()`, `intersect()`, `merge()`, `mapToGroups()`) return a **new** `Collection` and leave the original untouched, exactly like `map()`/`filter()`. The mutating methods (`push()`, `pull()`, `put()`) modify the collection in place, exactly like `transform()`. Where a `$key` parameter is accepted, you can pass either a string column name (read via array access for plain arrays, or property access for objects/models) or a callable that receives the item and returns the value to use.
 
+### filter(?callable $callback = null)
+**Description:** Return a new collection containing only items accepted by the callback. When no callback is provided, PHP-falsy values such as `null`, `false`, `0`, `''`, and empty arrays are removed. The remaining keys and associated model class metadata are preserved.
+
+**Example:**
+```php
+$active = $users->filter(fn($user) => $user->active);
+$truthy = (new Collection([0, 1, false, 'WPORM', null]))->filter();
+```
+
 ### each(callable $callback)
 **Description:** Iterate over every item, invoking `$callback($item, $key)`. Returning `false` from the callback stops iteration early (mirrors `QueryBuilder::each()`). Returns `$this` for chaining, though it's primarily intended for side-effects.
 

@@ -906,7 +906,7 @@ All multi-result queries (`get()`, `all()`, etc.) return a `Collection` instance
 | `toArray()` | `array` | Convert all items to arrays |
 | `toJson($options = 0)` | `string` | JSON-encode the collection (via `toArray()`); throws `\JsonException` on encoding failure |
 | `__toString()` | `string` | Same output as `toJson()`, for use in string contexts (e.g. `echo $collection;`) |
-| `filter(callable)` | `Collection` | Return a new filtered collection |
+| `filter(?callable $callback = null)` | `Collection` | Return a new filtered collection; without a callback, remove falsy values |
 | `map(callable)` | `Collection` | Return a new collection with transformed items |
 | `transform(callable)` | `$this` | Transform items **in-place** (mutating) |
 | `each(callable)` | `$this` | Iterate items; return `false` from the callback to stop early |
@@ -1004,6 +1004,9 @@ $users = User::query()->where('role', 'admin')->get();
 $active = $users->filter(function ($user) {
     return $user->active;
 });
+
+// Remove falsy values while preserving the remaining keys
+$truthy = (new Collection([0, 1, false, 'WPORM', null]))->filter();
 
 // Pluck emails
 $emails = $users->pluck('email');

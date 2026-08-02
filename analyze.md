@@ -323,7 +323,7 @@ protected function update() {
 | 17 | `$model->mutateAttributeForArray()` / `mutateAttribute()` | **Optional** | Not implemented. |
 | 18 | `$model->toJson()` options parameter | **Implemented** | ✅ Exists. |
 | 19 | `Collection::toJson()` options | **Implemented** | ✅ Exists. |
-| 20 | `Collection::filter()` without callback | **Important** | In Laravel, calling `filter()` with no args removes falsy values. Current requires callback. |
+| 20 | `Collection::filter()` without callback | **Implemented** | ✅ Calling `filter()` with no callback removes falsy values while preserving keys. |
 | 21 | `Collection::mapWithKeys()` | **Optional** | Not implemented. |
 | 22 | `Collection::reject()` | **Optional** | Inverse of filter. Not implemented. |
 | 23 | `Collection::every()` | **Optional** | Not implemented. |
@@ -463,7 +463,7 @@ protected function update() {
 4. Add `getAttributes()` public method.
 5. Add `isClean()` / `wasChanged()` dirty tracking.
 6. Add `syncOriginal()` method.
-7. Add `Collection::filter()` without callback (remove falsy).
+7. ~~Add `Collection::filter()` without callback (remove falsy).~~ **Implemented**
 8. Fix `reorder()` to accept optional column/direction.
 9. Split `Model.php` into traits for maintainability.
 10. Add PHP type declarations throughout.
@@ -485,7 +485,7 @@ protected function update() {
 | Phase | Items | Estimated Effort |
 |-------|-------|------------------|
 | **Phase 1: Critical Bugs** | ~~Fix update() dirty tracking~~ (Fixed), ~~operator validation~~ (Fixed), ~~__callStatic~~ (Fixed), ~~original sync~~ (Fixed), ~~ensureTableExists() recursion~~ (Fixed), ~~first() soft delete scope~~ (Fixed), ~~page manipulation~~ (Fixed), ~~getTable() double-prefixing~~ (Fixed) | 1-2 days |
-| **Phase 2: Core Eloquent Parity** | ~~Add forceFill~~ (Implemented), ~~setAppends~~ (Implemented), without, getAttributes, isClean, syncOriginal, Collection::filter() | 3-5 days |
+| **Phase 2: Core Eloquent Parity** | ~~Add forceFill~~ (Implemented), ~~setAppends~~ (Implemented), ~~Collection::filter()~~ (Implemented), without, getAttributes, isClean, syncOriginal | 3-5 days |
 | **Phase 3: Architecture** | Split Model.php into traits, add type declarations, extract DB abstraction | 5-7 days |
 | **Phase 4: Quality** | PHPUnit test suite, PHPStan level 5+, CI/CD, documentation | 5-10 days |
 | **Phase 5: Advanced Features** | Lock for update, Factory support, lazy collections, cursor pagination | 5-10 days |
