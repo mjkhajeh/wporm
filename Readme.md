@@ -903,6 +903,7 @@ All multi-result queries (`get()`, `all()`, etc.) return a `Collection` instance
 | `last()` | `mixed` | Get the last item |
 | `count()` | `int` | Number of items |
 | `isEmpty()` | `bool` | Whether the collection is empty |
+| `isNotEmpty()` | `bool` | Whether the collection is not empty |
 | `toArray()` | `array` | Convert all items to arrays |
 | `toJson($options = 0)` | `string` | JSON-encode the collection (via `toArray()`); throws `\JsonException` on encoding failure |
 | `__toString()` | `string` | Same output as `toJson()`, for use in string contexts (e.g. `echo $collection;`) |
@@ -1020,6 +1021,10 @@ $lastFive = $users->slice(-5)->reverse();
 // Check existence
 if ($users->isEmpty()) {
     // No results
+}
+
+if ($users->isNotEmpty()) {
+    // Has results
 }
 ```
 

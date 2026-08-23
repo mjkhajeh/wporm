@@ -187,6 +187,13 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
     }
 
     /**
+     * Determine if the collection is not empty.
+     */
+    public function isNotEmpty() {
+        return !$this->isEmpty();
+    }
+
+    /**
      * Filter items using a callback, or remove falsy values when omitted.
      *
      * @param callable|null $callback

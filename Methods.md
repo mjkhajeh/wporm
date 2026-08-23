@@ -3339,7 +3339,7 @@ $dto = User::find(1)->pipe(fn($u) => $userPresenter->toDto($u));
 
 ## Collection Methods
 
-`MJ\WPORM\Collection` is the Eloquent-style collection returned by `get()`, `all()`, `find([...])`, and every other multi-row query method. Beyond the methods documented inline in the [Readme](./Readme.md#collections) (`all()`, `first()`, `firstOrFail()`, `last()`, `count()`, `isEmpty()`, `toArray()`, `toJson()`, `__toString()`, `filter()`, `map()`, `transform()`, `tap()`, `pipe()`, `pluck()`, `contains()`, `slice()`, `reverse()`, `after()`), this section documents the additional Eloquent-parity methods.
+`MJ\WPORM\Collection` is the Eloquent-style collection returned by `get()`, `all()`, `find([...])`, and every other multi-row query method. Beyond the methods documented inline in the [Readme](./Readme.md#collections) (`all()`, `first()`, `firstOrFail()`, `last()`, `count()`, `isEmpty()`, `isNotEmpty()`, `toArray()`, `toJson()`, `__toString()`, `filter()`, `map()`, `transform()`, `tap()`, `pipe()`, `pluck()`, `contains()`, `slice()`, `reverse()`, `after()`), this section documents the additional Eloquent-parity methods.
 
 ### Constructor
 `__construct(array $items = [], ?string $modelClass = null)`
@@ -3347,6 +3347,30 @@ $dto = User::find(1)->pipe(fn($u) => $userPresenter->toDto($u));
 The optional `$modelClass` parameter specifies the model class that produced this collection. It is automatically passed by the QueryBuilder when creating Collections from `get()` and similar methods. This enables `firstOrFail()` to throw a meaningful `ModelNotFoundException` with the correct model class name (e.g., `User`) rather than the generic `Collection` class name.
 
 All transformation methods (`sortBy()`, `groupBy()`, `keyBy()`, `unique()`, `flatMap()`, `values()`, `keys()`, `diff()`, `intersect()`, `merge()`, `mapToGroups()`) return a **new** `Collection` and leave the original untouched, exactly like `map()`/`filter()`. The mutating methods (`push()`, `pull()`, `put()`) modify the collection in place, exactly like `transform()`. Where a `$key` parameter is accepted, you can pass either a string column name (read via array access for plain arrays, or property access for objects/models) or a callable that receives the item and returns the value to use.
+
+### isEmpty()
+**Description:** Determine if the collection is empty. Returns `true` when the collection contains no items, `false` otherwise.
+
+**Example:**
+```php
+$users = User::query()->where('role', 'admin')->get();
+
+if ($users->isEmpty()) {
+    echo 'No admins found';
+}
+```
+
+### isNotEmpty()
+**Description:** Determine if the collection is not empty. Returns `true` when the collection contains at least one item, `false` otherwise. This is the inverse of `isEmpty()`.
+
+**Example:**
+```php
+$users = User::query()->where('role', 'admin')->get();
+
+if ($users->isNotEmpty()) {
+    echo 'Found ' . $users->count() . ' admin(s)';
+}
+```
 
 ### filter(?callable $callback = null)
 **Description:** Return a new collection containing only items accepted by the callback. When no callback is provided, PHP-falsy values such as `null`, `false`, `0`, `''`, and empty arrays are removed. The remaining keys and associated model class metadata are preserved.
