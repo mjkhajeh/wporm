@@ -2029,6 +2029,25 @@ $comments = Comment::with('commentable')->get();
 
 See [Per-relation global-scope control](./Readme.md#per-relation-global-scope-control-eager-loads) in the Readme for disabling global scopes on a specific eager-loaded relation.
 
+### without($relations)
+**Description:** Exclude one or more relations from eager loading (Eloquent-style). Removes the named relations from the current query's eager-load set — whether they were added as plain names (`with('posts')`) or with constraints (`with(['posts' => fn($q) => ...])`). Useful when building a `with()` chain conditionally and you need to drop a relation at runtime. Available as a static method on the model and as a `QueryBuilder` instance method (so it also works through the model-instance proxy).
+
+**Example:**
+```php
+// Drop one relation from an existing chain
+$posts = Post::with(['author', 'tags', 'comments'])->without('comments')->get();
+
+// Multiple relations at once
+$users = User::with(['posts', 'comments', 'likes'])->without(['likes', 'comments'])->get();
+
+// Conditional eager loading
+$query = Post::with(['author', 'comments']);
+if ($skipComments) {
+    $query->without('comments');
+}
+$posts = $query->get();
+```
+
 ---
 
 ## Eager Loading Counts: withCount()

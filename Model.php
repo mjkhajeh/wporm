@@ -2749,6 +2749,19 @@ public function forceDelete() {
     }
 
     /**
+     * Start a query excluding the given relation(s) from eager loading
+     * (Eloquent-style static without()). Pairs with with() chains built
+     * conditionally:
+     *   User::with(['posts', 'comments'])->without('comments')->get();
+     *
+     * @param array|string $relations
+     * @return \MJ\WPORM\QueryBuilder
+     */
+    public static function without($relations) {
+        return static::query()->without($relations);
+    }
+
+    /**
      * Start a query with relationship counts (Eloquent-style static withCount()).
      * Usage: User::withCount('posts')->get(); // each $user->posts_count
      * @param array|string $relations

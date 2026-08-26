@@ -1359,6 +1359,21 @@ $comments = Comment::with('commentable')->get(); // resolves Post/Video per row
 
 `with()` runs exactly **one extra query per relation** for `hasOne`/`hasMany`/`belongsTo`/`belongsToMany`/`hasManyThrough`/`morphOne`/`morphMany` (not one per model), regardless of how many parent rows were fetched — it batches all parent keys into a single `WHERE ... IN (...)` (or, for `belongsToMany`/`hasManyThrough`, a single joined query), then distributes results back onto each parent model in memory. `morphTo()` is the one exception: since different rows may point to *different* related model classes, it runs one batched query **per distinct type** present in the result set (still no N+1 — typically just 1–2 extra queries even with mixed types).
 
+### Excluding relations: without()
+
+Remove one or more relations from an existing eager-load set — handy when the `with()` chain is built conditionally:
+
+```php
+// 'comments' will NOT be eager-loaded; 'author' still is
+$posts = Post::with(['author', 'comments'])->without('comments')->get();
+
+// Multiple at once, or via the static shorthand
+$users = User::with(['posts', 'likes'])->without('likes');
+$users = User::without('likes')->with('posts')->get();
+```
+
+Excluded relations are removed before any queries run, so no batched query is issued for them.
+
 ### Constraining an eager-loaded relation
 
 Pass a closure to add extra `WHERE` constraints to the relation's query:

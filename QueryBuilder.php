@@ -1162,6 +1162,33 @@ class QueryBuilder {
     }
 
     /**
+     * Exclude the given relation(s) from eager loading (Eloquent-style without()).
+     *
+     * Handy for dropping one relation from an existing with() chain, e.g. when
+     * building queries conditionally:
+     *
+     * Usage:
+     *   User::with(['posts', 'comments'])->without('comments')->get();
+     *   $query = Post::with(['author', 'tags', 'comments']);
+     *   if ($skipComments) { $query->without('comments'); }
+     *
+     * @param array|string $relations Relation name(s) to exclude.
+     * @return $this
+     */
+    public function without($relations) {
+        foreach ((array) $relations as $name) {
+            // String-keyed form: ->with(['posts' => constraint])
+            unset($this->with[$name]);
+            // Numeric form: ->with('posts') / ->with(['posts', ...])
+            $key = array_search($name, $this->with, true);
+            if ($key !== false && is_int($key)) {
+                unset($this->with[$key]);
+            }
+        }
+        return $this;
+    }
+
+    /**
      * Select additional pivot table columns for belongsToMany relationships.
      *
      * The pivot columns will be accessible on the related model via $model->pivot->column.
