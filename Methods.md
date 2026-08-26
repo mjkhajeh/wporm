@@ -1500,7 +1500,7 @@ if (User::query()->where('email', $email)->doesntExist()) {
 ```
 
 ### increment($column, $amount = 1, array $extra = [])
-**Description:** Increment a column's value. Available both as a **query builder** method (affects every row matching the current query, in a single atomic `UPDATE ... SET col = col + amount` statement) and as an **instance** method on a model (affects only that model's row, scoped automatically by its primary key, and syncs the new value onto the in-memory model). An optional `$extra` array of additional `column => value` pairs can be set in the same query (e.g. to bump a `last_voted_at` timestamp alongside the counter). If the model uses timestamps, `updated_at` is touched automatically unless you supply it yourself in `$extra`.
+**Description:** Increment a column's value. Available both as a **query builder** method (affects every row matching the current query, in a single atomic `UPDATE ... SET col = col + amount` statement) and as an **instance** method on a model (affects only that model's row, scoped automatically by its primary key, and syncs the new value onto the in-memory model — routed through your `$casts`, so `'int'`-cast columns stay PHP integers and `'float'`-cast columns stay floats). An optional `$extra` array of additional `column => value` pairs can be set in the same query (e.g. to bump a `last_voted_at` timestamp alongside the counter). If the model uses timestamps, `updated_at` is touched automatically unless you supply it yourself in `$extra`.
 
 **Examples:**
 ```php

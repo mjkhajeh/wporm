@@ -593,7 +593,7 @@ User::query()->where('subscription', 'expired')->decrement('seats');
 ```
 
 - If the model uses timestamps, `updated_at` is touched automatically (unless you pass it yourself via the optional `$extra` array).
-- The instance form keeps the in-memory model in sync with the new value, so you don't need to `refresh()`/re-fetch afterward.
+- The instance form keeps the in-memory model in sync with the new value, so you don't need to `refresh()`/re-fetch afterward. The synced value is routed through your `$casts`, so an `'int'`-cast column stays a PHP `int` and a `'float'`-cast column stays a `float`.
 
 See [Methods.md](./Methods.md#aggregates--utility-methods) for the full list with signatures.
 

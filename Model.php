@@ -1498,7 +1498,12 @@ protected function castSet($key, $value) {
 			: $query->decrement($column, $amount, $extra);
 
 		// Sync the new value(s) onto the in-memory model so it reflects the change.
-		$current = (float) ($this->attributes[$column] ?? 0);
+		// Read through get-casts first ('int' casts return real ints) so integer
+		// columns keep their type; only coerce to float when non-numeric.
+		$current = $this->castGet($column, $this->attributes[$column] ?? 0);
+		if (!is_numeric($current)) {
+			$current = (float) $current;
+		}
 		$newValue = $current + ($direction * $amount);
 		// Route through the standard attribute assignment path so casts and
 		// mutators are applied consistently to the in-memory value.
