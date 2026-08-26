@@ -1189,6 +1189,32 @@ class QueryBuilder {
     }
 
     /**
+     * Eager load a relation limited to specific columns (Eloquent-style
+     * "select specific columns on relation").
+     *
+     * Shorthand for with([$relation => ['columns' => $columns]]). The columns
+     * required for mapping results back onto parents (foreign keys, owner
+     * keys, pivot grouping aliases) are always included automatically, so you
+     * only list what you actually need:
+     *
+     * Usage:
+     *   Post::withOnly('author', ['name', 'email'])->get();
+     *
+     * Combine with constraints via the options-array form of with():
+     *   Post::with(['author' => [
+     *       'columns'    => ['name'],
+     *       'constraint' => fn($q) => $q->where('active', 1),
+     *   ]])->get();
+     *
+     * @param string $relation Relation name.
+     * @param array  $columns  Columns to select on the related table.
+     * @return $this
+     */
+    public function withOnly(string $relation, array $columns) {
+        return $this->with([$relation => ['columns' => array_values($columns)]]);
+    }
+
+    /**
      * Select additional pivot table columns for belongsToMany relationships.
      *
      * The pivot columns will be accessible on the related model via $model->pivot->column.
@@ -2773,9 +2799,15 @@ class QueryBuilder {
 
         // ── Parse constraint / options array ──────────────────────────────────
         $disableGlobalScopes = false;
+        $selectColumns = null;
         if (is_array($constraint)) {
             if (isset($constraint['disableGlobalScopes'])) {
                 $disableGlobalScopes = (bool) $constraint['disableGlobalScopes'];
+            }
+            if (isset($constraint['columns']) && is_array($constraint['columns']) && !empty($constraint['columns'])) {
+                // Limit which columns the relation query fetches (the required
+                // mapping key columns are always included automatically).
+                $selectColumns = array_values($constraint['columns']);
             }
             if (isset($constraint['constraint']) && is_callable($constraint['constraint'])) {
                 $constraint = $constraint['constraint'];
@@ -2829,6 +2861,7 @@ class QueryBuilder {
             }
 
             $query = $relClass::query(!$disableGlobalScopes)->whereIn($ownerKey, $ids);
+            $this->applyRelationColumnSelect($query, [$ownerKey], $selectColumns);
             if ($constraint) $constraint($query);
 
             $map = [];
@@ -2852,6 +2885,7 @@ class QueryBuilder {
             $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
 
             $query = $relClass::query(!$disableGlobalScopes)->whereIn($foreignKey, $ids);
+            $this->applyRelationColumnSelect($query, [$foreignKey], $selectColumns);
             if ($constraint) $constraint($query);
 
             $map = [];
@@ -2879,6 +2913,7 @@ class QueryBuilder {
 
             $query = $relClass::query(!$disableGlobalScopes)
                 ->whereIn($foreignKey, $ids);
+            $this->applyRelationColumnSelect($query, [$foreignKey], $selectColumns);
 
             // Apply ordering from the sample query (latestOfMany, oldestOfMany, etc.)
             // Orders are stored as strings like "column direction" or arrays with 'raw' key
@@ -2921,6 +2956,7 @@ class QueryBuilder {
             $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
 
             $query = $relClass::query(!$disableGlobalScopes)->whereIn($foreignKey, $ids);
+            $this->applyRelationColumnSelect($query, [$foreignKey], $selectColumns);
             if ($constraint) $constraint($query);
 
             $grouped = [];
@@ -2949,10 +2985,20 @@ class QueryBuilder {
             $relatedInstance = new $relClass;
             $relatedPK       = $relatedInstance->getPrimaryKey();
 
-            // Create the base query with the pivot FK aliased for grouping
-            $query = $relClass::query(!$disableGlobalScopes)
-                ->select(["$relatedTable.*", "$pivotTable.$foreignPivotKey as _pivot_fk"])
-                ->join($pivotTable, "$relatedTable.$relatedPK", '=', "$pivotTable.$relatedPivotKey")
+            // Create the base query with the pivot FK aliased for grouping.
+            // When column limiting is active, replace the related-table `*`
+            // with the requested (table-qualified) columns; the pivot-FK
+            // grouping alias is always kept.
+            $query = $relClass::query(!$disableGlobalScopes);
+            if ($selectColumns !== null) {
+                $query->select(array_merge(
+                    array_map(fn($c) => "$relatedTable.$c", array_values(array_unique($selectColumns))),
+                    ["$pivotTable.$foreignPivotKey as _pivot_fk"]
+                ));
+            } else {
+                $query->select(["$relatedTable.*", "$pivotTable.$foreignPivotKey as _pivot_fk"]);
+            }
+            $query->join($pivotTable, "$relatedTable.$relatedPK", '=', "$pivotTable.$relatedPivotKey")
                 ->whereIn("$pivotTable.$foreignPivotKey", $ids);
 
             // Apply the constraint closure FIRST — user may call withPivot/withTimestamps/using
@@ -3030,9 +3076,18 @@ class QueryBuilder {
             $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
 
             // Fetch related rows with the through-table FK so we can group by parent.
-            $query = $relClass::query(!$disableGlobalScopes)
-                ->select(["$relatedTable.*", "$throughTable.$firstKey as _through_fk"])
-                ->join($throughTable, "$relatedTable.$secondKey", '=', "$throughTable.$throughPK")
+            // Column limiting replaces the related-table `*` with the requested
+            // (table-qualified) columns; the grouping alias is always kept.
+            $query = $relClass::query(!$disableGlobalScopes);
+            if ($selectColumns !== null) {
+                $query->select(array_merge(
+                    array_map(fn($c) => "$relatedTable.$c", array_values(array_unique($selectColumns))),
+                    ["$throughTable.$firstKey as _through_fk"]
+                ));
+            } else {
+                $query->select(["$relatedTable.*", "$throughTable.$firstKey as _through_fk"]);
+            }
+            $query->join($throughTable, "$relatedTable.$secondKey", '=', "$throughTable.$throughPK")
                 ->whereIn("$throughTable.$firstKey", $ids);
 
             if ($constraint) $constraint($query);
@@ -3066,9 +3121,16 @@ class QueryBuilder {
 
             $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
 
-            $query = $relClass::query(!$disableGlobalScopes)
-                ->select(["$relatedTable.*", "$throughTable.$firstKey as _through_fk"])
-                ->join($throughTable, "$relatedTable.$secondKey", '=', "$throughTable.$throughPK")
+            $query = $relClass::query(!$disableGlobalScopes);
+            if ($selectColumns !== null) {
+                $query->select(array_merge(
+                    array_map(fn($c) => "$relatedTable.$c", array_values(array_unique($selectColumns))),
+                    ["$throughTable.$firstKey as _through_fk"]
+                ));
+            } else {
+                $query->select(["$relatedTable.*", "$throughTable.$firstKey as _through_fk"]);
+            }
+            $query->join($throughTable, "$relatedTable.$secondKey", '=', "$throughTable.$throughPK")
                 ->whereIn("$throughTable.$firstKey", $ids);
 
             if ($constraint) $constraint($query);
@@ -3107,6 +3169,7 @@ class QueryBuilder {
             $query = $relClass::query(!$disableGlobalScopes)
                 ->where($morphType, $morphClass)
                 ->whereIn($morphId, $ids);
+            $this->applyRelationColumnSelect($query, [$morphId], $selectColumns);
             if ($constraint) $constraint($query);
 
             $map = [];
@@ -3138,6 +3201,7 @@ class QueryBuilder {
             $query = $relClass::query(!$disableGlobalScopes)
                 ->where($morphType, $morphClass)
                 ->whereIn($morphId, $ids);
+            $this->applyRelationColumnSelect($query, [$morphId], $selectColumns);
             if ($constraint) $constraint($query);
 
             $grouped = [];
@@ -3188,6 +3252,7 @@ class QueryBuilder {
                 $ids = array_values(array_unique(array_map(fn($m) => $m->$morphId, $group)));
 
                 $query = $relClass::query(!$disableGlobalScopes)->whereIn($ownerKey, $ids);
+                $this->applyRelationColumnSelect($query, [$ownerKey], $selectColumns);
                 if ($constraint) $constraint($query);
 
                 $map = [];
@@ -3202,6 +3267,23 @@ class QueryBuilder {
         }
 
         // ── Unknown / unsupported relation type: no-op (fail silently) ───────
+    }
+
+    /**
+     * Apply a limited column selection to a relation's query, automatically
+     * keeping the mapping key column(s) required to distribute results back
+     * onto the parent models (Eloquent does the same for its eager loads).
+     *
+     * @param QueryBuilder $query      The relation query being built.
+     * @param array        $keyColumns Mapping column(s) on the related table that must be selected.
+     * @param array|null   $columns    User-requested columns, or null for no limiting.
+     * @return void
+     */
+    protected function applyRelationColumnSelect($query, array $keyColumns, ?array $columns): void {
+        if ($columns === null || $columns === []) {
+            return;
+        }
+        $query->select(array_values(array_unique(array_merge($keyColumns, $columns))));
     }
 
     /**

@@ -1374,6 +1374,22 @@ $users = User::without('likes')->with('posts')->get();
 
 Excluded relations are removed before any queries run, so no batched query is issued for them.
 
+### Limiting relation columns: withOnly()
+
+Fetch only the columns you need from an eager-loaded relation — mapping keys (foreign/owner keys, pivot grouping aliases) are always included automatically:
+
+```php
+$posts = Post::withOnly('author', ['name', 'email'])->get();
+
+// Or inline via the options-array form of with(), combined with other options:
+$posts = Post::with(['author' => [
+    'columns'    => ['name', 'email'],
+    'constraint' => fn($q) => $q->where('active', 1),
+]])->get();
+```
+
+This works for every relationship type (`belongsTo`, `hasOne`, `hasMany`, `belongsToMany`, through-relations, and morph types).
+
 ### Constraining an eager-loaded relation
 
 Pass a closure to add extra `WHERE` constraints to the relation's query:

@@ -2048,6 +2048,22 @@ if ($skipComments) {
 $posts = $query->get();
 ```
 
+### withOnly($relation, array $columns)
+**Description:** Eager load one relation limited to specific columns ("select specific columns on relation"). Shorthand for `with([$relation => ['columns' => $columns]])`. The mapping key columns required to distribute results back onto parents (owner keys for `belongsTo`/`morphTo`, foreign keys for `hasOne`/`hasMany`, pivot grouping aliases for joined relation types) are **always included automatically** — you only list what you actually need. Also composable with constraints and global-scope control via the options-array form of `with()`. Available as a static method on the model and as a `QueryBuilder` instance method.
+
+**Example:**
+```php
+$posts = Post::withOnly('author', ['name', 'email'])->get();
+// SELECT ... id, name, email FROM users WHERE id IN (...)  -- 'id' auto-added
+
+// Options-array form: combine column limiting with constraints/scopes
+$posts = Post::with(['author' => [
+    'columns'             => ['name'],
+    'constraint'          => fn($q) => $q->where('active', 1),
+    'disableGlobalScopes' => true,
+]])->get();
+```
+
 ---
 
 ## Eager Loading Counts: withCount()

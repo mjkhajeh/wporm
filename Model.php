@@ -2762,6 +2762,20 @@ public function forceDelete() {
     }
 
     /**
+     * Start a query eager loading one relation limited to specific columns
+     * (select specific columns on relation). Mapping keys are added
+     * automatically; see QueryBuilder::withOnly() for details.
+     * Usage: Post::withOnly('author', ['name', 'email'])->get();
+     *
+     * @param string $relation
+     * @param array $columns
+     * @return \MJ\WPORM\QueryBuilder
+     */
+    public static function withOnly(string $relation, array $columns) {
+        return static::query()->withOnly($relation, $columns);
+    }
+
+    /**
      * Start a query with relationship counts (Eloquent-style static withCount()).
      * Usage: User::withCount('posts')->get(); // each $user->posts_count
      * @param array|string $relations
