@@ -679,7 +679,7 @@ User::query()->each(function ($user) {
 
 Just like `chunk()`, returning `false` from the callback stops processing early.
 
-Both methods automatically respect any `where()`/`join()`/soft-delete scoping already applied to the query, since they're built on the same query builder instance.
+Both methods automatically respect any `where()`/`join()`/soft-delete scoping already applied to the query, since they're built on the same query builder instance. The builder's state is also fully restored afterwards — even if your callback throws an exception — so reusing the query won't see a leftover limit/offset or a duplicated soft-delete constraint.
 
 ### cursor()
 

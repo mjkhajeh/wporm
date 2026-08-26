@@ -3984,9 +3984,14 @@ class QueryBuilder {
         $count = max((int) $count, 1);
         $page = 1;
 
+        // Snapshot every piece of builder state this method touches so it can
+        // be restored no matter how the loop exits — normal completion, an
+        // early `return false` from the callback, or a thrown exception.
         $originalLimit        = $this->limit;
         $originalOffset       = $this->offset;
         $originalSoftDelete   = $this->softDeleteScopeApplied;
+        $originalWheres       = $this->wheres;
+        $originalBindings     = $this->bindings;
 
         // Apply the soft-delete scope once up-front so get() doesn't
         // re-evaluate it on every iteration of the loop.
@@ -4015,9 +4020,15 @@ class QueryBuilder {
 
             return true;
         } finally {
-            $this->limit                = $originalLimit;
-            $this->offset               = $originalOffset;
-            $this->softDeleteScopeApplied = $originalSoftDelete;
+            // Restore everything — including the wheres/bindings added by
+            // applySoftDeleteScope() — so the builder is never left with a
+            // stale LIMIT/OFFSET or a half-applied soft-delete scope (guard
+            // reset while its constraints still sit in $this->wheres).
+            $this->limit                    = $originalLimit;
+            $this->offset                   = $originalOffset;
+            $this->softDeleteScopeApplied   = $originalSoftDelete;
+            $this->wheres                   = $originalWheres;
+            $this->bindings                 = $originalBindings;
         }
     }
 
@@ -4041,6 +4052,9 @@ class QueryBuilder {
      */
     public function each(callable $callback, $count = 1000) {
         $index = 0;
+
+        // Delegates to chunk(), inheriting its exception-safe restoration of
+        // limit/offset and soft-delete scope state (wheres/bindings included).
 
         return $this->chunk($count, function($results) use ($callback, &$index) {
             foreach ($results as $item) {

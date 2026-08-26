@@ -1538,7 +1538,7 @@ result set into memory at once — essential for iterating over large tables
 `join()`/soft-delete scoping is already on the query.
 
 ### chunk($count, callable $callback)
-**Description:** Run the query in pages of `$count` records, invoking `$callback` once per page with a `Collection` of up to `$count` models and the current page number (`function(Collection $chunk, int $page)`). Returning `false` from the callback stops processing early. Returns `false` if iteration was stopped early, `true` otherwise.
+**Description:** Run the query in pages of `$count` records, invoking `$callback` once per page with a `Collection` of up to `$count` models and the current page number (`function(Collection $chunk, int $page)`). Returning `false` from the callback stops processing early. Returns `false` if iteration was stopped early, `true` otherwise. The query builder's state (`limit()`/`offset()`, plus any soft-delete scoping applied internally) is always restored when `chunk()` finishes — including when your callback throws an exception — so the builder can be reused safely afterwards without duplicated constraints or a stale limit/offset.
 
 **Example:**
 ```php
@@ -1559,7 +1559,7 @@ Order::query()->chunk(200, function($orders, $page) {
 ```
 
 ### each(callable $callback, $count = 1000)
-**Description:** Like `chunk()`, but invokes `$callback` once per individual model instead of once per page — `function(Model $item, int $index)`, where `$index` is a running zero-based counter across the whole result set. Internally fetches records in pages of `$count` for memory efficiency. Returning `false` from the callback stops processing early. Returns `false` if iteration was stopped early, `true` otherwise.
+**Description:** Like `chunk()`, but invokes `$callback` once per individual model instead of once per page — `function(Model $item, int $index)`, where `$index` is a running zero-based counter across the whole result set. Internally fetches records in pages of `$count` for memory efficiency (delegating to `chunk()`, so it inherits the same exception-safe restoration of the builder's `limit()`/`offset()` and soft-delete scope state). Returning `false` from the callback stops processing early. Returns `false` if iteration was stopped early, `true` otherwise.
 
 **Example:**
 ```php
