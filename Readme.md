@@ -1370,7 +1370,7 @@ $users = User::with(['posts' => function($q) {
 - `hasOne` / `belongsTo` / `morphOne` / `morphTo` relations resolve to a single model instance (or `null` if none matched).
 - `hasMany` / `belongsToMany` / `hasManyThrough` / `morphMany` relations resolve to a `Collection` (empty if none matched).
 
-This applies whether the relation was eager-loaded via `with()` or accessed lazily as a property (e.g. `$user->posts`, `$post->user`).
+This applies whether the relation was eager-loaded via `with()` or accessed lazily as a property (e.g. `$user->posts`, `$post->user`). Null foreign keys are handled consistently too: a `belongsTo`/`morphTo` relation whose FK column is `null` resolves to `null` both lazily and under eager loading — no query is issued at all when *every* parent row has a null FK, and rows with null FKs never contribute keys to the batched `WHERE ... IN (...)`. Likewise `withCount()` reports `0` and `withSum()`/`withAvg()`/`withMin()`/`withMax()` report `null` for such rows.
 
 ### Disabling global scopes for an eager-loaded relation
 

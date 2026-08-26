@@ -1737,7 +1737,7 @@ $latestPublishedPost = $user->latestPost()
 | `smallestOfMany($column)` | Order by column ascending |
 
 ### belongsTo($related, $foreignKey = null, $ownerKey = null)
-**Description:** Define an inverse one-to-one or many relationship. Like `hasOne`/`hasMany`, this returns a lazy, chainable `QueryBuilder` rather than eagerly executing the query — call `->first()` (or further chain `->where(...)` etc.) to resolve it.
+**Description:** Define an inverse one-to-one or many relationship. Like `hasOne`/`hasMany`, this returns a lazy, chainable `QueryBuilder` rather than eagerly executing the query — call `->first()` (or further chain `->where(...)` etc.) to resolve it. When the local foreign-key value is `null`, the returned query is constrained to match nothing (compiled as an always-false `0=1` predicate), so resolving it yields `null`; eager loading applies the equivalent guard — models with null FKs are excluded from the batched `WHERE IN` keys and resolve to `null` (or a `0` count / `null` aggregate under `withCount()`/`withSum()` etc.) without issuing a query when no valid keys remain.
 
 **Example:**
 ```php
