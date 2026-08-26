@@ -1388,7 +1388,9 @@ $success = User::insertOrIgnore($data);
 - `$uniqueBy` — Column(s) that uniquely identify records (e.g., `['email']` or `'email'`).
 - `$update` — (Optional) Columns to update when a duplicate is found. If `null`, all columns except `$uniqueBy` are updated.
 
-**Returns:** Number of affected rows or `false` on failure.
+**Returns:** Number of affected rows or `false` on failure. Returns `0` when `$values` is empty.
+
+**Throws:** `\InvalidArgumentException` if any row is not an associative array, or if rows have inconsistent column sets — every row must carry exactly the same columns as the first row (column *order* may differ). This prevents missing keys from being silently inserted as `NULL` and extra keys from being silently dropped.
 
 **Examples:**
 ```php
@@ -1421,6 +1423,7 @@ DB::table('users')->upsert([
 - If timestamps are enabled on the model, `created_at` and `updated_at` are handled automatically.
 - The `$uniqueBy` columns must have a unique or primary key constraint in the database for the ON DUPLICATE KEY behavior to work.
 - If `$update` is empty (no columns to update), falls back to `INSERT IGNORE` behavior.
+- An empty `$values` array is a no-op returning `0`; all rows must share the same column set (order-insensitive) — see **Throws** above.
 
 ---
 

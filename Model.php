@@ -1041,6 +1041,7 @@ protected function castSet($key, $value) {
      * @param array|string $uniqueBy Column(s) that uniquely identify records (used for ON DUPLICATE KEY).
      * @param array|null $update Columns to update on duplicate. If null, all columns except $uniqueBy are updated.
      * @return int|false Number of affected rows or false on failure.
+     * @throws \InvalidArgumentException if rows have inconsistent column sets.
      *
      * Usage:
      *   Model::upsert([
@@ -1061,6 +1062,10 @@ protected function castSet($key, $value) {
         if (!isset($values[0]) || !is_array($values[0])) {
             $values = [$values];
         }
+
+        // Every row must carry the same columns as the first — otherwise
+        // missing keys would silently become NULL and extra keys be dropped.
+        Helpers::validateConsistentColumns($values, static::class . '::upsert');
 
         $uniqueBy = (array) $uniqueBy;
 

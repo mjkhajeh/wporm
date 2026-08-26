@@ -76,4 +76,41 @@ class Helpers {
         $pascalCaseString = implode( '', $capitalizedWords ); // Combine the words back into a string
         return str_replace( ' ', '', $pascalCaseString ); // Remove spaces
     }
+
+    /**
+     * Validate that every row in a batch insert/upsert carries exactly the same
+     * column set as the first row.
+     *
+     * Column order may differ between rows (values are matched by key when the
+     * VALUES tuples are built), but the set of keys must be identical — otherwise
+     * missing keys would be silently inserted as NULL and extra keys silently
+     * dropped.
+     *
+     * @param array $values Array of rows, each an associative array of column => value
+     * @param string $method Caller method name used in error messages
+     * @return void
+     * @throws \InvalidArgumentException if a row is not an array or has a different column set
+     */
+    public static function validateConsistentColumns(array $values, string $method = 'upsert'): void {
+        $firstKeys = null;
+        foreach ($values as $index => $row) {
+            if (!is_array($row)) {
+                throw new \InvalidArgumentException(
+                    "{$method}(): row at index " . var_export($index, true) . ' is not an associative array of column => value pairs.'
+                );
+            }
+            $keys = array_keys($row);
+            sort($keys);
+            if ($firstKeys === null) {
+                $firstKeys = $keys;
+                continue;
+            }
+            if ($keys !== $firstKeys) {
+                throw new \InvalidArgumentException(
+                    "{$method}(): row at index " . var_export($index, true) . ' has a different column set than the first row.'
+                    . ' Expected: [' . implode(', ', $firstKeys) . '], got: [' . implode(', ', $keys) . '].'
+                );
+            }
+        }
+    }
 }

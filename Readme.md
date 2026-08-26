@@ -412,8 +412,9 @@ DB::table('users')->upsert([
 ```
 
 - If timestamps are enabled on the model, `created_at` and `updated_at` are handled automatically.
-- Returns the number of affected rows, or `false` on failure.
+- Returns the number of affected rows, or `false` on failure. An empty `$values` array is a no-op that returns `0`.
 - If no update columns are specified and none can be inferred, falls back to `INSERT IGNORE` behavior.
+- Every row must carry exactly the same columns as the first row (column order doesn't matter); otherwise an `InvalidArgumentException` is thrown — this catches typos and shape mismatches instead of silently inserting `NULL`s for missing keys or dropping extra ones.
 
 WPORM also provides `firstOrCreate` and `firstOrNew` methods, similar to Laravel Eloquent, for convenient record retrieval or creation.
 
