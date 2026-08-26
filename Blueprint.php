@@ -203,11 +203,11 @@ class Blueprint
     public function jsonb(string $column) { return $this->addColumn("JSONB", $column); }
     public function char(string $column, int $length = 1) { return $this->addColumn("CHAR($length)", $column); }
     public function enum(string $column, array $values) {
-        $values = implode("', '", array_map('addslashes', $values));
+        $values = implode("', '", array_map([Helpers::class, 'escapeSqlString'], array_map('strval', $values)));
         return $this->addColumn("ENUM('$values')", $column);
     }
     public function set(string $column, array $values) {
-        $values = implode("', '", array_map('addslashes', $values));
+        $values = implode("', '", array_map([Helpers::class, 'escapeSqlString'], array_map('strval', $values)));
         return $this->addColumn("SET('$values')", $column);
     }
     public function year(string $column) { return $this->addColumn("YEAR", $column); }

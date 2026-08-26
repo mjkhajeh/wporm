@@ -78,6 +78,34 @@ class Helpers {
     }
 
     /**
+     * Escape a plain PHP string for embedding inside a single-quoted MySQL
+     * string literal, safely for ANY connection charset.
+     *
+     * Unlike addslashes() — which blindly escapes individual bytes and can be
+     * defeated or corrupted by multibyte encodings such as GBK/BIG5, where a
+     * trailing escape backslash can be swallowed into a multibyte character —
+     * this uses only encoding-independent escaping rules:
+     *
+     *   - backslashes are doubled      ( \  -> \\ )
+     *   - single quotes are doubled    ( '  -> '' )   pure syntax-level escaping
+     *   - NUL bytes use the \0 escape sequence
+     *
+     * Quote-doubling cannot be abused by charset tricks because it operates at
+     * the SQL syntax layer rather than the byte layer.
+     *
+     * @param string $value Raw value (without surrounding quotes).
+     * @return string Escaped content, ready to wrap in single quotes.
+     */
+    public static function escapeSqlString(string $value): string {
+        // Order matters: double existing backslashes first, then double
+        // quotes; finally emit NUL as the \0 escape sequence (its backslash
+        // must stay single, so it comes last).
+        $value = str_replace('\\', '\\\\', $value);
+        $value = str_replace("'", "''", $value);
+        return str_replace("\0", '\0', $value);
+    }
+
+    /**
      * Validate that every row in a batch insert/upsert carries exactly the same
      * column set as the first row.
      *

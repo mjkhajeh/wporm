@@ -415,14 +415,14 @@ $table->jsonb('meta');
 ## Special Types
 
 ### enum($column, $values)
-**Description:** Adds an ENUM column with allowed values.
+**Description:** Adds an ENUM column with allowed values. Values are embedded in the generated DDL using charset-safe escaping (see `default()`).
 **Example:**
 ```php
 $table->enum('status', ['draft', 'published', 'archived']);
 ```
 
 ### set($column, $values)
-**Description:** Adds a SET column with allowed values.
+**Description:** Adds a SET column with allowed values. Values are embedded in the generated DDL using charset-safe escaping (see `default()`).
 **Example:**
 ```php
 $table->set('tags', ['news', 'tech', 'sports']);
@@ -576,7 +576,7 @@ $table->string('middle_name')->nullable();
 ```
 
 ### default($value)
-**Description:** Sets a `DEFAULT` value for the column. Plain strings, ints, floats, and booleans are rendered as quoted/unquoted literals as appropriate (e.g. `'active'`, `1`, `0.5`). Raw SQL keywords/expressions — `CURRENT_TIMESTAMP`, `CURRENT_TIMESTAMP(n)`, `CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`, `NOW()`, `NULL`, `TRUE`, `FALSE`, `UUID()` (matched case-insensitively) — are detected automatically and emitted **unquoted**, so they execute as SQL rather than being stored as the literal string `'CURRENT_TIMESTAMP'`.
+**Description:** Sets a `DEFAULT` value for the column. Plain strings, ints, floats, and booleans are rendered as quoted/unquoted literals as appropriate (e.g. `'active'`, `1`, `0.5`). String values are escaped with charset-safe rules (quotes doubled, backslashes escaped — never `addslashes()`, which multibyte charsets like GBK can defeat), so embedded quotes and backslashes are safe. Raw SQL keywords/expressions — `CURRENT_TIMESTAMP`, `CURRENT_TIMESTAMP(n)`, `CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`, `NOW()`, `NULL`, `TRUE`, `FALSE`, `UUID()` (matched case-insensitively) — are detected automatically and emitted **unquoted**, so they execute as SQL rather than being stored as the literal string `'CURRENT_TIMESTAMP'`.
 **Example:**
 ```php
 $table->string('status')->default('active');           // DEFAULT 'active'

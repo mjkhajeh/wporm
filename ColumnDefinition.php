@@ -170,8 +170,9 @@ class ColumnDefinition
                 // — emit as-is, uppercased for readability, never quoted.
                 $val = strtoupper(trim($this->default));
             } else {
-                // Plain string literal — quote it (and escape embedded quotes).
-                $val = "'" . addslashes($this->default) . "'";
+                // Plain string literal — quote it, escaping with charset-safe
+                // rules (addslashes() is unsafe for multibyte charsets).
+                $val = "'" . Helpers::escapeSqlString((string) $this->default) . "'";
             }
             $sql .= " DEFAULT $val";
         }
