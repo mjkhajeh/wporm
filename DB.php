@@ -41,7 +41,21 @@ class DB {
             public $createdAtColumn = 'created_at';
             public $updatedAtColumn = 'updated_at';
 
-            public function getTable() { return $this->table; }
+            public function getTable() {
+                global $wpdb;
+                if (strpos($this->table, $wpdb->prefix) === 0) {
+                    return $this->table;
+                }
+                return $wpdb->prefix . $this->table;
+            }
+            public function getPrimaryKey() { return $this->primaryKey; }
+            public function getCasts() { return $this->casts; }
+            public function getTimestamps() { return $this->timestamps; }
+            public function getSoftDeletes() { return $this->softDeletes; }
+            public function getSoftDeleteType() { return $this->softDeleteType; }
+            public function getDeletedAtColumn() { return $this->deletedAtColumn; }
+            public function getCreatedAtColumn() { return $this->createdAtColumn; }
+            public function getUpdatedAtColumn() { return $this->updatedAtColumn; }
         };
 
         if ($table instanceof \Closure || $table instanceof QueryBuilder) {

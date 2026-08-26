@@ -1459,11 +1459,16 @@ class QueryBuilder {
         );
         if (!$results) return new \MJ\WPORM\Collection([], get_class($this->model));
         $modelClass = get_class($this->model);
-        $models = array_map(function ($row) use ($modelClass) {
-            $instance = (new $modelClass)->newFromBuilder($row);
-            $instance->fireModelEvent('retrieved');
-            return $instance;
-        }, $results);
+        if (!$this->model instanceof Model) {
+            // Raw table query (DB::table()): hydrate as plain stdClass rows
+            $models = array_map(fn($row) => (object) $row, $results);
+        } else {
+            $models = array_map(function ($row) use ($modelClass) {
+                $instance = (new $modelClass)->newFromBuilder($row);
+                $instance->fireModelEvent('retrieved');
+                return $instance;
+            }, $results);
+        }
         // Eager load relations if requested
         if (!empty($this->with) && !empty($models)) {
             foreach ($this->with as $relation => $constraint) {
@@ -1519,6 +1524,13 @@ class QueryBuilder {
             $bindings
         );
         if (!$results) {
+            return;
+        }
+        if (!$this->model instanceof Model) {
+            // Raw table query (DB::table()): yield plain stdClass rows
+            foreach ($results as $row) {
+                yield (object) $row;
+            }
             return;
         }
         $modelClass = get_class($this->model);
