@@ -1952,8 +1952,12 @@ class QueryBuilder {
      */
     public function join($table, $first = null, $operator = null, $second = null, $type = 'INNER') {
         if ($first instanceof \Closure) {
-            // Support closure for advanced join conditions
-            $join = new static($this->model);
+            // Support closure for advanced join conditions.
+            // The sub-builder must NOT receive global scopes: its wheres are
+            // spliced into the JOIN's ON clause, and global-scope constraints
+            // (e.g. soft deletes) belong to the outer query's WHERE clause —
+            // baking them into the ON condition would change join semantics.
+            $join = new static($this->model, false);
             $first($join);
             $this->joins[] = [
                 'type' => $type,

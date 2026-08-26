@@ -385,7 +385,7 @@ $users = User::query()->where('country', 'US')->orWhereNone([
 ```
 
 ### join($table, $first = null, $operator = null, $second = null, $type = 'INNER')
-**Description:** Add an INNER JOIN clause to the query. Supports closure for advanced ON conditions.
+**Description:** Add an INNER JOIN clause to the query. Supports closure for advanced ON conditions. The closure receives a dedicated sub-builder whose conditions are spliced into the JOIN's `ON` clause; this sub-builder intentionally does **not** inherit the model's global scopes (soft deletes, etc.) — those constraints belong to the outer query's `WHERE`, matching Eloquent's behavior.
 
 **Example:**
 ```php
