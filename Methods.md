@@ -1316,7 +1316,7 @@ $user = User::updateOrCreate(['email' => 'foo@bar.com'], ['name' => 'Foo']);
 ```
 
 ### create(array $attributes = [])
-**Description:** Instantiate a new model with the given attributes, save it, and return the instance — a one-line insert + return model (Eloquent-style). Attributes are mass-assigned through the same `$fillable`/`$guarded` rules as `new Model([...])`; anything not allowed through mass assignment is silently skipped. Equivalent to `new static($attributes)` followed by `->save()`, just shorter.
+**Description:** Instantiate a new model with the given attributes, save it, and return the instance — a one-line insert + return model (Eloquent-style). Attributes are mass-assigned through the same `$fillable`/`$guarded` rules as `new Model([...])`; anything not allowed through mass assignment throws a `MassAssignmentException`. Equivalent to `new static($attributes)` followed by `->save()`, just shorter.
 
 **Example:**
 ```php
@@ -2363,10 +2363,10 @@ $clone->save();
 
 ## Mass Assignment Protection
 
-WPORM guards against unintended mass assignment, just like Eloquent, via `$fillable` and `$guarded` on the model. These are enforced by `isFillableAttribute()` for **every** mass-assignment path: `fill()`, `__set()` (and therefore array access like `$user['name'] = ...`), `new Model([...])`, `updateOrCreate()`, `firstOrCreate()`, and `firstOrNew()`. Note: `fill()` and the constructor silently skip blocked attributes, while `__set()` and array access throw a `MassAssignmentException`.
+WPORM guards against unintended mass assignment, just like Eloquent, via `$fillable` and `$guarded` on the model. These are enforced by `isFillableAttribute()` for **every** mass-assignment path: `fill()`, `__set()` (and therefore array access like `$user['name'] = ...`), `new Model([...])`, `updateOrCreate()`, `firstOrCreate()`, and `firstOrNew()`. All of these paths throw a `MassAssignmentException` when an attribute is blocked — nothing is silently skipped, so guard violations surface immediately instead of hiding bugs. Use `forceFill()` to bypass the guards deliberately.
 
 ### $fillable
-**Description:** A whitelist of attribute names that may be mass-assigned. If `$fillable` is non-empty, only the listed keys can be set via `fill()`/constructor/`__set()`; everything else is either silently ignored (for `fill()`/constructor) or throws a `MassAssignmentException` (for `__set()` and array access).
+**Description:** A whitelist of attribute names that may be mass-assigned. If `$fillable` is non-empty, only the listed keys can be set via `fill()`/constructor/`__set()`; everything else throws a `MassAssignmentException` on every mass-assignment path.
 
 **Example:**
 ```php
@@ -2375,9 +2375,12 @@ class User extends Model {
 }
 
 $user = new User(['name' => 'Jane', 'email' => 'jane@example.com', 'is_admin' => true]);
-$user->is_admin; // null — 'is_admin' was silently ignored during construction
+// Throws MassAssignmentException — 'is_admin' is not in $fillable
 
-$user->is_admin = true; // Throws MassAssignmentException
+$user->is_admin = true; // Also throws MassAssignmentException
+
+// Trusted data can bypass the guards:
+$user->forceFill(['is_admin' => true]);
 ```
 
 ### $guarded

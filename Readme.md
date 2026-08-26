@@ -302,7 +302,7 @@ $user = User::create([
 echo $user->id; // the newly-inserted primary key
 ```
 
-- Attributes are mass-assigned through the same `$fillable`/`$guarded` rules as `new Model([...])` — any attribute not allowed through mass assignment is silently skipped, exactly like the constructor.
+- Attributes are mass-assigned through the same `$fillable`/`$guarded` rules as `new Model([...])` — any attribute not allowed through mass assignment throws a `MassAssignmentException`, exactly like the constructor.
 - Equivalent to (and a shorthand for):
   ```php
   $user = new User(['name' => 'John Doe', 'email' => 'user@example.com']);
@@ -788,9 +788,12 @@ class User extends Model {
 }
 
 $user = new User(['name' => 'Jane', 'is_admin' => true]);
-$user->is_admin; // null — 'is_admin' was silently ignored during construction
+// Throws MassAssignmentException — 'is_admin' is not in $fillable
 
-$user->is_admin = true; // Throws MassAssignmentException
+$user->is_admin = true; // Also throws MassAssignmentException
+
+// Use forceFill() to bypass the guards for trusted data:
+$user->forceFill(['is_admin' => true]);
 
 // Or, blacklist style:
 class Post extends Model {

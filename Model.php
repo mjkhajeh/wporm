@@ -460,13 +460,9 @@ abstract class Model implements \ArrayAccess {
 			if ($this->isFillableAttribute($key)) {
 				$this->setAttributeDirectly($key, $value);
 			} else {
-				error_log(sprintf(
-					'WPORM: Mass-assignment guard blocked filling "%s" on %s. '
-					. 'Add "%s" to $fillable or set $guarded to [] to allow this.',
-					$key,
-					static::class,
-					$key
-				));
+				// Fail loudly like Eloquent: silently skipping blocked
+				// attributes hides bugs (e.g. typos in $fillable lists).
+				throw MassAssignmentException::forAttribute($key, static::class);
 			}
 		}
 		return $this;
@@ -943,14 +939,15 @@ protected function castSet($key, $value) {
 	 * Mass assignment still goes through the constructor/fill()/__set()
 	 * pipeline, so $fillable/$guarded are enforced exactly as they are for
 	 * `new static($attributes)`. Any attribute not allowed through mass
-	 * assignment is skipped with a logged warning, making guard violations
-	 * visible in the error log.
+	 * assignment throws a MassAssignmentException, Eloquent-style — use
+	 * forceFill() to bypass the guards deliberately.
 	 *
 	 * Usage:
 	 *   $user = User::create(['name' => 'Jane', 'email' => 'jane@example.com']);
 	 *
 	 * @param array $attributes
 	 * @return static The newly created (and already-saved) model instance.
+	 * @throws \MJ\WPORM\MassAssignmentException
 	 */
 	public static function create(array $attributes = []) {
 		$instance = new static($attributes);
