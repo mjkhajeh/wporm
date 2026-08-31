@@ -476,6 +476,12 @@ abstract class Model implements \ArrayAccess {
 			return true;
 		}
 
+		// Allow timestamp columns to pass mass-assignment when timestamps
+		// are enabled — the ORM manages created_at / updated_at internally.
+		if ($this->timestamps && in_array($key, [$this->createdAtColumn, $this->updatedAtColumn], true)) {
+			return true;
+		}
+
 		if ($this->isGuardedAttribute($key)) {
 			return false;
 		}
