@@ -270,6 +270,7 @@ protected function update() {
 | `pluck()` / `value()` | ✅ Compatible |
 | `find()` / `findOrFail()` on QueryBuilder | ✅ Compatible |
 | `whereHas()` / `orWhereHas()` | ✅ Compatible |
+| `whereRelation()` / `orWhereRelation()` | ✅ Compatible |
 | `whereExists()` / `whereNotExists()` | ✅ Compatible |
 | `has()` | ✅ Compatible |
 | `increment()` / `decrement()` | ✅ Compatible |

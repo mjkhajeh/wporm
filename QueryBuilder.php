@@ -4208,6 +4208,30 @@ class QueryBuilder {
     }
 
     /**
+     * Filter by existence of related records (Eloquent-style whereRelation).
+     *
+     * Alias of whereHas() — identical behavior, provided for Eloquent API
+     * parity. Calls the relation method on a fresh model instance so that
+     * no concrete FK value from a real row leaks into the existence
+     * subquery. The relation context carried on the returned QueryBuilder
+     * drives all key resolution — no reflection needed.
+     *
+     * Usage: ->whereRelation('posts', function($q) { $q->where('published', 1); })
+     */
+    public function whereRelation($relation, $constraint = null) {
+        $this->applyRelationExistenceClause('whereExists', $relation, $constraint);
+        return $this;
+    }
+
+    /**
+     * OR version of whereRelation.
+     */
+    public function orWhereRelation($relation, $constraint = null) {
+        $this->applyRelationExistenceClause('orWhereExists', $relation, $constraint);
+        return $this;
+    }
+
+    /**
      * Shared implementation for whereHas / orWhereHas.
      *
      * @param string   $existsMethod  'whereExists' or 'orWhereExists'

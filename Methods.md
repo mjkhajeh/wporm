@@ -1992,10 +1992,18 @@ $type = $post->getMorphClass(); // 'post' if mapped, otherwise Post::class
 - Filter models where the given relation exists and matches the constraint closure.
 - Supported for all relationship types: `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`, `morphOne`, `morphMany`.
 - Example: `$query->whereHas('posts', function($q) { $q->where('published', 1); })`
-- `morphTo` relations are filterable from a single resolved row's context but are not meaningful to use in bulk `whereHas()`/`has()` query construction — see the note in the [Readme](./Readme.md#relationship-existence-filtering-wherehas-orwherehas-has).
+- `morphTo` relations are filterable from a single resolved row's context but are not meaningful to use in bulk `whereHas()`/`has()` query construction — see the note in the [Readme](./Readme.md#relationship-existence-filtering-wherehas-orwherehas-whererelation-orwhererelation-has).
 
 ### orWhereHas($relation, $constraint = null)
 - OR version of whereHas.
+
+### whereRelation($relation, $constraint = null)
+- Alias of whereHas(). Identical behavior — filter models where the given relation exists and matches the constraint closure.
+- Supported for all relationship types: `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`, `morphOne`, `morphMany`.
+- Example: `$query->whereRelation('posts', function($q) { $q->where('published', 1); })`
+
+### orWhereRelation($relation, $constraint = null)
+- OR version of whereRelation (alias of orWhereHas).
 
 ### has($relation, $operator = '>=', $count = 1)
 - Filter models with a number of related records matching the operator and count.

@@ -16,7 +16,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Schema management**: Create and modify tables using a fluent schema builder.
 - **Query builder**: Chainable query builder for flexible and safe SQL queries.
 - **Attribute casting**: Automatic type casting for model attributes.
-- **Relationships**: Define `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`, `hasOneThrough`, and `hasOneOfMany` relationships, with eager loading via `with()`, relationship-count eager loading via `withCount()`, and existence filtering via `whereHas()`/`has()`. Polymorphic relationships (`morphOne`, `morphMany`, `morphTo`) are also supported, including an optional `morphMap()` for short type aliases.
+- **Relationships**: Define `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`, `hasOneThrough`, and `hasOneOfMany` relationships, with eager loading via `with()`, relationship-count eager loading via `withCount()`, and existence filtering via `whereHas()`/`whereRelation()`/`has()`. Polymorphic relationships (`morphOne`, `morphMany`, `morphTo`) are also supported, including an optional `morphMap()` for short type aliases.
 - **Convenient creation**: `create()` for a one-line insert + return model, plus `updateOrCreate()`, `firstOrCreate()`, and `firstOrNew()` for upsert-style lookups.
 - **Aggregates & utilities**: `sum()`, `avg()`, `min()`, `max()`, `value()`, `pluck()`, `exists()`/`doesntExist()`, and `increment()`/`decrement()`.
 - **Fail-fast lookups**: `findOrFail()`/`firstOrFail()` (including array-of-ids lookups, and `Collection::firstOrFail()`) throw a `ModelNotFoundException` instead of silently returning `null`.
@@ -1299,10 +1299,12 @@ All relationship methods (`hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `ha
 > so eager loading and existence filtering work correctly for all relationship types,
 > including `belongsToMany`, `hasManyThrough`, and the polymorphic relations.
 
-### Relationship Existence Filtering: whereHas, orWhereHas, has
+### Relationship Existence Filtering: whereHas, orWhereHas, whereRelation, orWhereRelation, has
 
 - `whereHas('relation', function($q) { ... })`: Filter models where the relation exists and matches constraints.
 - `orWhereHas('relation', function($q) { ... })`: OR version of whereHas.
+- `whereRelation('relation', function($q) { ... })`: Alias of `whereHas()` — identical behavior, provided for Eloquent API parity.
+- `orWhereRelation('relation', function($q) { ... })`: OR version of `whereRelation()`.
 - `has('relation', '>=', 2)`: Filter models with at least (or exactly, or at most) N related records. Operator and count are optional (defaults to ">= 1"). Implemented as a correlated `COUNT(*)` subquery, so the count comparison is enforced precisely (not just existence).
 
 **Examples:**
@@ -1318,6 +1320,11 @@ User::query()->has('posts', '=', 2)->get();
 
 // Users with at least one published post
 User::query()->whereHas('posts', function($q) {
+    $q->where('published', 1);
+})->get();
+
+// whereRelation() is an alias of whereHas() — same behavior:
+User::query()->whereRelation('posts', function($q) {
     $q->where('published', 1);
 })->get();
 
