@@ -186,6 +186,22 @@ $user = User::find(1);
 
 ---
 
+### scope($scope, ...$parameters)
+**Description:** Apply a local scope using this model instance. A string such as `active` resolves to `scopeActive($query, ...$parameters)`. A closure or callable receives the query as its first argument and is bound to the model instance when possible.
+
+Query-builder scope calls such as `User::query()->active()` use the same model-bound dispatch.
+
+**Example:**
+```php
+$user = new User();
+
+$activeUsers = $user->scope('active')->get();
+
+$namedUsers = $user->scope(function ($query, $name) {
+    return $query->where('name', $name);
+}, 'Jane')->get();
+```
+
 ## Query Methods
 
 ### query()

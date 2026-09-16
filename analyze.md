@@ -313,7 +313,7 @@ protected function update() {
 | 4 | `$model->setAppends()` | **Implemented** | ✅ Exists and replaces the runtime appends array. |
 | 5 | `Model::without()` (eager load exclusion) | **Implemented** | ✅ Exists. |
 | 6 | `Model::only()` (select specific columns on relation) | **Implemented** | ✅ Exists. |
-| 7 | `Model::scope()` (binding scope to model instance) | **Important** | Not implemented. |
+| 7 | ~~`Model::scope()` (binding scope to model instance)~~ | **Implemented** | ✅ Supports named local scopes and model-bound callables. |
 | 8 | `Model::queryRaw()` / `Model::selectRaw()` static | **Important** | Not available as static methods. |
 | 9 | `$model->isClean()` / `$model->wasChanged()` | **Important** | Missing dirty tracking methods. |
 | 10 | `$model->syncOriginal()` | **Important** | No way to manually refresh original state. |

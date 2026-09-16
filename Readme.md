@@ -233,7 +233,7 @@ $users = User::query()
     ->get();
 ```
 
-`And` and `Or` are case-sensitive separators and each parsed column requires exactly one argument, in method-name order. Dynamic wheres always use the equality operator; use `where()` for other operators. Model query scopes are resolved before dynamic wheres, so a scope such as `scopeWhereEmail()` takes precedence over the generated clause.
+`And` and `Or` are case-sensitive separators and each parsed column requires exactly one argument, in method-name order. Dynamic wheres always use the equality operator; use `where()` for other operators. Model query scopes are resolved before dynamic wheres, so a scope such as `scopeWhereEmail()` takes precedence over the generated clause. Local scopes can also be applied explicitly through an instance with `$model->scope('active')`, which binds the scope to that model.
 
 ### Finding a Record or Failing: findOrFail and firstOrFail
 

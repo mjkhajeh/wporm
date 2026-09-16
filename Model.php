@@ -589,8 +589,7 @@ abstract class Model implements \ArrayAccess {
 	public function __call($method, $parameters) {
         // Handle dynamic scopes: scopeXyz() — cheap check before building a query
         if (strpos($method, 'scope') === 0 && method_exists($this, $method)) {
-            $query = static::query();
-            return $this->$method($query, ...$parameters);
+            return $this->scope(substr($method, 5), ...$parameters);
         }
         // Proxy query builder methods and dynamic wheres for fluent API
         if (method_exists(\MJ\WPORM\QueryBuilder::class, $method) || strpos($method, 'where') === 0) {
@@ -599,6 +598,48 @@ abstract class Model implements \ArrayAccess {
         }
         throw new \BadMethodCallException("Method {$method} does not exist.");
     }
+
+	/**
+	 * Apply a local scope to a query using this model instance.
+	 *
+	 * This is the instance-bound equivalent of Eloquent's local-scope
+	 * dispatch: a scope named "active" resolves to scopeActive($query, ...).
+	 * Callable scopes receive the query first and remain bound to this model.
+	 *
+	 * @param string|callable $scope
+	 * @param mixed ...$parameters
+	 * @return mixed
+	 */
+	public function scope($scope, ...$parameters) {
+		$query = static::query();
+
+		if (is_string($scope)) {
+			$method = 'scope' . ucfirst($scope);
+			if (!method_exists($this, $method)) {
+				throw new \BadMethodCallException(
+					"Local scope '{$scope}' does not exist on " . static::class . '.'
+				);
+			}
+
+			$result = $this->$method($query, ...$parameters);
+			return $result === null ? $query : $result;
+		}
+
+		if (is_callable($scope)) {
+			if ($scope instanceof \Closure) {
+				$boundScope = $scope->bindTo($this, static::class);
+				if ($boundScope !== null) {
+					$scope = $boundScope;
+				}
+			}
+			$result = $scope($query, ...$parameters);
+			return $result === null ? $query : $result;
+		}
+
+		throw new \InvalidArgumentException(
+			'The scope must be a scope name or callable.'
+		);
+	}
 
 	protected function castGet($key, $value) {
     if (!isset($this->casts[$key])) return $value;

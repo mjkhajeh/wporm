@@ -1822,8 +1822,7 @@ class QueryBuilder {
     public function __call($method, $parameters) {
         $scopeMethod = 'scope' . ucfirst($method);
         if (method_exists($this->model, $scopeMethod)) {
-            array_unshift($parameters, $this);
-            return call_user_func_array([$this->model, $scopeMethod], $parameters);
+            return $this->model->scope($method, ...$parameters);
         }
 
         if (strpos($method, 'where') === 0) {
