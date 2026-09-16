@@ -2494,6 +2494,34 @@ public function forceDelete() {
 		return $key ? ($this->original[$key] ?? null) : array_values($this->original);
 	}
 
+	/**
+	 * Sync the original attributes with the current attributes.
+	 *
+	 * When attributes are provided, only those original values are synced.
+	 * The post-save changes snapshot is intentionally preserved, matching
+	 * Eloquent's syncOriginal() behavior.
+	 *
+	 * @param string|array|null $attributes
+	 * @return $this
+	 */
+	public function syncOriginal($attributes = null) {
+		if ($attributes === null) {
+			$this->original = $this->attributes;
+			return $this;
+		}
+
+		$attributes = is_array($attributes) ? $attributes : [$attributes];
+		foreach ($attributes as $attribute) {
+			if (array_key_exists($attribute, $this->attributes)) {
+				$this->original[$attribute] = $this->attributes[$attribute];
+			} else {
+				unset($this->original[$attribute]);
+			}
+		}
+
+		return $this;
+	}
+
 	// -------------------------------------------------------------------------
 	// Event dispatching
 	// -------------------------------------------------------------------------

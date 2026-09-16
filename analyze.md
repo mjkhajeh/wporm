@@ -457,7 +457,7 @@ protected function update() {
 3. ~~Add `without()` for eager load exclusion.~~ **Implemented**
 4. ~~Add `getAttributes()` public method.~~ **Implemented**
 5. ~~Add `isClean()` / `wasChanged()` dirty tracking.~~ **Implemented**
-6. Add `syncOriginal()` method.
+6. ~~Add `syncOriginal()` method.~~ **Implemented**
 7. ~~Add `Collection::filter()` without callback (remove falsy).~~ **Implemented**
 8. ~~Fix `reorder()` to accept optional column/direction.~~ **Implemented**
 9. Split `Model.php` into traits for maintainability.

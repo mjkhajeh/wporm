@@ -2294,6 +2294,17 @@ $log = "Created user: {$user}";
 $original = $user->getOriginal();
 ```
 
+### syncOriginal($attributes = null)
+**Description:** Sync the model's original attribute snapshot with its current attributes and return the model. Pass an attribute name or array of names to sync only those attributes. The `wasChanged()`/`getChanges()` snapshot is preserved.
+
+**Example:**
+```php
+$user->name = 'New Name';
+$user->syncOriginal('name');
+
+$user->isClean('name'); // true
+```
+
 ### isDirty($attribute = null)
 **Description:** Determine if the model or a given attribute has been modified.
 
