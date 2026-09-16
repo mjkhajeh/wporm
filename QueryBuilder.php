@@ -2238,8 +2238,8 @@ class QueryBuilder {
      */
     public function getBindings() {
         return [
-            ...$this->getFromSubBindings(),
             ...$this->getSelectBindings(),
+            ...$this->getFromSubBindings(),
             ...$this->bindings,
             ...$this->getGroupByBindings(),
             ...$this->getHavingBindings(),

@@ -428,12 +428,12 @@ protected function update() {
 
 | # | Severity | Issue | File:Line |
 |---|----------|-------|-----------|
-| 1 | ~~**High**~~ **Fixed** | ~~`whereColumn()` does not validate operator — SQL injection possible.~~ Fixed by adding `Helpers::validateOperator($operator);`. | QueryBuilder.php:966 |
-| 2 | ~~**Medium**~~ **Fixed** | ~~`paginate()` reads `$_GET['page']` directly — page manipulation possible (not a security issue per se, but allows arbitrary pagination).~~ Fixed by adding `$maxPage` property (default 10,000) and capping page numbers. | QueryBuilder.php:3713 |
-| 3 | **Medium** | `$wpdb->prepare()` is used correctly for most queries, but some raw SQL paths bypass it. | QueryBuilder.php:4688 |
-| 4 | **Low** | `Helpers::quoteIdentifier()` correctly escapes backticks but does not handle special characters beyond that. | Helpers.php:9-42 |
-| 5 | **Low** | `SchemaBuilder::drop()` uses raw SQL with table name interpolation (no parameterization). | SchemaBuilder.php:62 |
-| 6 | **Low** | `createTableIfNotExists()` uses `$wpdb->prepare()` with `SHOW TABLES LIKE %s` — correct. | Model.php:386 |
+| 1 | ~~**High**~~ **Fixed** | ~~`whereColumn()` does not validate operator — SQL injection possible.~~ Fixed by adding `Helpers::validateOperator($operator);`. | QueryBuilder.php |
+| 2 | ~~**Medium**~~ **Fixed** | ~~`paginate()` reads `$_GET['page']` directly — page manipulation possible (not a security issue per se, but allows arbitrary pagination).~~ Fixed by adding `$maxPage` property (default 10,000) and capping page numbers. | QueryBuilder.php |
+| 3 | **Medium** | `$wpdb->prepare()` is used correctly for most queries, but some raw SQL paths bypass it. | QueryBuilder.php |
+| 4 | **Low** | `Helpers::quoteIdentifier()` correctly escapes backticks but does not handle special characters beyond that. | Helpers.php |
+| 5 | **Low** | `SchemaBuilder::drop()` uses raw SQL with table name interpolation (no parameterization). | SchemaBuilder.php |
+| 6 | **Low** | `createTableIfNotExists()` uses `$wpdb->prepare()` with `SHOW TABLES LIKE %s` — correct. | Model.php |
 
 ### Positive Security Practices
 
