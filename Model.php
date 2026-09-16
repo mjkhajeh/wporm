@@ -48,6 +48,7 @@ abstract class Model implements \ArrayAccess {
 	// Runtime data
 	protected $attributes = [];
 	protected $original = [];
+	protected $changes = [];
 	protected $exists = false;
 	protected $wasRecentlyCreated = false;
 	protected $_eagerLoaded = [];
@@ -1405,6 +1406,8 @@ protected function castSet($key, $value) {
 		$this->wasRecentlyCreated = true;
 		$pk = $this->primaryKey;
 		$this->attributes[$pk] = $wpdb->insert_id;
+		$this->changes = $this->attributes;
+		$this->original = $this->attributes;
 
 		// created (after-hook)
 		$this->fireModelEvent('created');
@@ -1431,6 +1434,7 @@ protected function castSet($key, $value) {
 		}
 		$dirty = $this->getDirty();
 		if (empty($dirty)) {
+			$this->changes = [];
 			return true;
 		}
 		$result = $wpdb->update($this->getTable(), $dirty, [$pk => $this->attributes[$pk]]);
@@ -1438,6 +1442,7 @@ protected function castSet($key, $value) {
 			return false;
 		}
 
+		$this->changes = $dirty;
 		// Sync original state after successful update
 		$this->original = $this->attributes;
 
@@ -1674,6 +1679,7 @@ protected function castSet($key, $value) {
 
 		$this->attributes = $fresh->attributes;
 		$this->original = $fresh->attributes;
+		$this->changes = [];
 		$this->exists = true;
 		// Eager-loaded relations may now be stale; clear them so accessing
 		// a relation property re-resolves it against the refreshed state.
@@ -2589,21 +2595,50 @@ public function forceDelete() {
 	}
 
 	public function isDirty($attribute = null) {
-		if ($attribute) {
-			$existsInOriginal = array_key_exists($attribute, $this->original);
-			$existsInAttributes = array_key_exists($attribute, $this->attributes);
+		return $this->hasChanges($this->getDirty(), $attribute);
+	}
 
-			if (!$existsInOriginal && !$existsInAttributes) {
-				return false;
-			}
+	/**
+	 * Determine whether the model or the given attributes are clean.
+	 *
+	 * @param string|array|null $attribute
+	 * @return bool
+	 */
+	public function isClean($attribute = null) {
+		return !$this->isDirty($attribute);
+	}
 
-			if (!$existsInOriginal || !$existsInAttributes) {
+	/**
+	 * Determine whether the model or the given attributes changed during the
+	 * most recent successful save.
+	 *
+	 * @param string|array|null $attribute
+	 * @return bool
+	 */
+	public function wasChanged($attribute = null) {
+		return $this->hasChanges($this->changes, $attribute);
+	}
+
+	/**
+	 * Match Eloquent's attribute filtering for isDirty()/wasChanged().
+	 *
+	 * @param array $changes
+	 * @param string|array|null $attribute
+	 * @return bool
+	 */
+	protected function hasChanges(array $changes, $attribute = null) {
+		if ($attribute === null || (is_array($attribute) && empty($attribute))) {
+			return !empty($changes);
+		}
+
+		$attributes = is_array($attribute) ? $attribute : [$attribute];
+		foreach ($attributes as $key) {
+			if (array_key_exists($key, $changes)) {
 				return true;
 			}
-
-			return $this->attributes[$attribute] !== $this->original[$attribute];
 		}
-		return !empty($this->getChanges());
+
+		return false;
 	}
 
 	/**
@@ -2622,13 +2657,7 @@ public function forceDelete() {
 	}
 
 	public function getChanges() {
-		$changes = [];
-		foreach ($this->attributes as $key => $value) {
-			if (!array_key_exists($key, $this->original) || $value !== $this->original[$key]) {
-				$changes[$key] = $value;
-			}
-		}
-		return $changes;
+		return $this->changes;
 	}    
 
 	/**

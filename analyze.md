@@ -433,14 +433,6 @@ protected function update() {
 | 3 | **Medium** | `$wpdb->prepare()` is used correctly for most queries, but some raw SQL paths bypass it. | QueryBuilder.php |
 | 4 | ~~**Low**~~ **Fixed** | ~~`Helpers::quoteIdentifier()` correctly escapes backticks but does not handle special characters beyond that.~~ Identifier segments are now consistently quoted, supplied backticks are normalized to one pair, and NUL bytes are rejected. | Helpers.php |
 | 5 | ~~**Low**~~ **Fixed** | ~~`SchemaBuilder::drop()` uses raw SQL with table name interpolation (no parameterization).~~ The fully-prefixed table name is now passed through `Helpers::quoteIdentifier()` before being used in the DDL statement. | SchemaBuilder.php |
-| 6 | **Low** | `createTableIfNotExists()` uses `$wpdb->prepare()` with `SHOW TABLES LIKE %s` — correct. | Model.php |
-
-### Positive Security Practices
-
-- All WHERE clause values go through `$wpdb->prepare()` with `%s` placeholders.
-- `Helpers::validateOperator()` is called on most comparison operators.
-- Identifier quoting uses one pair of backticks per segment via `Helpers::quoteIdentifier()`, normalizing supplied backticks and rejecting NUL bytes.
-- Mass assignment protection via `$fillable`/`$guarded`.
 
 ---
 
@@ -463,8 +455,8 @@ protected function update() {
 1. ~~Add `forceFill()` static method.~~ **Implemented**
 2. ~~Add `setAppends()` runtime method.~~ **Implemented**
 3. ~~Add `without()` for eager load exclusion.~~ **Implemented**
-4. Add `getAttributes()` public method.
-5. Add `isClean()` / `wasChanged()` dirty tracking.
+4. Add `getAttributes()` public method.~~ **Implemented**
+5. Add `isClean()` / `wasChanged()` dirty tracking.~~ **Implemented**
 6. Add `syncOriginal()` method.
 7. ~~Add `Collection::filter()` without callback (remove falsy).~~ **Implemented**
 8. Fix `reorder()` to accept optional column/direction.

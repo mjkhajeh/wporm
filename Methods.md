@@ -2300,6 +2300,25 @@ $original = $user->getOriginal();
 if ($user->isDirty('name')) { /* ... */ }
 ```
 
+### isClean($attribute = null)
+**Description:** Determine whether the model or the given attributes have not been modified since the last save or hydration. Accepts a single attribute, an array of attributes, or no argument.
+
+**Example:**
+```php
+if ($user->isClean('email')) { /* ... */ }
+```
+
+### wasChanged($attribute = null)
+**Description:** Determine whether the model or the given attributes changed during the most recent successful save. Accepts a single attribute, an array of attributes, or no argument.
+
+**Example:**
+```php
+$user->name = 'New Name';
+$user->save();
+
+if ($user->wasChanged('name')) { /* ... */ }
+```
+
 ### getDirty()
 **Description:** Get the attributes that have been changed since the last save. Returns an associative array of attribute names to their new values. This is used internally by `update()` to only send changed columns to the database, preventing unnecessary write amplification.
 
@@ -2314,7 +2333,7 @@ $dirty = $user->getDirty();
 ```
 
 ### getChanges()
-**Description:** Get the changed attributes of the model.
+**Description:** Get the attributes changed during the most recent successful save. Returns the new values, matching Eloquent's post-save change snapshot.
 
 **Example:**
 ```php
