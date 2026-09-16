@@ -782,6 +782,8 @@ echo $users;                   // same as echo $users->toJson();
 
 WPORM protects against unintended mass assignment, just like Eloquent. Use `$fillable` to whitelist attributes that can be set via `fill()`, the constructor, `__set()` (including array access like `$model['name'] = ...`), `updateOrCreate()`, `firstOrCreate()`, or `firstOrNew()`. Use `$guarded` (default: `['id']`) to blacklist attributes instead — anything **not** in `$guarded` is mass-assignable. `$guarded` is only checked when `$fillable` is empty.
 
+For explicit single-attribute assignment, use `$model->setAttribute($key, $value)`. Like Eloquent, this applies mutators and casts but intentionally bypasses mass-assignment protection; use it only with trusted attribute names and values.
+
 ```php
 class User extends Model {
     protected $fillable = ['name', 'email'];

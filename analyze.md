@@ -319,7 +319,7 @@ protected function update() {
 | 10 | `$model->syncOriginal()` | **Implemented** | ✅ Exists. |
 | 11 | ~~`$model->syncOriginalAttributes()`~~ | **Implemented** | ✅ Selectively syncs one or more attributes and preserves the post-save changes snapshot. |
 | 12 | `$model->getAttributes()` | **Implemented** | ✅ Exists. |
-| 13 | `$model->setAttribute()` (public) | **Important** | Only `setAttributeDirectly()` exists (protected). |
+| 13 | ~~`$model->setAttribute()` (public)~~ | **Implemented** | ✅ Public fluent setter applies mutators/casts and bypasses mass-assignment guards like Eloquent. |
 | 14 | `$model->getAttribute()` (public) | **Important** | Only `__get()` magic method. |
 | 15 | `$model->hasCast()` | **Important** | No method to check if a column is cast. |
 | 16 | `$model->getCasts()` | **Implemented** | ✅ Exists. |

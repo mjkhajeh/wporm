@@ -581,9 +581,25 @@ abstract class Model implements \ArrayAccess {
 	protected function setAttributeDirectly($key, $value) {
 		$method = 'set' . Helpers::convert_to_pascal_case($key) . 'Attribute';
 		if (method_exists($this, $method)) {
-			return $this->$method($value);
+			$this->$method($value);
+			return $this;
 		}
 		$this->attributes[$key] = $this->castSet($key, $value);
+		return $this;
+	}
+
+	/**
+	 * Set an attribute on the model, applying mutators and casts.
+	 *
+	 * Unlike fill() or property assignment, this explicit method bypasses
+	 * mass-assignment protection, matching Eloquent's setAttribute().
+	 *
+	 * @param string $key
+	 * @param mixed $value
+	 * @return $this
+	 */
+	public function setAttribute($key, $value) {
+		return $this->setAttributeDirectly($key, $value);
 	}
 
 	public function __call($method, $parameters) {

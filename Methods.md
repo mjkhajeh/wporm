@@ -1349,6 +1349,15 @@ $admins = User::getWithEvent(User::query()->where('role', 'admin'));
 $admin = User::firstWithEvent(User::query()->where('role', 'admin'));
 ```
 
+### setAttribute($key, $value)
+**Description:** Set one model attribute explicitly, applying its mutator and cast, and return the model for chaining. This method bypasses `$fillable`/`$guarded` mass-assignment protection, as in Eloquent; use `fill()` when protection is required.
+
+**Example:**
+```php
+$user->setAttribute('name', 'Jane')
+    ->setAttribute('email', 'jane@example.com');
+```
+
 ### updateOrCreate(array $attributes, array $values = [])
 **Description:** Find a record matching attributes, update it or create a new one.
 
