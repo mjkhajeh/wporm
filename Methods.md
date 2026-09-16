@@ -2338,6 +2338,20 @@ $log = "Created user: {$user}";
 $original = $user->getOriginal();
 ```
 
+### hasCast($key, $types = null)
+**Description:** Determine whether an attribute has a cast configured. With no `$types`, checks whether any cast exists. Pass a cast type or array of types to require a specific cast.
+
+**Example:**
+```php
+if ($user->hasCast('settings')) {
+    // The attribute has a cast.
+}
+
+if ($user->hasCast('age', ['int', 'integer'])) {
+    // The attribute uses one of the requested cast types.
+}
+```
+
 ### getAttribute($key)
 **Description:** Get an attribute explicitly using the same resolution as property access. This includes eager-loaded relations, accessors, relationships, cast values, model properties, and raw attributes.
 

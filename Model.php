@@ -83,6 +83,29 @@ abstract class Model implements \ArrayAccess {
     }
 
     /**
+     * Determine whether an attribute has a cast configured.
+     *
+     * @param string $key
+     * @param array|string|null $types Optional cast type or types to match.
+     * @return bool
+     */
+    public function hasCast($key, $types = null) {
+        if (!array_key_exists($key, $this->casts)) {
+            return false;
+        }
+
+        if ($types === null) {
+            return true;
+        }
+
+        $cast = $this->casts[$key];
+        $castType = is_array($cast) ? ($cast[0] ?? null) : $cast;
+        $types = is_array($types) ? $types : [$types];
+
+        return in_array($castType, $types, true);
+    }
+
+    /**
      * Get whether soft deletes are enabled for this model.
      * @return bool
      */

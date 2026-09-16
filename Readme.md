@@ -717,6 +717,8 @@ protected $casts = [
 ];
 ```
 
+Use `$model->hasCast('column')` to check whether a cast is configured, or pass a cast type (or array of types) to check for a specific cast.
+
 ## Array Conversion and Casting
 
 - Call `->toArray()` on a model or a collection to get an array representation with all casts applied.
