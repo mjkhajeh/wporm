@@ -315,10 +315,10 @@ protected function update() {
 | 6 | `Model::only()` (select specific columns on relation) | **Implemented** | ✅ Exists. |
 | 7 | ~~`Model::scope()` (binding scope to model instance)~~ | **Implemented** | ✅ Supports named local scopes and model-bound callables. |
 | 8 | ~~`Model::queryRaw()` / `Model::selectRaw()` static~~ | **Implemented** | ✅ Explicit static entry points now return a model query builder and support raw SELECT expressions with bindings. |
-| 9 | `$model->isClean()` / `$model->wasChanged()` | **Important** | Missing dirty tracking methods. |
-| 10 | `$model->syncOriginal()` | **Important** | No way to manually refresh original state. |
-| 11 | `$model->syncOriginalAttributes()` | **Important** | Partial sync of specific attributes. |
-| 12 | `$model->getAttributes()` | **Important** | No public method to get all raw attributes. |
+| 9 | `$model->isClean()` / `$model->wasChanged()` | **Implemented** | ✅ Exists. |
+| 10 | `$model->syncOriginal()` | **Implemented** | ✅ Exists. |
+| 11 | ~~`$model->syncOriginalAttributes()`~~ | **Implemented** | ✅ Selectively syncs one or more attributes and preserves the post-save changes snapshot. |
+| 12 | `$model->getAttributes()` | **Implemented** | ✅ Exists. |
 | 13 | `$model->setAttribute()` (public) | **Important** | Only `setAttributeDirectly()` exists (protected). |
 | 14 | `$model->getAttribute()` (public) | **Important** | Only `__get()` magic method. |
 | 15 | `$model->hasCast()` | **Important** | No method to check if a column is cast. |

@@ -2576,12 +2576,20 @@ public function forceDelete() {
 			return $this;
 		}
 
-		$attributes = is_array($attributes) ? $attributes : [$attributes];
+		return $this->syncOriginalAttributes($attributes);
+	}
+
+	/**
+	 * Sync only the given attributes with the original snapshot.
+	 *
+	 * @param string|array $attributes
+	 * @return $this
+	 */
+	public function syncOriginalAttributes($attributes) {
+		$attributes = is_array($attributes) ? $attributes : func_get_args();
 		foreach ($attributes as $attribute) {
 			if (array_key_exists($attribute, $this->attributes)) {
 				$this->original[$attribute] = $this->attributes[$attribute];
-			} else {
-				unset($this->original[$attribute]);
 			}
 		}
 

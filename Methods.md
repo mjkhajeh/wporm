@@ -2340,6 +2340,19 @@ $user->syncOriginal('name');
 $user->isClean('name'); // true
 ```
 
+### syncOriginalAttributes($attributes)
+**Description:** Sync only the specified attribute or attributes with the model's original snapshot and return the model. The `wasChanged()`/`getChanges()` snapshot is preserved. Missing attributes are ignored, matching Eloquent.
+
+**Example:**
+```php
+$user->name = 'New Name';
+$user->email = 'new@example.com';
+$user->syncOriginalAttributes(['name']);
+
+$user->isClean('name');  // true
+$user->isDirty('email'); // true
+```
+
 ### isDirty($attribute = null)
 **Description:** Determine if the model or a given attribute has been modified.
 
