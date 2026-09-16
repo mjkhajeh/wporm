@@ -502,6 +502,19 @@ abstract class Model implements \ArrayAccess {
 	}
 
 	public function __get($key) {
+		return $this->getAttribute($key);
+	}
+
+	/**
+	 * Get an attribute, accessor, relationship, or cast value.
+	 *
+	 * This is the explicit equivalent of property access and follows the same
+	 * resolution order as __get().
+	 *
+	 * @param string $key
+	 * @return mixed
+	 */
+	public function getAttribute($key) {
         // Eager loaded relations: always return the cached value (even null means "loaded but empty")
         if (array_key_exists($key, $this->_eagerLoaded)) {
             return $this->_eagerLoaded[$key];

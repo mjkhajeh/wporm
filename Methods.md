@@ -2338,6 +2338,15 @@ $log = "Created user: {$user}";
 $original = $user->getOriginal();
 ```
 
+### getAttribute($key)
+**Description:** Get an attribute explicitly using the same resolution as property access. This includes eager-loaded relations, accessors, relationships, cast values, model properties, and raw attributes.
+
+**Example:**
+```php
+$name = $user->getAttribute('name');
+$posts = $user->getAttribute('posts');
+```
+
 ### syncOriginal($attributes = null)
 **Description:** Sync the model's original attribute snapshot with its current attributes and return the model. Pass an attribute name or array of names to sync only those attributes. The `wasChanged()`/`getChanges()` snapshot is preserved.
 
