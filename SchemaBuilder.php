@@ -63,7 +63,8 @@ class SchemaBuilder
     public function drop(string $table)
     {
         $table = $this->bareTable($table);
-        $this->db->query("DROP TABLE IF EXISTS `{$this->prefix}$table`");
+        $fullTable = Helpers::quoteIdentifier($this->prefix . $table);
+        $this->db->query("DROP TABLE IF EXISTS {$fullTable}");
     }
 
     public function rename(string $from, string $to)

@@ -432,7 +432,7 @@ protected function update() {
 | 2 | ~~**Medium**~~ **Fixed** | ~~`paginate()` reads `$_GET['page']` directly — page manipulation possible (not a security issue per se, but allows arbitrary pagination).~~ Fixed by adding `$maxPage` property (default 10,000) and capping page numbers. | QueryBuilder.php |
 | 3 | **Medium** | `$wpdb->prepare()` is used correctly for most queries, but some raw SQL paths bypass it. | QueryBuilder.php |
 | 4 | ~~**Low**~~ **Fixed** | ~~`Helpers::quoteIdentifier()` correctly escapes backticks but does not handle special characters beyond that.~~ Identifier segments are now consistently quoted, supplied backticks are normalized to one pair, and NUL bytes are rejected. | Helpers.php |
-| 5 | **Low** | `SchemaBuilder::drop()` uses raw SQL with table name interpolation (no parameterization). | SchemaBuilder.php |
+| 5 | ~~**Low**~~ **Fixed** | ~~`SchemaBuilder::drop()` uses raw SQL with table name interpolation (no parameterization).~~ The fully-prefixed table name is now passed through `Helpers::quoteIdentifier()` before being used in the DDL statement. | SchemaBuilder.php |
 | 6 | **Low** | `createTableIfNotExists()` uses `$wpdb->prepare()` with `SHOW TABLES LIKE %s` — correct. | Model.php |
 
 ### Positive Security Practices
