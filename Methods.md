@@ -212,6 +212,25 @@ $namedUsers = $user->scope(function ($query, $name) {
 $users = User::query()->where('role', 'admin')->get();
 ```
 
+### queryRaw($applyGlobalScopes = true)
+**Description:** Explicit static entry point for a model query builder intended for raw-expression chaining. Equivalent to `query()`; use `selectRaw()`, `whereRaw()`, or another `*Raw()` method for raw SQL clauses with bindings.
+
+**Example:**
+```php
+$users = User::queryRaw()
+    ->selectRaw('COUNT(*) AS total')
+    ->whereRaw('active = %s', [1])
+    ->get();
+```
+
+### selectRaw($sql, array $bindings = [])
+**Description:** Start a model query and add a raw SELECT expression. Bindings are passed through the query builder to `$wpdb->prepare()`.
+
+**Example:**
+```php
+$users = User::selectRaw('price * %s AS adjusted_price', [1.1])->get();
+```
+
 ### newQuery()
 **Description:** Alias for `query()`. Returns a new query builder with global scopes.
 

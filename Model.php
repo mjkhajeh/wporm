@@ -850,6 +850,31 @@ protected function castSet($key, $value) {
 		return $query;
 	}
 
+	/**
+	 * Start a new model query for raw-expression chaining.
+	 *
+	 * This is an explicit static entry point equivalent to query(); raw
+	 * expressions are added with selectRaw(), whereRaw(), or another *Raw()
+	 * query-builder method.
+	 *
+	 * @param bool $applyGlobalScopes
+	 * @return \MJ\WPORM\QueryBuilder
+	 */
+	public static function queryRaw($applyGlobalScopes = true) {
+		return static::query($applyGlobalScopes);
+	}
+
+	/**
+	 * Start a model query with a raw SELECT expression.
+	 *
+	 * @param string $sql
+	 * @param array $bindings
+	 * @return \MJ\WPORM\QueryBuilder
+	 */
+	public static function selectRaw($sql, array $bindings = []) {
+		return static::query()->selectRaw($sql, $bindings);
+	}
+
 	public static function newQuery($applyGlobalScopes = true) {
 		return static::query($applyGlobalScopes);
 	}

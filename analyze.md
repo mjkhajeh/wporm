@@ -314,7 +314,7 @@ protected function update() {
 | 5 | `Model::without()` (eager load exclusion) | **Implemented** | ✅ Exists. |
 | 6 | `Model::only()` (select specific columns on relation) | **Implemented** | ✅ Exists. |
 | 7 | ~~`Model::scope()` (binding scope to model instance)~~ | **Implemented** | ✅ Supports named local scopes and model-bound callables. |
-| 8 | `Model::queryRaw()` / `Model::selectRaw()` static | **Important** | Not available as static methods. |
+| 8 | ~~`Model::queryRaw()` / `Model::selectRaw()` static~~ | **Implemented** | ✅ Explicit static entry points now return a model query builder and support raw SELECT expressions with bindings. |
 | 9 | `$model->isClean()` / `$model->wasChanged()` | **Important** | Missing dirty tracking methods. |
 | 10 | `$model->syncOriginal()` | **Important** | No way to manually refresh original state. |
 | 11 | `$model->syncOriginalAttributes()` | **Important** | Partial sync of specific attributes. |

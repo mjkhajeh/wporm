@@ -1834,7 +1834,7 @@ $parts = Parts::partsWithMinQty(5);
 
 ## Raw SQL Expressions
 
-When the fluent query builder can't cleanly express what you need — SQL functions, computed columns, vendor-specific syntax — drop down to raw SQL for individual clauses with `selectRaw()`, `whereRaw()`/`orWhereRaw()`, `groupByRaw()`, and `havingRaw()`/`orHavingRaw()` (alongside the existing `orderByRaw()`). Bindings use the same `%s`-style placeholders as the rest of WPORM and are passed straight through to `$wpdb->prepare()`, so they're just as safe as the regular query builder methods — and they can be freely mixed with non-raw calls in the same query.
+When the fluent query builder can't cleanly express what you need — SQL functions, computed columns, vendor-specific syntax — drop down to raw SQL for individual clauses with `selectRaw()`, `whereRaw()`/`orWhereRaw()`, `groupByRaw()`, and `havingRaw()`/`orHavingRaw()` (alongside the existing `orderByRaw()`). These methods are available on a query builder and through the static model entry points `Model::queryRaw()` and `Model::selectRaw()`. Bindings use the same `%s`-style placeholders as the rest of WPORM and are passed straight through to `$wpdb->prepare()`, so they're just as safe as the regular query builder methods — and they can be freely mixed with non-raw calls in the same query.
 
 ```php
 // selectRaw() — add a raw expression to the SELECT list (combine with select())
