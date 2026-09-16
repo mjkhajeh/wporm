@@ -7,16 +7,11 @@ class Helpers {
     }
 
     public static function quoteIdentifier($name) {
-        // Fast path: plain column name (id, name, created_at, …) — skip all regex.
-        // Alphanumeric + underscores only covers the vast majority of column names.
-        if ($name !== '' && $name[0] !== '`' && $name !== '*'
-            && ctype_alnum(str_replace('_', '', $name))
-        ) {
-            return '`' . $name . '`';
+        if (!is_string($name)) {
+            throw new \InvalidArgumentException('Identifier must be a string.');
         }
 
-        // If already quoted or is a function call, return as is
-        if ($name === '*' || strpos($name, '`') !== false || preg_match('/\w+\s*\(/', $name)) {
+        if ($name === '*') {
             return $name;
         }
 
@@ -28,6 +23,13 @@ class Helpers {
             return self::quoteIdentifier($expr) . ' AS ' . self::quoteIdentifier($alias);
         }
 
+        // Function expressions are intentionally supported for select()/orderBy()
+        // compatibility; callers should use the corresponding *Raw() method for
+        // arbitrary SQL expressions.
+        if (preg_match('/^\s*[A-Za-z_][A-Za-z0-9_]*\s*\(/', $name)) {
+            return $name;
+        }
+
         // Support dot notation (table.column or table.*)
         if (strpos($name, '.') !== false) {
             return implode('.', array_map(function($part) {
@@ -35,10 +37,35 @@ class Helpers {
                 if ($part === '*') {
                     return '*';
                 }
-                return '`' . str_replace('`', '', $part) . '`';
+                return self::quoteIdentifierPart($part);
             }, explode('.', $name)));
         }
-        return '`' . str_replace('`', '', $name) . '`';
+
+        return self::quoteIdentifierPart($name);
+    }
+
+    /**
+     * Quote one identifier segment. This supports names containing spaces,
+     * hyphens, Unicode, and other otherwise-valid identifier characters. Any
+     * backticks supplied by the caller are normalized so each segment has one
+     * pair of delimiters.
+     *
+     * @param string $part
+     * @return string
+     */
+    protected static function quoteIdentifierPart(string $part): string {
+        $part = trim($part);
+        if ($part === '*') {
+            return '*';
+        }
+
+        if (strpos($part, "\0") !== false) {
+            throw new \InvalidArgumentException('Identifier cannot contain NUL bytes.');
+        }
+
+        // Normalize caller-supplied quoting, then add exactly one pair.
+        $part = str_replace('`', '', $part);
+        return '`' . $part . '`';
     }
 
     /**

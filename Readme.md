@@ -2129,6 +2129,8 @@ $parts = Parts::query()
 > Note: For very advanced SQL, you can always use `$wpdb` directly.
 >
 > Note: `where()`/`orWhere()` detect nested groups via `instanceof \Closure`, so column names that happen to match PHP function names (e.g. `trim`, `count`, `date`) are treated as plain column names, not as closures — `->where('count', 5)` works exactly as expected.
+>
+> Identifier names are safely backtick-quoted, including names containing spaces, hyphens, and Unicode. Supplied backticks are normalized to one pair per identifier segment, while NUL bytes are rejected. Use `selectRaw()`, `whereRaw()`, or another `*Raw()` method for arbitrary SQL expressions.
 > 
 You can also use `$wpdb` directly for complex SQL logic:
 

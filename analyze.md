@@ -431,7 +431,7 @@ protected function update() {
 | 1 | ~~**High**~~ **Fixed** | ~~`whereColumn()` does not validate operator — SQL injection possible.~~ Fixed by adding `Helpers::validateOperator($operator);`. | QueryBuilder.php |
 | 2 | ~~**Medium**~~ **Fixed** | ~~`paginate()` reads `$_GET['page']` directly — page manipulation possible (not a security issue per se, but allows arbitrary pagination).~~ Fixed by adding `$maxPage` property (default 10,000) and capping page numbers. | QueryBuilder.php |
 | 3 | **Medium** | `$wpdb->prepare()` is used correctly for most queries, but some raw SQL paths bypass it. | QueryBuilder.php |
-| 4 | **Low** | `Helpers::quoteIdentifier()` correctly escapes backticks but does not handle special characters beyond that. | Helpers.php |
+| 4 | ~~**Low**~~ **Fixed** | ~~`Helpers::quoteIdentifier()` correctly escapes backticks but does not handle special characters beyond that.~~ Identifier segments are now consistently quoted, supplied backticks are normalized to one pair, and NUL bytes are rejected. | Helpers.php |
 | 5 | **Low** | `SchemaBuilder::drop()` uses raw SQL with table name interpolation (no parameterization). | SchemaBuilder.php |
 | 6 | **Low** | `createTableIfNotExists()` uses `$wpdb->prepare()` with `SHOW TABLES LIKE %s` — correct. | Model.php |
 
@@ -439,7 +439,7 @@ protected function update() {
 
 - All WHERE clause values go through `$wpdb->prepare()` with `%s` placeholders.
 - `Helpers::validateOperator()` is called on most comparison operators.
-- Identifier quoting uses backticks via `Helpers::quoteIdentifier()`.
+- Identifier quoting uses one pair of backticks per segment via `Helpers::quoteIdentifier()`, normalizing supplied backticks and rejecting NUL bytes.
 - Mass assignment protection via `$fillable`/`$guarded`.
 
 ---
