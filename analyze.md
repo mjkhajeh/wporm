@@ -346,7 +346,7 @@ protected function update() {
 | 37 | `Collection::keyBy()` with nested dot notation | **Optional** | Current `keyBy()` does not support dot notation. |
 | 38 | `QueryBuilder::lockForUpdate()` / `sharedLock()` | **Optional** | Not implemented. |
 | 39 | `QueryBuilder::oldest()` / `latest()` on QueryBuilder | **Implemented** | ✅ Exists. |
-| 40 | `QueryBuilder::reorder()` with column | **Important** | Current `reorder()` only clears. Should accept optional column/direction. |
+| 40 | `QueryBuilder::reorder()` with column | **Implemented** | ✅ `reorder($column = null, $direction = 'asc')` clears existing ordering and optionally applies the new ordering. |
 
 ---
 
@@ -455,11 +455,11 @@ protected function update() {
 1. ~~Add `forceFill()` static method.~~ **Implemented**
 2. ~~Add `setAppends()` runtime method.~~ **Implemented**
 3. ~~Add `without()` for eager load exclusion.~~ **Implemented**
-4. Add `getAttributes()` public method.~~ **Implemented**
-5. Add `isClean()` / `wasChanged()` dirty tracking.~~ **Implemented**
+4. ~~Add `getAttributes()` public method.~~ **Implemented**
+5. ~~Add `isClean()` / `wasChanged()` dirty tracking.~~ **Implemented**
 6. Add `syncOriginal()` method.
 7. ~~Add `Collection::filter()` without callback (remove falsy).~~ **Implemented**
-8. Fix `reorder()` to accept optional column/direction.
+8. ~~Fix `reorder()` to accept optional column/direction.~~ **Implemented**
 9. Split `Model.php` into traits for maintainability.
 10. Add PHP type declarations throughout.
 

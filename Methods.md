@@ -475,13 +475,15 @@ $users = User::query()->orderBy('created_at')->get(); // defaults to 'asc'
 $products = Product::query()->orderByRaw('FIELD(name, ?, ?)', ['Widget', 'Gadget'])->get();
 ```
 
-### reorder()
-**Description:** Remove all previous order by clauses from the query.
+### reorder($column = null, $direction = 'asc')
+**Description:** Remove all previous order by clauses from the query. If a column is provided, apply it as the query's only ordering. The direction must be `asc` or `desc`.
 
 **Example:**
 ```php
 $query = User::query()->orderBy('name');
 $unorderedUsers = $query->reorder()->get();
+
+$users = $query->reorder('created_at', 'desc')->get();
 ```
 
 ### limit($limit)

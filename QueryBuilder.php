@@ -1066,10 +1066,17 @@ class QueryBuilder {
     }
 
     /**
-     * Remove all order by clauses
+     * Remove all order by clauses and optionally apply a new order.
+     *
+     * @param string|null $column
+     * @param string $direction
+     * @return $this
      */
-    public function reorder() {
+    public function reorder($column = null, $direction = 'asc') {
         $this->orders = [];
+        if ($column !== null) {
+            $this->orderBy($column, $direction);
+        }
         return $this;
     }
 
