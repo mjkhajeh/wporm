@@ -469,6 +469,10 @@ class QueryBuilder {
             }
             return $this;
         }
+        // Eloquent-style scalar subquery: where('column', function ($query) {})
+        if (is_string($column) && $operator instanceof \Closure && $value === null) {
+            return $this->whereSub($column, '=', $operator);
+        }
         if ($column instanceof \Closure) {
             // Nested group: build SQL preserving explicit OR prefixes
             $nested = new self($this->model, false);

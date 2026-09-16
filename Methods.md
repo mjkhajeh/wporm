@@ -683,6 +683,11 @@ foreach ($users as $user) {
 
 **Examples:**
 ```php
+// Eloquent-style scalar subquery shorthand
+User::query()->where('user_id', function($q) {
+    $q->from('users')->select('id')->where('email', 'admin@example.com');
+})->get();
+
 // WHERE id IN (subquery)
 User::query()->whereSub('id', 'IN', function($q) {
     $q->from('role_user')->select('user_id')->where('role_id', 1);
