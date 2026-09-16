@@ -208,6 +208,352 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
     }
 
     /**
+     * Map each item to a key/value pair and merge the result into a new collection.
+     * The callback must return an associative array of the form [key => value].
+     *
+     * @param callable $callback
+     * @return static
+     */
+    public function mapWithKeys(callable $callback) {
+        $result = [];
+        foreach ($this->items as $key => $item) {
+            $mapped = $callback($item, $key);
+            if (!is_array($mapped)) {
+                throw new \InvalidArgumentException('Collection::mapWithKeys() callback must return an array of key/value pairs.');
+            }
+            foreach ($mapped as $mappedKey => $mappedValue) {
+                $result[$mappedKey] = $mappedValue;
+            }
+        }
+        return new static($result, $this->modelClass);
+    }
+
+    /**
+     * Return a new collection of all items that do not pass the given truth test.
+     * When no callback is supplied, it is the inverse of filter() and removes truthy values.
+     *
+     * @param callable|null $callback
+     * @return static
+     */
+    public function reject(?callable $callback = null) {
+        if ($callback === null) {
+            return new static(array_filter($this->items, fn($item) => !$item), $this->modelClass);
+        }
+
+        return new static(array_filter($this->items, fn($item, $key) => !$callback($item, $key), ARRAY_FILTER_USE_BOTH), $this->modelClass);
+    }
+
+    /**
+     * Determine if every item in the collection passes the given truth test.
+     * With no callback, every item must be truthy.
+     *
+     * @param callable|null $callback
+     * @return bool
+     */
+    public function every(?callable $callback = null) {
+        if ($callback === null) {
+            if ($this->isEmpty()) {
+                return true;
+            }
+            foreach ($this->items as $item) {
+                if (!$item) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        foreach ($this->items as $key => $item) {
+            if (!$callback($item, $key)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Return a new collection with the first $limit items from the beginning.
+     * Negative values are treated like array_slice() and omit the last |$limit| values.
+     *
+     * @param int $limit
+     * @return static
+     */
+    public function take($limit) {
+        return $this->slice(0, $limit);
+    }
+
+    /**
+     * Get a page of items from the collection.
+     *
+     * @param int $page
+     * @param int $perPage
+     * @return static
+     */
+    public function forPage($page, $perPage) {
+        $page = max(1, (int) $page);
+        $perPage = max(1, (int) $perPage);
+        return $this->slice(($page - 1) * $perPage, $perPage);
+    }
+
+    /**
+     * Split the collection into chunks of the given size.
+     *
+     * @param int $size
+     * @return static
+     */
+    public function chunk($size) {
+        $size = max(1, (int) $size);
+        $chunks = array_chunk($this->items, $size, true);
+        return new static(array_map(fn($chunk) => new static($chunk, $this->modelClass), $chunks), $this->modelClass);
+    }
+
+    /**
+     * Split the collection into a fixed number of groups.
+     *
+     * @param int $numberOfGroups
+     * @return array<int, static>
+     */
+    public function split($numberOfGroups) {
+        $numberOfGroups = max(1, (int) $numberOfGroups);
+        $items = array_values($this->items);
+        $chunkSize = $this->isEmpty() ? 0 : (int) ceil(count($items) / $numberOfGroups);
+        $chunks = $chunkSize > 0 ? array_chunk($items, $chunkSize, true) : [];
+        return array_map(fn($chunk) => new static($chunk, $this->modelClass), $chunks);
+    }
+
+    /**
+     * Partition the collection into two collections by a truth test.
+     *
+     * @param string|callable $key
+     * @param mixed $operator
+     * @param mixed $value
+     * @return array{0: static, 1: static}
+     */
+    public function partition($key, $operator = null, $value = null) {
+        if (func_num_args() === 2) {
+            $value = $operator;
+            $operator = '=';
+        }
+
+        $passed = [];
+        $failed = [];
+        foreach ($this->items as $itemKey => $item) {
+            $actual = $this->valueFor($item, $key);
+            if ($this->compare($actual, $operator, $value)) {
+                $passed[$itemKey] = $item;
+            } else {
+                $failed[$itemKey] = $item;
+            }
+        }
+
+        return [new static($passed, $this->modelClass), new static($failed, $this->modelClass)];
+    }
+
+    /**
+     * Combine the values of the collection with the given keys.
+     *
+     * @param array|Collection $values
+     * @return static
+     */
+    public function combine($values) {
+        $values = $values instanceof self ? $values->all() : $values;
+        $combined = [];
+        foreach (array_keys($this->items) as $index => $key) {
+            $combined[$key] = $values[$index] ?? null;
+        }
+        return new static($combined, $this->modelClass);
+    }
+
+    /**
+     * Zip the collection together with one or more arrays/collections.
+     *
+     * @param array|Collection $items
+     * @return static
+     */
+    public function zip(...$items) {
+        $lists = [];
+        foreach ($items as $item) {
+            $lists[] = $item instanceof self ? $item->all() : $item;
+        }
+
+        $count = count($this->items);
+        $result = [];
+        foreach ($this->items as $index => $item) {
+            $pair = [$item];
+            foreach ($lists as $list) {
+                $pair[] = $list[$index] ?? null;
+            }
+            $result[] = $pair;
+        }
+
+        return new static($result, $this->modelClass);
+    }
+
+    /**
+     * Flatten a multi-dimensional collection by one or more levels.
+     *
+     * @param int $depth
+     * @return static
+     */
+    public function flatten($depth = INF) {
+        $result = [];
+        $this->flattenItems($this->items, $result, $depth);
+        return new static($result, $this->modelClass);
+    }
+
+    /**
+     * Flatten nested arrays/collections into a single list.
+     *
+     * @param mixed $items
+     * @param array $result
+     * @param int $depth
+     * @param int $currentDepth
+     * @return void
+     */
+    protected function flattenItems($items, array &$result, $depth, $currentDepth = 0) {
+        foreach ($items as $item) {
+            if ($item instanceof self) {
+                $item = $item->all();
+            }
+
+            if (is_object($item) && method_exists($item, 'toArray')) {
+                $item = $item->toArray();
+            }
+
+            if (is_array($item) && $currentDepth < $depth) {
+                $this->flattenItems($item, $result, $depth, $currentDepth + 1);
+                continue;
+            }
+
+            $result[] = $item;
+        }
+    }
+
+    /**
+     * Get only the specified keys from the collection.
+     *
+     * @param array|mixed $keys
+     * @return static
+     */
+    public function only($keys) {
+        if (!is_array($keys)) {
+            $keys = [$keys];
+        }
+
+        $items = [];
+        foreach ($keys as $key) {
+            if (array_key_exists($key, $this->items)) {
+                $items[$key] = $this->items[$key];
+            }
+        }
+        return new static($items, $this->modelClass);
+    }
+
+    /**
+     * Get all items except the specified keys.
+     *
+     * @param array|mixed $keys
+     * @return static
+     */
+    public function except($keys) {
+        if (!is_array($keys)) {
+            $keys = [$keys];
+        }
+
+        $items = $this->items;
+        foreach ($keys as $key) {
+            unset($items[$key]);
+        }
+        return new static($items, $this->modelClass);
+    }
+
+    /**
+     * Return a random item from the collection, or a random subset when a count is supplied.
+     *
+     * @param int|null $number
+     * @return mixed|static
+     */
+    public function random($number = null) {
+        if ($this->isEmpty()) {
+            return $number === null ? null : new static([], $this->modelClass);
+        }
+
+        $items = array_values($this->items);
+        if ($number === null) {
+            return $items[array_rand($items)];
+        }
+
+        $number = max(0, (int) $number);
+        $count = min($number, count($items));
+        if ($count === 0) {
+            return new static([], $this->modelClass);
+        }
+
+        $shuffled = $items;
+        shuffle($shuffled);
+        return new static(array_slice($shuffled, 0, $count), $this->modelClass);
+    }
+
+    /**
+     * Get every nth item from the collection.
+     *
+     * @param int $step
+     * @param int $offset
+     * @return static
+     */
+    public function nth($step, $offset = 0) {
+        $step = max(1, (int) $step);
+        $offset = max(0, (int) $offset);
+        $items = array_values($this->items);
+        $result = [];
+        for ($i = $offset; $i < count($items); $i += $step) {
+            $result[] = $items[$i];
+        }
+        return new static($result, $this->modelClass);
+    }
+
+    /**
+     * Remove and return the last item from the collection.
+     *
+     * @return mixed
+     */
+    public function pop() {
+        if ($this->isEmpty()) {
+            return null;
+        }
+        return array_pop($this->items);
+    }
+
+    /**
+     * Remove and return the first item from the collection.
+     *
+     * @return mixed
+     */
+    public function shift() {
+        if ($this->isEmpty()) {
+            return null;
+        }
+        return array_shift($this->items);
+    }
+
+    /**
+     * Prepend an item to the beginning of the collection.
+     *
+     * @param mixed $value
+     * @param mixed $key
+     * @return $this
+     */
+    public function prepend($value, $key = null) {
+        if ($key === null) {
+            array_unshift($this->items, $value);
+            return $this;
+        }
+
+        $this->items = array_merge([$key => $value], $this->items);
+        return $this;
+    }
+
+    /**
      * Map items using a callback.
      */
     public function map(callable $callback) {
@@ -297,13 +643,37 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
         if (is_callable($key) && !is_string($key)) {
             return $key($item);
         }
-        if (is_array($item)) {
-            return $item[$key] ?? null;
+
+        $segments = is_string($key) && strpos($key, '.') !== false ? explode('.', $key) : [$key];
+        $current = $item;
+
+        foreach ($segments as $segment) {
+            if (is_array($current)) {
+                if (!array_key_exists($segment, $current)) {
+                    return null;
+                }
+                $current = $current[$segment];
+                continue;
+            }
+
+            if (is_object($current)) {
+                if (isset($current->{$segment})) {
+                    $current = $current->{$segment};
+                    continue;
+                }
+
+                if (property_exists($current, $segment)) {
+                    $current = $current->{$segment};
+                    continue;
+                }
+
+                return null;
+            }
+
+            return null;
         }
-        if (is_object($item)) {
-            return $item->$key ?? null;
-        }
-        return null;
+
+        return $current;
     }
 
     /**

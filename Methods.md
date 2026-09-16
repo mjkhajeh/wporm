@@ -3439,6 +3439,15 @@ $users = User::query()->distinct()->get();
 - You can also disable it by passing `false`: `$query->distinct(false)`
 - Works with all other query builder methods.
 
+### lockForUpdate() / sharedLock()
+**Description:** Add a row-lock clause to the generated `SELECT` query, matching the Eloquent-style lock helpers used for concurrent writes. `lockForUpdate()` emits `FOR UPDATE`; `sharedLock()` emits `LOCK IN SHARE MODE` for the MySQL-backed WordPress driver.
+
+**Example:**
+```php
+$rows = User::query()->where('status', 'pending')->lockForUpdate()->get();
+$readOnly = Orders::query()->where('customer_id', 42)->sharedLock()->get();
+```
+
 ---
 
 ### tap($callback)
@@ -3687,6 +3696,66 @@ $result = $collection->unless($includeInactive, fn($c) => $c->filter(fn($u) => $
 ```php
 $admin = $users->firstWhere('role', 'admin');
 $cheap = $products->firstWhere('price', '<', 100);
+```
+
+### mapWithKeys(callable $callback)
+**Description:** Map each item to a `[key => value]` pair, then merge the results into a single collection. This is the Eloquent equivalent of `mapWithKeys()`.
+
+**Example:**
+```php
+$byId = $users->mapWithKeys(fn($user) => [$user->id => $user->name]);
+```
+
+### reject(?callable $callback = null) / every(?callable $callback = null)
+**Description:** `reject()` is the inverse of `filter()`, and `every()` checks whether all items pass a callback (or are truthy when no callback is given). Both are Eloquent-compatible and preserve collection metadata.
+
+**Example:**
+```php
+$inactive = $users->reject(fn($user) => $user->active);
+$allActive = $users->every(fn($user) => $user->active);
+```
+
+### take($limit) / forPage($page, $perPage) / chunk($size) / split($groups)
+**Description:** These helpers mirror Eloquent's collection slicing and paging helpers, including page-based and chunked iteration without mutating the original collection.
+
+**Example:**
+```php
+$firstTen = $users->take(10);
+$pageTwo = $users->forPage(2, 15);
+$pages = $users->chunk(100);
+$groups = $users->split(4);
+```
+
+### partition($key, $operator = null, $value = null) / combine($values) / zip(...$items)
+**Description:** `partition()` splits the collection into `[matched, notMatched]`; `combine()` matches this collection's keys to a supplied value list; `zip()` merges the collection with one or more arrays/collections index-by-index.
+
+**Example:**
+```php
+[$admins, $others] = $users->partition('role', 'admin');
+$mapped = $users->combine(['Alice', 'Bob']);
+$zipped = $users->zip(['Alice', 'Bob'], ['admin', 'editor']);
+```
+
+### flatten($depth = INF) / only($keys) / except($keys)
+**Description:** Flatten nested arrays/collections, keep only the named keys, or drop the named keys while preserving the original key structure.
+
+**Example:**
+```php
+$flat = $matrix->flatten();
+$subset = $users->only(['id', 'name']);
+$withoutMeta = $users->except(['created_at', 'updated_at']);
+```
+
+### random($number = null) / nth($step, $offset = 0) / pop() / shift() / prepend($value, $key = null)
+**Description:** These list helpers match Eloquent's common collection API: random selection, every-nth selection, and mutating insertion/removal operations.
+
+**Example:**
+```php
+$winner = $users->random();
+$everyThird = $users->nth(3, 1);
+$last = $users->pop();
+$first = $users->shift();
+$users->prepend($newUser, 'newest');
 ```
 
 ### mapToGroups(callable $callback)

@@ -22,6 +22,7 @@ class QueryBuilder {
     protected $withCount = [];
     protected $withAggregate = [];
     protected $casts = [];
+    protected $lock = null;
 
     /**
      * Additional pivot table columns to select on belongsToMany relationships.
@@ -1077,6 +1078,26 @@ class QueryBuilder {
         if ($column !== null) {
             $this->orderBy($column, $direction);
         }
+        return $this;
+    }
+
+    /**
+     * Lock the selected rows for update (Eloquent-style).
+     *
+     * @return $this
+     */
+    public function lockForUpdate() {
+        $this->lock = 'FOR UPDATE';
+        return $this;
+    }
+
+    /**
+     * Lock the selected rows in shared mode (Eloquent-style equivalent for MySQL).
+     *
+     * @return $this
+     */
+    public function sharedLock() {
+        $this->lock = 'LOCK IN SHARE MODE';
         return $this;
     }
 
@@ -2668,6 +2689,9 @@ class QueryBuilder {
         }
         if (isset($this->offset)) {
             $sql .= " OFFSET {$this->offset}";
+        }
+        if ($this->lock !== null) {
+            $sql .= " {$this->lock}";
         }
         return $sql;
     }

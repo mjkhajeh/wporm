@@ -22,13 +22,14 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Fail-fast lookups**: `findOrFail()`/`firstOrFail()` (including array-of-ids lookups, and `Collection::firstOrFail()`) throw a `ModelNotFoundException` instead of silently returning `null`.
 - **Re-fetching**: `fresh()` returns a new instance with the current database state (optionally eager-loading relations); `refresh()` re-syncs the current instance in place — both Eloquent-style.
 - **Batch processing**: `chunk()` and `each()` for iterating large result sets in pages without loading everything into memory at once.
+- **Row locking**: `lockForUpdate()` and `sharedLock()` add `FOR UPDATE` / `LOCK IN SHARE MODE` clauses to generated `SELECT` queries for concurrent-write protection.
 - **Serialization**: `toArray()`/`toJson()`/`__toString()` on both models and collections, with `$hidden`/`$visible` support and safe (exception-on-failure) JSON encoding.
 - **Raw SQL expressions**: `selectRaw()`, `whereRaw()`/`orWhereRaw()`, `groupByRaw()`, `havingRaw()`/`orHavingRaw()`, and `orderByRaw()` for dropping down to raw SQL with safe, bound placeholders.
 - **Subqueries**: `fromSub()` / `from()` for derived tables, `selectSub()` for scalar subselects in the SELECT list, and `whereSub()`/`whereInSub()`/`whereNotInSub()` (plus OR variants) for subqueries in WHERE — all accepting a `QueryBuilder`, `Closure`, or raw SQL string, Eloquent-style.
 - **Combining queries**: `union()`/`unionAll()` to combine two or more queries' result sets, Eloquent-style.
 - **Events**: Model lifecycle events via `booted()` + `static::creating(fn)`, Eloquent-style `$dispatchesEvents` property mapping, observers, and a standalone `EventDispatcher` for global listeners — no Laravel dependency required.
 - **Functional chaining**: `tap()` for inline side-effects (logging, debugging) that leave the builder unchanged, and `pipe()` to hand the builder off to a callback and return its result — both Eloquent-style, and available on `QueryBuilder`, `Collection`, **and `Model`** instances.
-- **Rich Collections**: `Collection` supports Eloquent-style `sortBy()`/`sortByDesc()`, `groupBy()`, `keyBy()`, `unique()`, `flatMap()`, `mapToGroups()`, `each()`, `reduce()`, `values()`, `keys()`, `diff()`/`intersect()`/`merge()`, `push()`/`pull()`/`put()`, `implode()`, `when()`/`unless()`, `firstWhere()`, and in-memory `sum()`/`avg()`/`min()`/`max()`.
+- **Rich Collections**: `Collection` supports Eloquent-style `sortBy()`/`sortByDesc()`, `groupBy()`, `keyBy()`, `unique()`, `flatMap()`, `mapToGroups()`, `mapWithKeys()`, `reject()`, `every()`, `take()`, `forPage()`, `chunk()`, `split()`, `partition()`, `combine()`, `zip()`, `flatten()`, `only()`/`except()`, `random()`, `nth()`, `pop()`/`shift()`/`prepend()`, `each()`, `reduce()`, `values()`, `keys()`, `diff()`/`intersect()`/`merge()`, `push()`/`pull()`/`put()`, `implode()`, `when()`/`unless()`, `firstWhere()`, and in-memory `sum()`/`avg()`/`min()`/`max()`.
 - **Global scopes**: Add global query constraints to models.
 
 ## Installation
@@ -681,6 +682,24 @@ User::query()->each(function ($user) {
 Just like `chunk()`, returning `false` from the callback stops processing early.
 
 Both methods automatically respect any `where()`/`join()`/soft-delete scoping already applied to the query, since they're built on the same query builder instance. The builder's state is also fully restored afterwards — even if your callback throws an exception — so reusing the query won't see a leftover limit/offset or a duplicated soft-delete constraint.
+
+## Row locking
+
+WPORM supports Eloquent-style row locking for concurrent writes. Use `lockForUpdate()` to emit `FOR UPDATE`, or `sharedLock()` to emit `LOCK IN SHARE MODE`.
+
+```php
+$pending = User::query()
+    ->where('status', 'pending')
+    ->lockForUpdate()
+    ->get();
+
+$readOnly = Order::query()
+    ->where('customer_id', 42)
+    ->sharedLock()
+    ->get();
+```
+
+These are appended to the generated `SELECT` SQL and are useful when you need to prevent races while selecting rows for update or when you want to read them under a shared lock in a transactional workflow.
 
 ### cursor()
 
