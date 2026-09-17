@@ -9,6 +9,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - [Blueprint and column types documents](./Blueprint.md)
 - [Casts types and define custom casts](./CastsType.md)
 - [DB usage and raw queries](./DB.md)
+- [WordPress core table models](./WordPressCore.md)
 - [Debugging tips](./Debugging.md)
 
 ## Features
@@ -91,6 +92,50 @@ class Parts extends Model {
 > **Note:** Just build your columns on the `$blueprint` passed into `up()` — WPORM reads the schema directly from it via `$blueprint->toSql()`. You do **not** need to (and should not) manually assign `$this->schema` anymore; `up(Blueprint $blueprint)` is now the single source of truth for table schema.
 
 > **Note:** When using `$table` in custom SQL queries, do **not** manually add the WordPress prefix (e.g., `$wpdb->prefix`). The ORM automatically handles table prefixing. `getTable()` also safely detects and preserves an already-prefixed table name, so even if a prefixed name is provided it will not be double-prefixed. Use `$table = (new User)->getTable();` as shown below, which returns the fully-prefixed table name.
+
+### WordPress Core Table Models
+
+WPORM includes models for the standard WordPress tables under the
+`MJ\WPORM\WordPress` namespace. They use the live `$wpdb` table properties,
+so the configured prefix and multisite table names are respected. These
+models do not define `up()` and never create or alter WordPress-managed
+tables.
+
+```php
+use MJ\WPORM\WordPress\Post;
+use MJ\WPORM\WordPress\User;
+
+$posts = Post::with(['author', 'meta', 'comments'])
+    ->where('post_status', 'publish')
+    ->get();
+
+$users = User::withCount('posts')->get();
+```
+
+Available models are `Post`, `PostMeta`, `User`, `UserMeta`, `Comment`,
+`CommentMeta`, `Term`, `TermTaxonomy`, `TermRelationship`, `TermMeta`,
+`Option`, `Link`, `Blog`, `BlogMeta`, `Site`, `SiteMeta`, `Signup`, and
+`RegistrationLog`. The last six models cover the multisite network tables.
+`TermRelationship` represents WordPress's composite-key table and is intended
+for reads and relationship queries; WPORM does not support composite primary
+keys for identity-safe updates.
+
+The core models resolve tables from the corresponding `$wpdb` property. This
+is important in multisite: `Post`, `PostMeta`, `Comment`, `Term`, `Option`,
+and related models follow the currently selected site, while `User`,
+`UserMeta`, `Site`, `SiteMeta`, `Blog`, `BlogMeta`, `Signup`, and
+`RegistrationLog` use network-level tables. To query another site's
+site-specific data, use WordPress's `switch_to_blog()` before creating or
+querying the models, and call `restore_current_blog()` afterward:
+
+```php
+switch_to_blog($blogId);
+try {
+    $posts = \MJ\WPORM\WordPress\Post::with('author')->get();
+} finally {
+    restore_current_blog();
+}
+```
 
 ## Schema Management
 Create or update tables using the model's `up` method and the `SchemaBuilder`:
