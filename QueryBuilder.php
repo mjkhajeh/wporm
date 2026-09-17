@@ -1803,11 +1803,19 @@ class QueryBuilder {
         $attempts = max(1, $attempts);
 
         for ($currentAttempt = 1; $currentAttempt <= $attempts; $currentAttempt++) {
-            $wpdb->query('START TRANSACTION');
-
             try {
+                if ($wpdb->query('START TRANSACTION') === false) {
+                    throw new \RuntimeException(
+                        'Unable to start database transaction: ' . ($wpdb->last_error ?: 'unknown database error')
+                    );
+                }
+
                 $result = $callback();
-                $wpdb->query('COMMIT');
+                if ($wpdb->query('COMMIT') === false) {
+                    throw new \RuntimeException(
+                        'Unable to commit database transaction: ' . ($wpdb->last_error ?: 'unknown database error')
+                    );
+                }
                 return $result;
             } catch (\Throwable $e) {
                 $wpdb->query('ROLLBACK');

@@ -1682,6 +1682,27 @@ $user = new User(['name' => 'Bar']);
 $user->save();
 ```
 
+### saveOrFail(array $options = [])
+**Description:** Save the model inside a database transaction and throw an exception if the save fails. This is the exception-based alternative to `save()`, which returns `false` when a before-save event halts the operation or the database adapter reports a failure.
+
+**Example:**
+```php
+try {
+    $user = new User(['name' => 'Bar']);
+    $user->saveOrFail();
+} catch (\Throwable $e) {
+    // The transaction has been rolled back.
+    error_log($e->getMessage());
+}
+```
+
+**Notes:**
+- Returns `true` after a successful insert or update.
+- Rolls back the transaction and rethrows exceptions from model events or the database layer.
+- Converts a `false` result from `save()` into a `\RuntimeException`; the exception message includes `$wpdb->last_error` when available.
+- Restores the model's in-memory attributes and persistence flags when the transaction fails, so the instance does not appear persisted after a rollback.
+- The `$options` argument is accepted for Eloquent-compatible method signatures. WPORM currently does not use save options.
+
 ### delete()
 **Description:** Delete the model from the database.
 

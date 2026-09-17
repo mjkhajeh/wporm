@@ -1307,6 +1307,50 @@ protected function castSet($key, $value) {
 	}
 
 	/**
+	 * Persist the model inside a transaction and throw if it cannot be saved.
+	 *
+	 * @param array $options Reserved for Eloquent-compatible save options.
+	 * @return bool
+	 * @throws \RuntimeException When a save is halted or the database operation fails.
+	 * @throws \Throwable When a save event or database layer throws an exception.
+	 */
+	public function saveOrFail(array $options = []) {
+		$state = [
+			'attributes' => $this->attributes,
+			'original' => $this->original,
+			'changes' => $this->changes,
+			'exists' => $this->exists,
+			'wasRecentlyCreated' => $this->wasRecentlyCreated,
+			'eagerLoaded' => $this->_eagerLoaded,
+		];
+
+		try {
+			return DB::transaction(function () {
+				$result = $this->save();
+				if ($result === false) {
+					global $wpdb;
+					$error = !empty($wpdb->last_error)
+						? $wpdb->last_error
+						: 'The model save operation was halted or failed.';
+					throw new \RuntimeException($error);
+				}
+
+				return $result;
+			});
+		} catch (\Throwable $e) {
+			// A rolled-back database operation must not leave this instance
+			// looking persisted or carrying changes from the failed attempt.
+			$this->attributes = $state['attributes'];
+			$this->original = $state['original'];
+			$this->changes = $state['changes'];
+			$this->exists = $state['exists'];
+			$this->wasRecentlyCreated = $state['wasRecentlyCreated'];
+			$this->_eagerLoaded = $state['eagerLoaded'];
+			throw $e;
+		}
+	}
+
+	/**
 	 * Touch the updated_at timestamp of parent models defined in $touches.
 	 *
 	 * After this model is saved, any parent relationship listed in $touches

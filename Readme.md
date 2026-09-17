@@ -566,6 +566,22 @@ $clone = $post->replicate(['slug', 'meta']);
 - Relations are not copied — only scalar attributes.
 - `$clone->exists` is `false`, so the next `save()` triggers an INSERT.
 
+### Saving With Exceptions: saveOrFail
+
+Use `saveOrFail()` when a failed insert or update should throw instead of returning `false`:
+
+```php
+try {
+    $user = new User(['name' => 'John']);
+    $user->saveOrFail();
+} catch (\Throwable $e) {
+    // The transaction has been rolled back.
+    error_log($e->getMessage());
+}
+```
+
+`saveOrFail()` runs the save inside a database transaction and returns `true` after a successful insert or update. It throws a `\RuntimeException` when `save()` returns `false`, including when a before-save event cancels the operation, and rethrows exceptions from model events or the database layer. Transaction start/commit failures are also reported as exceptions. If the transaction fails, the model's in-memory attributes and persistence flags are restored to their pre-save state. The `$options` argument is accepted for Eloquent-compatible method signatures but is not currently used by WPORM.
+
 ### Checking Creation Status: wasRecentlyCreated
 
 After saving a model, use `wasRecentlyCreated` to check if the save triggered an INSERT (new record) or an UPDATE (existing record):
