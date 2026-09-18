@@ -17,7 +17,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Schema management**: Create and modify tables using a fluent schema builder.
 - **Query builder**: Chainable query builder for flexible and safe SQL queries.
 - **Attribute casting**: Automatic type casting for model attributes.
-- **Relationships**: Define `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`, `hasOneThrough`, and `hasOneOfMany` relationships, with eager loading via `with()`, relationship-count eager loading via `withCount()`, and existence filtering via `whereHas()`/`whereRelation()`/`has()`. Polymorphic relationships (`morphOne`, `morphMany`, `morphTo`) are also supported, including an optional `morphMap()` for short type aliases.
+- **Relationships**: Define `hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`, `hasOneThrough`, and `hasOneOfMany` relationships, including composite-key `hasOne`/`hasMany` relations using matching key arrays. Relationships support eager loading via `with()`, relationship-count eager loading via `withCount()`, and existence filtering via `whereHas()`/`whereRelation()`/`has()`. Polymorphic relationships (`morphOne`, `morphMany`, `morphTo`) are also supported, including an optional `morphMap()` for short type aliases.
 - **Convenient creation**: `create()` for a one-line insert + return model, plus `updateOrCreate()`, `firstOrCreate()`, and `firstOrNew()` for upsert-style lookups.
 - **Aggregates & utilities**: `sum()`, `avg()`, `min()`, `max()`, `value()`, `pluck()`, `exists()`/`doesntExist()`, and `increment()`/`decrement()`.
 - **Fail-fast lookups**: `findOrFail()`/`firstOrFail()` (including array-of-ids lookups, and `Collection::firstOrFail()`) throw a `ModelNotFoundException` instead of silently returning `null`.
@@ -209,6 +209,34 @@ $table->unique(['col1', 'col2']);
 This works for all column types and matches Eloquent's API.
 
 ## Basic Usage
+
+### Composite-Key Relationships
+
+`hasOne()`, `hasOneOfMany()`, `hasMany()`, and `belongsTo()` accept matching arrays of foreign-key and local-key
+columns. Values are matched positionally as one composite tuple, which is
+useful for WordPress plugin tables partitioned by an identifier and language:
+
+```php
+class Specialist extends Model {
+    public function specialities() {
+        return $this->hasMany(
+            SpecialistSpeciality::class,
+            ['user_id', 'language'],
+            ['user_id', 'language']
+        );
+    }
+}
+
+$specialist = Specialist::find(12);
+$specialities = $specialist->specialities; // Lazy-loaded Collection
+$specialists = Specialist::with(['specialities'])->get(); // Eager-loaded
+```
+
+The key arrays must have the same length. These relationship methods map rows
+by composite tuples; they do not add composite primary-key support for model
+identity or persistence. See [`RealExamples/CompositeRelations.php`](./RealExamples/CompositeRelations.php)
+for a complete model and schema example.
+
 ### Creating a Record
 ```php
 $part = new Parts(['part_id' => 1, 'product_id' => 2, 'qty' => 10]);

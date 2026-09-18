@@ -279,6 +279,24 @@ $users = User::query()
 $users = User::query()->whereIn('status', ['active', 'pending'])->get();
 ```
 
+### whereCompositeIn(array $columns, array $tuples)
+**Description:** Add a grouped WHERE clause that matches one or more composite-key
+tuples. This is primarily used internally by composite-key relationships, but is
+also available for explicit query construction.
+
+**Example:**
+```php
+$rows = SpecialistSpeciality::query()
+    ->whereCompositeIn(
+        ['user_id', 'language'],
+        [[12, 'en'], [12, 'fa']]
+    )
+    ->get();
+```
+
+Each tuple must contain exactly one value for every column. Empty columns or
+tuples produce an always-false condition.
+
 ### whereNotIn($column, array $values)
 **Description:** Add a WHERE ... NOT IN (...) clause to the query.
 
@@ -1759,6 +1777,25 @@ $profile = $user->hasOne(Profile::class)->first();
 $profile = $user->profile; // equivalent, via property access
 ```
 
+Both `$foreignKey` and `$localKey` may be arrays of matching column names for
+composite-key relationships:
+
+```php
+public function profile() {
+    return $this->hasOne(
+        Profile::class,
+        ['user_id', 'language'],
+        ['user_id', 'language']
+    );
+}
+```
+
+The arrays are positional and must have the same length. Composite
+`hasOne()`, `hasOneOfMany()`, `hasMany()`, and `belongsTo()` relations support
+lazy loading and eager loading with `with()`. They identify related rows by
+the tuple; they do not change the model's primary-key identity or
+update/delete behavior.
+
 ### hasMany($related, $foreignKey = null, $localKey = null)
 **Description:** Define a one-to-many relationship. Returns a lazy, chainable `QueryBuilder` — call `->get()` to resolve it, or access it as a property (e.g. `$user->posts`) to have it resolved to a `Collection` automatically.
 
@@ -1766,6 +1803,36 @@ $profile = $user->profile; // equivalent, via property access
 ```php
 $posts = $user->hasMany(Post::class)->get();
 $posts = $user->posts; // equivalent, via property access
+```
+
+For a composite relationship, pass matching arrays for the related-table
+foreign keys and parent-model local keys:
+
+```php
+public function specialities() {
+    return $this->hasMany(
+        SpecialistSpeciality::class,
+        ['user_id', 'language'],
+        ['user_id', 'language']
+    );
+}
+
+$specialities = $specialist->specialities;
+$specialists = Specialist::with('specialities')->get();
+```
+
+`belongsTo()` uses the same positional form, with the arrays reversed from the
+parent's perspective: the first array contains the foreign-key columns on the
+current model and the second contains the matching owner columns:
+
+```php
+public function specialist() {
+    return $this->belongsTo(
+        Specialist::class,
+        ['user_id', 'language'],
+        ['user_id', 'language']
+    );
+}
 ```
 
 ### hasOneOfMany($related, $foreignKey = null, $localKey = null)

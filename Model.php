@@ -1986,7 +1986,21 @@ public function forceDelete() {
 	public function hasOne($related, $foreignKey = null, $localKey = null) {
 		$foreignKey = $foreignKey ?: strtolower(Helpers::class_basename(static::class)) . '_id';
 		$localKey   = $localKey   ?: $this->primaryKey;
-		$query = $related::query()->where($foreignKey, $this->$localKey);
+		$query = $related::query();
+		if (is_array($foreignKey) || is_array($localKey)) {
+			$foreignKey = array_values((array) $foreignKey);
+			$localKey = array_values((array) $localKey);
+			if (count($foreignKey) !== count($localKey)) {
+				throw new \InvalidArgumentException('Composite relationship key counts must match.');
+			}
+			$values = [];
+			foreach ($localKey as $key) {
+				$values[] = $this->$key;
+			}
+			$query->whereCompositeIn($foreignKey, [$values]);
+		} else {
+			$query->where($foreignKey, $this->$localKey);
+		}
 		return $query->setRelationContext('hasOne', [
 			'foreignKey' => $foreignKey,
 			'localKey'   => $localKey,
@@ -2011,9 +2025,22 @@ public function forceDelete() {
 		$foreignKey = $foreignKey ?: strtolower(Helpers::class_basename(static::class)) . '_id';
 		$localKey   = $localKey   ?: $this->primaryKey;
 
-		$query = $related::query()
-			->where($foreignKey, $this->$localKey)
-			->limit(1);
+		$query = $related::query();
+		if (is_array($foreignKey) || is_array($localKey)) {
+			$foreignKey = array_values((array) $foreignKey);
+			$localKey = array_values((array) $localKey);
+			if (count($foreignKey) !== count($localKey)) {
+				throw new \InvalidArgumentException('Composite relationship key counts must match.');
+			}
+			$values = [];
+			foreach ($localKey as $key) {
+				$values[] = $this->$key;
+			}
+			$query->whereCompositeIn($foreignKey, [$values]);
+		} else {
+			$query->where($foreignKey, $this->$localKey);
+		}
+		$query->limit(1);
 
 		return $query->setRelationContext('hasOneOfMany', [
 			'foreignKey' => $foreignKey,
@@ -2035,7 +2062,21 @@ public function forceDelete() {
     public function hasMany($related, $foreignKey = null, $localKey = null) {
         $foreignKey = $foreignKey ?: strtolower(Helpers::class_basename(static::class)) . '_id';
         $localKey   = $localKey   ?: $this->primaryKey;
-        $query = $related::query()->where($foreignKey, $this->$localKey);
+        $query = $related::query();
+        if (is_array($foreignKey) || is_array($localKey)) {
+            $foreignKey = array_values((array) $foreignKey);
+            $localKey = array_values((array) $localKey);
+            if (count($foreignKey) !== count($localKey)) {
+                throw new \InvalidArgumentException('Composite relationship key counts must match.');
+            }
+            $values = [];
+            foreach ($localKey as $key) {
+                $values[] = $this->$key;
+            }
+            $query->whereCompositeIn($foreignKey, [$values]);
+        } else {
+            $query->where($foreignKey, $this->$localKey);
+        }
         return $query->setRelationContext('hasMany', [
             'foreignKey' => $foreignKey,
             'localKey'   => $localKey,
@@ -2210,12 +2251,30 @@ public function forceDelete() {
         $instance = new $related;
         $foreignKey = $foreignKey ?: strtolower(Helpers::class_basename($related)) . '_id';
         $ownerKey = $ownerKey ?: $instance->getPrimaryKey();
-        $foreignValue = $this->attributes[$foreignKey] ?? null;
         $query = $related::query();
-        if ($foreignValue === null) {
-            $query->whereIn($ownerKey, []);
+        if (is_array($foreignKey) || is_array($ownerKey)) {
+            $foreignKey = array_values((array) $foreignKey);
+            $ownerKey = array_values((array) $ownerKey);
+            if (count($foreignKey) !== count($ownerKey)) {
+                throw new \InvalidArgumentException('Composite relationship key counts must match.');
+            }
+            $values = [];
+            foreach ($foreignKey as $key) {
+                $values[] = $this->attributes[$key] ?? null;
+            }
+            if (in_array(null, $values, true)) {
+                $query->whereCompositeIn($ownerKey, []);
+            } else {
+                $query->whereCompositeIn($ownerKey, [$values]);
+            }
+            $foreignValue = $values;
         } else {
-            $query->where($ownerKey, $foreignValue);
+            $foreignValue = $this->attributes[$foreignKey] ?? null;
+            if ($foreignValue === null) {
+                $query->whereIn($ownerKey, []);
+            } else {
+                $query->where($ownerKey, $foreignValue);
+            }
         }
         return $query->setRelationContext('belongsTo', [
             'foreignKey'     => $foreignKey,

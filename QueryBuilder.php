@@ -597,11 +597,15 @@ class QueryBuilder {
     }
 
     public function whereIn($column, array $values) {
+        if (is_array($column)) {
+            return $this->whereCompositeIn($column, $values);
+        }
         if (empty($values)) {
             // Always false
             $this->wheres[] = '0=1';
             return $this;
         }
+
         $placeholders = implode(', ', array_fill(0, count($values), '%s'));
         $this->wheres[] = Helpers::quoteIdentifier($column) . " IN ($placeholders)";
         foreach ($values as $v) {
@@ -610,7 +614,40 @@ class QueryBuilder {
         return $this;
     }
 
+    /**
+     * Add a WHERE clause matching any of the supplied composite-key tuples.
+     *
+     * @param array<int, string> $columns
+     * @param array<int, array<int, mixed>> $tuples
+     * @return $this
+     */
+    public function whereCompositeIn(array $columns, array $tuples, $boolean = 'AND') {
+        if (empty($columns) || empty($tuples)) {
+            $this->wheres[] = strtoupper($boolean) === 'OR' ? 'OR 0=1' : '0=1';
+            return $this;
+        }
+
+        $groups = [];
+        foreach ($tuples as $tuple) {
+            if (count($tuple) !== count($columns)) {
+                throw new \InvalidArgumentException('Composite key tuple size must match the column count.');
+            }
+            $conditions = [];
+            foreach (array_values($columns) as $index => $column) {
+                $conditions[] = Helpers::quoteIdentifier($column) . ' = %s';
+                $this->bindings[] = $tuple[$index];
+            }
+            $groups[] = '(' . implode(' AND ', $conditions) . ')';
+        }
+        $prefix = strtoupper($boolean) === 'OR' ? 'OR ' : '';
+        $this->wheres[] = $prefix . '(' . implode(' OR ', $groups) . ')';
+        return $this;
+    }
+
     public function whereNotIn($column, array $values) {
+        if (is_array($column)) {
+            return $this->whereCompositeNotIn($column, $values);
+        }
         if (empty($values)) {
             // Always true
             return $this;
@@ -624,6 +661,9 @@ class QueryBuilder {
     }
 
     public function orWhereIn($column, array $values) {
+        if (is_array($column)) {
+            return $this->whereCompositeIn($column, $values, 'OR');
+        }
         if (empty($values)) {
             $this->wheres[] = 'OR 0=1';
             return $this;
@@ -637,6 +677,9 @@ class QueryBuilder {
     }
 
     public function orWhereNotIn($column, array $values) {
+        if (is_array($column)) {
+            return $this->whereCompositeNotIn($column, $values, 'OR');
+        }
         if (empty($values)) {
             return $this;
         }
@@ -645,6 +688,36 @@ class QueryBuilder {
         foreach ($values as $v) {
             $this->bindings[] = $v;
         }
+        return $this;
+    }
+
+    /**
+     * Add a WHERE clause excluding all supplied composite-key tuples.
+     *
+     * @param array<int, string> $columns
+     * @param array<int, array<int, mixed>> $tuples
+     * @return $this
+     */
+    public function whereCompositeNotIn(array $columns, array $tuples, $boolean = 'AND') {
+        if (empty($columns) || empty($tuples)) {
+            return $this;
+        }
+
+        $groups = [];
+        foreach ($tuples as $tuple) {
+            if (count($tuple) !== count($columns)) {
+                throw new \InvalidArgumentException('Composite key tuple size must match the column count.');
+            }
+            $conditions = [];
+            foreach (array_values($columns) as $index => $column) {
+                $conditions[] = Helpers::quoteIdentifier($column) . ' = %s';
+                $this->bindings[] = $tuple[$index];
+            }
+            $groups[] = '(' . implode(' AND ', $conditions) . ')';
+        }
+
+        $prefix = strtoupper($boolean) === 'OR' ? 'OR ' : '';
+        $this->wheres[] = $prefix . 'NOT (' . implode(' OR ', $groups) . ')';
         return $this;
     }
 
@@ -1009,6 +1082,21 @@ class QueryBuilder {
             $second = $operator;
             $operator = '=';
         }
+        if (is_array($first) || is_array($second)) {
+            $first = array_values((array) $first);
+            $second = array_values((array) $second);
+            if (count($first) !== count($second)) {
+                throw new \InvalidArgumentException('Composite column counts must match.');
+            }
+            if ($second === []) {
+                return $this;
+            }
+            Helpers::validateOperator($operator);
+            foreach ($first as $index => $column) {
+                $this->whereColumn($column, $operator, $second[$index]);
+            }
+            return $this;
+        }
         Helpers::validateOperator($operator);
     $this->wheres[] = Helpers::quoteIdentifier($first) . " $operator " . Helpers::quoteIdentifier($second);
         return $this;
@@ -1017,6 +1105,21 @@ class QueryBuilder {
         if ($second === null) {
             $second = $operator;
             $operator = '=';
+        }
+        if (is_array($first) || is_array($second)) {
+            $first = array_values((array) $first);
+            $second = array_values((array) $second);
+            if (count($first) !== count($second)) {
+                throw new \InvalidArgumentException('Composite column counts must match.');
+            }
+            if ($second === []) {
+                return $this;
+            }
+            Helpers::validateOperator($operator);
+            foreach ($first as $index => $column) {
+                $this->orWhereColumn($column, $operator, $second[$index]);
+            }
+            return $this;
         }
         Helpers::validateOperator($operator);
     $this->wheres[] = "OR " . Helpers::quoteIdentifier($first) . " $operator " . Helpers::quoteIdentifier($second);
@@ -2892,6 +2995,44 @@ class QueryBuilder {
             $ownerKey   = $ctx['ownerKey'];
             $relClass   = $ctx['related'];
 
+            if (is_array($foreignKey) || is_array($ownerKey)) {
+                $foreignKey = array_values((array) $foreignKey);
+                $ownerKey = array_values((array) $ownerKey);
+                if (count($foreignKey) !== count($ownerKey)) {
+                    throw new \InvalidArgumentException('Composite relationship key counts must match.');
+                }
+                $tuples = [];
+                foreach ($models as $m) {
+                    $tuple = [];
+                    $valid = true;
+                    foreach ($foreignKey as $key) {
+                        $value = $m->$key;
+                        $tuple[] = $value;
+                        $valid = $valid && $value !== null;
+                    }
+                    if ($valid) {
+                        $tuples[] = $tuple;
+                    }
+                }
+                if (empty($tuples)) {
+                    foreach ($models as $m) $m->setEagerLoaded($relation, null);
+                    return;
+                }
+                $query = $relClass::query(!$disableGlobalScopes)->whereCompositeIn($ownerKey, $tuples);
+                $this->applyRelationColumnSelect($query, $ownerKey, $selectColumns);
+                if ($constraint) $constraint($query);
+
+                $map = [];
+                foreach ($query->get() as $rel) {
+                    $map[$this->relationTupleKey($ownerKey, $rel)] = $rel;
+                }
+                foreach ($models as $m) {
+                    $key = $this->modelTupleKey($foreignKey, $m);
+                    $m->setEagerLoaded($relation, $map[$key] ?? null);
+                }
+                return;
+            }
+
             $ids = array_values(array_unique(array_filter(
                 array_map(fn($m) => $m->$foreignKey, $models),
                 fn($id) => $id !== null
@@ -2924,6 +3065,38 @@ class QueryBuilder {
             $localKey   = $ctx['localKey'];
             $relClass   = $ctx['related'];
 
+            if (is_array($foreignKey) || is_array($localKey)) {
+                $foreignKey = array_values((array) $foreignKey);
+                $localKey = array_values((array) $localKey);
+                if (count($foreignKey) !== count($localKey)) {
+                    throw new \InvalidArgumentException('Composite relationship key counts must match.');
+                }
+                $tuples = [];
+                foreach ($models as $m) {
+                    $tuple = [];
+                    foreach ($localKey as $key) {
+                        $tuple[] = $m->$key;
+                    }
+                    $tuples[] = $tuple;
+                }
+                $query = $relClass::query(!$disableGlobalScopes)->whereCompositeIn($foreignKey, $tuples);
+                $this->applyRelationColumnSelect($query, $foreignKey, $selectColumns);
+                if ($constraint) $constraint($query);
+
+                $map = [];
+                foreach ($query->get() as $rel) {
+                    $key = $this->relationTupleKey($foreignKey, $rel);
+                    if (!isset($map[$key])) {
+                        $map[$key] = $rel;
+                    }
+                }
+                foreach ($models as $m) {
+                    $key = $this->modelTupleKey($localKey, $m);
+                    $m->setEagerLoaded($relation, $map[$key] ?? null);
+                }
+                return;
+            }
+
             $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
 
             $query = $relClass::query(!$disableGlobalScopes)->whereIn($foreignKey, $ids);
@@ -2950,6 +3123,49 @@ class QueryBuilder {
             $foreignKey = $ctx['foreignKey'];
             $localKey   = $ctx['localKey'];
             $relClass   = $ctx['related'];
+
+            if (is_array($foreignKey) || is_array($localKey)) {
+                $foreignKey = array_values((array) $foreignKey);
+                $localKey = array_values((array) $localKey);
+                if (count($foreignKey) !== count($localKey)) {
+                    throw new \InvalidArgumentException('Composite relationship key counts must match.');
+                }
+                $tuples = [];
+                foreach ($models as $m) {
+                    $tuple = [];
+                    foreach ($localKey as $key) {
+                        $tuple[] = $m->$key;
+                    }
+                    $tuples[] = $tuple;
+                }
+                $query = $relClass::query(!$disableGlobalScopes)->whereCompositeIn($foreignKey, $tuples);
+                $this->applyRelationColumnSelect($query, $foreignKey, $selectColumns);
+
+                if ($sampleQuery === null) {
+                    $sampleQuery = (new $modelClass)->$relation();
+                }
+                foreach ($sampleQuery->orders ?? [] as $order) {
+                    if (is_array($order) && isset($order['raw'])) {
+                        $query->reorder()->orderByRaw($order['raw'], $order['bindings'] ?? []);
+                    } elseif (preg_match('/^([a-zA-Z0-9_\.]+)\s+(asc|desc)$/i', $order, $m)) {
+                        $query->orderBy($m[1], strtolower($m[2]));
+                    } elseif (preg_match('/^([a-zA-Z0-9_\.]+)$/', $order, $m)) {
+                        $query->orderBy($m[1], 'asc');
+                    }
+                }
+                if ($constraint) $constraint($query);
+
+                $map = [];
+                foreach ($query->get() as $rel) {
+                    $key = $this->relationTupleKey($foreignKey, $rel);
+                    if (!isset($map[$key])) $map[$key] = $rel;
+                }
+                foreach ($models as $m) {
+                    $key = $this->modelTupleKey($localKey, $m);
+                    $m->setEagerLoaded($relation, $map[$key] ?? null);
+                }
+                return;
+            }
 
             $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
 
@@ -2994,6 +3210,36 @@ class QueryBuilder {
             $foreignKey = $ctx['foreignKey'];
             $localKey   = $ctx['localKey'];
             $relClass   = $ctx['related'];
+
+            if (is_array($foreignKey) || is_array($localKey)) {
+                $foreignKey = array_values((array) $foreignKey);
+                $localKey = array_values((array) $localKey);
+                if (count($foreignKey) !== count($localKey)) {
+                    throw new \InvalidArgumentException('Composite relationship key counts must match.');
+                }
+                $tuples = [];
+                foreach ($models as $m) {
+                    $tuple = [];
+                    foreach ($localKey as $key) {
+                        $tuple[] = $m->$key;
+                    }
+                    $tuples[] = $tuple;
+                }
+                $query = $relClass::query(!$disableGlobalScopes)->whereCompositeIn($foreignKey, $tuples);
+                $this->applyRelationColumnSelect($query, $foreignKey, $selectColumns);
+                if ($constraint) $constraint($query);
+
+                $grouped = [];
+                foreach ($query->get() as $rel) {
+                    $key = $this->relationTupleKey($foreignKey, $rel);
+                    $grouped[$key][] = $rel;
+                }
+                foreach ($models as $m) {
+                    $key = $this->modelTupleKey($localKey, $m);
+                    $m->setEagerLoaded($relation, new \MJ\WPORM\Collection($grouped[$key] ?? [], $relClass));
+                }
+                return;
+            }
 
             $ids = array_values(array_unique(array_map(fn($m) => $m->$localKey, $models)));
 
@@ -3326,6 +3572,30 @@ class QueryBuilder {
             return;
         }
         $query->select(array_values(array_unique(array_merge($keyColumns, $columns))));
+    }
+
+    /**
+     * Build a stable grouping key for a composite relationship tuple.
+     *
+     * @param array<int, string> $columns
+     * @param \MJ\WPORM\Model $model
+     * @return string
+     */
+    protected function modelTupleKey(array $columns, $model): string {
+        return serialize(array_map(function ($column) use ($model) {
+            return $model->$column;
+        }, $columns));
+    }
+
+    /**
+     * Build a stable grouping key from composite columns on a related model.
+     *
+     * @param array<int, string> $columns
+     * @param \MJ\WPORM\Model $model
+     * @return string
+     */
+    protected function relationTupleKey(array $columns, $model): string {
+        return $this->modelTupleKey($columns, $model);
     }
 
     /**
