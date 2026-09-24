@@ -931,6 +931,28 @@ protected function castSet($key, $value) {
 		return static::query($applyGlobalScopes);
 	}
 
+	/**
+	 * Create a new, unsaved model instance.
+	 *
+	 * This is the Eloquent-style counterpart to `new static($attributes)`.
+	 * Attributes are mass-assigned through the model's fillable/guarded rules.
+	 *
+	 * @param array $attributes
+	 * @return static
+	 */
+	public static function make(array $attributes = []) {
+		return new static($attributes);
+	}
+
+	/**
+	 * Start a model query without applying global scopes.
+	 *
+	 * @return \MJ\WPORM\QueryBuilder
+	 */
+	public static function withoutGlobalScopes() {
+		return static::query(false);
+	}
+
 	public static function all() {
 		return static::query()->get();
 	}
@@ -993,6 +1015,26 @@ protected function castSet($key, $value) {
 			throw (new ModelNotFoundException())->setModel(static::class, $id);
 		}
 		return $result;
+	}
+
+	/**
+	 * Delete models by their primary key, firing model delete events.
+	 *
+	 * @param mixed|array $ids
+	 * @return int Number of models deleted.
+	 */
+	public static function destroy($ids) {
+		$ids = is_array($ids) ? $ids : [$ids];
+		$deleted = 0;
+
+		foreach ($ids as $id) {
+			$instance = static::find($id);
+			if ($instance && $instance->delete()) {
+				$deleted++;
+			}
+		}
+
+		return $deleted;
 	}
 
 	/**

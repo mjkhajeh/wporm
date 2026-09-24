@@ -239,6 +239,37 @@ $users = User::selectRaw('price * %s AS adjusted_price', [1.1])->get();
 $query = User::newQuery();
 ```
 
+### where($column, $operator = null, $value = null)
+**Description:** Start a model query and add a WHERE clause. All query-builder
+methods are available through the model's static API, so `User::where(...)`
+is equivalent to `User::query()->where(...)`.
+
+**Examples:**
+```php
+$users = User::where('active', true)->get();
+$user = User::where('email', 'foo@bar.com')->first();
+$users = User::where(['active' => true, 'role' => 'admin'])->get();
+```
+
+### whereKey($id)
+**Description:** Add a constraint for the model's primary key. Accepts one id
+or an array of ids.
+
+**Example:**
+```php
+$user = User::whereKey(1)->first();
+$users = User::whereKey([1, 2, 3])->get();
+```
+
+### withoutGlobalScopes()
+**Description:** Start a model query without applying any registered global
+scopes.
+
+**Example:**
+```php
+$users = User::withoutGlobalScopes()->get();
+```
+
 ### Dynamic Where Clauses
 
 **`where{Column}(...$values)`**
@@ -1303,6 +1334,27 @@ try {
 } catch (\MJ\WPORM\ModelNotFoundException $e) {
     // $e->getIds() === [2, 3] if only id 1 existed
 }
+```
+
+### make(array $attributes = [])
+**Description:** Create a new unsaved model instance. Attributes are
+mass-assigned using the model's `$fillable`/`$guarded` rules.
+
+**Example:**
+```php
+$user = User::make(['name' => 'Foo']);
+$user->save();
+```
+
+### destroy($ids)
+**Description:** Delete one or more models by primary key. Each matching model
+is loaded and deleted individually, so model delete events and soft deletes
+are honored. Returns the number of models successfully deleted.
+
+**Examples:**
+```php
+$deleted = User::destroy(1);
+$deleted = User::destroy([1, 2, 3]);
 ```
 
 ### firstOrFail($attributes = [])

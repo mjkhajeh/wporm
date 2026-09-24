@@ -4916,6 +4916,19 @@ class QueryBuilder {
     }
 
     /**
+     * Add a primary-key constraint to the query.
+     *
+     * @param mixed|array $id
+     * @return $this
+     */
+    public function whereKey($id) {
+        $primaryKey = $this->model->getPrimaryKey();
+        return is_array($id)
+            ? $this->whereIn($primaryKey, $id)
+            : $this->where($primaryKey, $id);
+    }
+
+    /**
      * Find a model by its primary key, or throw a ModelNotFoundException if
      * no record matches (Eloquent-style). Identical to find() otherwise —
      * same single query, no extra DB round-trip is incurred just to check

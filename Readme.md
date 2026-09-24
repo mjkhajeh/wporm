@@ -253,6 +253,10 @@ $all = Parts::all();
 // Find by primary key
 $part = Parts::find(1);
 
+// Constrain a query by the model's primary key
+$part = Parts::whereKey(1)->first();
+$parts = Parts::whereKey([1, 2, 3])->get();
+
 // Where clause
 $parts = Parts::query()->where('qty', '>', 5)->orderBy('qty', 'desc')->limit(10)->get(); // Limit to 10 results
 
@@ -289,6 +293,20 @@ $recentUsers = User::query()->where('created_at', '>=', '2025-01-01')->get();
 ```
 
 This approach works for any column in your table.
+
+### Querying by Primary Key with `whereKey()`
+
+Use `whereKey()` when you want to add a primary-key constraint while
+continuing to build a query. It accepts either one id or an array of ids and
+uses the model's configured `$primaryKey` column:
+
+```php
+$part = Parts::whereKey(1)->first();
+
+$parts = Parts::whereKey([1, 2, 3])
+    ->orderBy('id')
+    ->get();
+```
 
 ### Dynamic Where Clauses
 

@@ -63,8 +63,18 @@ $user->save();
 
 // Query with global scope (only verified users)
 $activeUsers = User::all();
+$namedUsers = User::where('name', 'Alice')->get();
+$newUser = User::create([
+    'name' => 'bob',
+    'email' => 'bob@example.com',
+    'country' => 'US',
+    'age' => 28,
+    'verified' => true,
+    'subscribed' => true,
+    'meta' => [],
+]);
 // Remove global scope for a query
-$allUsers = User::query(false)->get();
+$allUsers = User::withoutGlobalScopes()->get();
 // Soft delete (timestamp)
 $user->delete(); // sets deleted_at
 $trashedUsers = User::query()->onlyTrashed()->get();
