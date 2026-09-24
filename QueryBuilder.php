@@ -4586,7 +4586,11 @@ class QueryBuilder {
                 $baseWhereCount, $constraint
             ) {
                 $q->from($relatedTable)
-                  ->whereColumn("$relatedTable.$ownerKey", '=', "$outerTable.$foreignKey");
+                  ->whereColumn(
+                      array_map(fn($key) => "$relatedTable.$key", (array) $ownerKey),
+                      '=',
+                      array_map(fn($key) => "$outerTable.$key", (array) $foreignKey)
+                  );
                 // Append only the user-added wheres (beyond the base FK constraint)
                 foreach (array_slice($relQuery->wheres,   $baseWhereCount) as $w) {
                     $q->wheres[] = $w;
@@ -4610,7 +4614,11 @@ class QueryBuilder {
                 $relQuery, $relatedTable, $foreignKey, $localKey, $outerTable, $constraint
             ) {
                 $q->from($relatedTable)
-                  ->whereColumn("$relatedTable.$foreignKey", '=', "$outerTable.$localKey");
+                  ->whereColumn(
+                      array_map(fn($key) => "$relatedTable.$key", (array) $foreignKey),
+                      '=',
+                      array_map(fn($key) => "$outerTable.$key", (array) $localKey)
+                  );
                 if ($constraint) $constraint($q);
             });
             return;
@@ -4763,7 +4771,11 @@ class QueryBuilder {
             $sub = new self($this->model, false);
             $sub->from($relatedTable)
                 ->select(["COUNT(*)"])
-                ->whereColumn("$relatedTable.$foreignKey", '=', "$outerTable.$localKey");
+                ->whereColumn(
+                    array_map(fn($key) => "$relatedTable.$key", (array) $foreignKey),
+                    '=',
+                    array_map(fn($key) => "$outerTable.$key", (array) $localKey)
+                );
 
             $subSql = $sub->buildSelectQuery();
             $this->wheres[]   = "($subSql) $operator %s";
@@ -4780,7 +4792,11 @@ class QueryBuilder {
             $sub = new self($this->model, false);
             $sub->from($relatedTable)
                 ->select(["COUNT(*)"])
-                ->whereColumn("$relatedTable.$ownerKey", '=', "$outerTable.$foreignKey");
+                ->whereColumn(
+                    array_map(fn($key) => "$relatedTable.$key", (array) $ownerKey),
+                    '=',
+                    array_map(fn($key) => "$outerTable.$key", (array) $foreignKey)
+                );
 
             $subSql = $sub->buildSelectQuery();
             $this->wheres[]   = "($subSql) $operator %s";
