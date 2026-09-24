@@ -6,6 +6,55 @@ namespace MJ\WPORM;
  *
  * @method string getTable()   Get the table name for the model instance
  * @method static string tableName()   Get the table name for the model statically
+ *
+ * Query-builder methods are available through the model's static API. These
+ * annotations expose the most commonly used methods to IDE autocomplete while
+ * preserving the fluent QueryBuilder return type.
+ *
+ * @method static \MJ\WPORM\QueryBuilder select(array|string $columns = ['*'])
+ * @method static \MJ\WPORM\QueryBuilder where($column, $operator = null, $value = null)
+ * @method static \MJ\WPORM\QueryBuilder orWhere($column, $operator = null, $value = null)
+ * @method static \MJ\WPORM\QueryBuilder whereIn($column, array $values)
+ * @method static \MJ\WPORM\QueryBuilder whereNotIn($column, array $values)
+ * @method static \MJ\WPORM\QueryBuilder whereBetween($column, array $values)
+ * @method static \MJ\WPORM\QueryBuilder whereNotBetween($column, array $values)
+ * @method static \MJ\WPORM\QueryBuilder whereNull($column)
+ * @method static \MJ\WPORM\QueryBuilder whereNotNull($column)
+ * @method static \MJ\WPORM\QueryBuilder whereLike($column, $value)
+ * @method static \MJ\WPORM\QueryBuilder whereNotLike($column, $value)
+ * @method static \MJ\WPORM\QueryBuilder whereRaw($sql, array $bindings = [])
+ * @method static \MJ\WPORM\QueryBuilder orderBy($column, $direction = 'asc')
+ * @method static \MJ\WPORM\QueryBuilder latest($column = 'created_at')
+ * @method static \MJ\WPORM\QueryBuilder oldest($column = 'created_at')
+ * @method static \MJ\WPORM\QueryBuilder inRandomOrder()
+ * @method static \MJ\WPORM\QueryBuilder groupBy($columns)
+ * @method static \MJ\WPORM\QueryBuilder having($column, $operator = null, $value = null)
+ * @method static \MJ\WPORM\QueryBuilder limit($limit)
+ * @method static \MJ\WPORM\QueryBuilder offset($offset)
+ * @method static \MJ\WPORM\QueryBuilder join($table, $first = null, $operator = null, $second = null)
+ * @method static \MJ\WPORM\QueryBuilder leftJoin($table, $first = null, $operator = null, $second = null)
+ * @method static \MJ\WPORM\QueryBuilder with($relations)
+ * @method static \MJ\WPORM\QueryBuilder withCount($relations)
+ * @method static \MJ\WPORM\QueryBuilder withoutGlobalScopes()
+ * @method static \MJ\WPORM\QueryBuilder lockForUpdate()
+ * @method static \MJ\WPORM\QueryBuilder sharedLock()
+ * @method static \MJ\WPORM\QueryBuilder whereKey($id)
+ * @method static \MJ\WPORM\Collection get()
+ * @method static static|null first()
+ * @method static int count()
+ * @method static bool exists()
+ * @method static mixed value($column)
+ * @method static \MJ\WPORM\Collection pluck($column, $key = null)
+ * @method static mixed sum($column)
+ * @method static mixed avg($column)
+ * @method static mixed min($column)
+ * @method static mixed max($column)
+ * @method static int update(array $data)
+ * @method static int delete()
+ * @method static int increment($column, $amount = 1, array $extra = [])
+ * @method static int decrement($column, $amount = 1, array $extra = [])
+ * @method static array paginate($perPage = 15, $page = null)
+ * @method static array simplePaginate($perPage = 15, $page = null)
  */
 abstract class Model implements \ArrayAccess {
 
