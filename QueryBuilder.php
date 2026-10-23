@@ -4497,6 +4497,47 @@ class QueryBuilder {
     }
 
     /**
+     * Lazily yield query results while fetching them in pages.
+     *
+     * Each page is hydrated through get(), so eager-loaded relations and
+     * retrieved events behave the same as they do for regular query results.
+     *
+     * @param int $chunkSize Number of records to fetch per query
+     * @return \Generator<int, Model|object>
+     * @throws \InvalidArgumentException
+     */
+    public function lazy($chunkSize = 1000): \Generator {
+        $chunkSize = (int) $chunkSize;
+        if ($chunkSize < 1) {
+            throw new \InvalidArgumentException('The chunk size must be greater than zero.');
+        }
+
+        return $this->lazyGenerator($chunkSize);
+    }
+
+    /**
+     * @param int $chunkSize
+     * @return \Generator<int, Model|object>
+     */
+    protected function lazyGenerator(int $chunkSize): \Generator {
+        // Keep pagination and soft-delete scope changes isolated from the
+        // builder being iterated and allow that builder to be reused safely.
+        $query = clone $this;
+        $page = 1;
+
+        do {
+            $query->limit($chunkSize)->offset(($page - 1) * $chunkSize);
+            $results = $query->get();
+
+            foreach ($results as $result) {
+                yield $result;
+            }
+
+            $page++;
+        } while (count($results) === $chunkSize);
+    }
+
+    /**
      * Filter by existence of related records (Eloquent-style whereHas).
      *
      * Calls the relation method on a fresh model instance so that no

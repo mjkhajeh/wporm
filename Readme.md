@@ -26,7 +26,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
   - [Deleting a Record](#deleting-a-record)
 - [Aggregates & Utility Methods](#aggregates-utility-methods)
 - [Pagination](#pagination)
-- [Processing Large Datasets: chunk() and each()](#processing-large-datasets-chunk-and-each)
+- [Processing Large Datasets: chunk(), each(), and lazy()](#processing-large-datasets-chunk-each-and-lazy)
 - [Row locking](#row-locking)
 - [Attribute Casting](#attribute-casting)
 - [Collections](#collections)
@@ -74,7 +74,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Aggregates & utilities**: `sum()`, `avg()`, `min()`, `max()`, `value()`, `pluck()`, `exists()`/`doesntExist()`, and `increment()`/`decrement()`.
 - **Fail-fast lookups**: `findOrFail()`/`firstOrFail()` (including array-of-ids lookups, and `Collection::firstOrFail()`) throw a `ModelNotFoundException` instead of silently returning `null`.
 - **Re-fetching**: `fresh()` returns a new instance with the current database state (optionally eager-loading relations); `refresh()` re-syncs the current instance in place — both Eloquent-style.
-- **Batch processing**: `chunk()` and `each()` for iterating large result sets in pages without loading everything into memory at once.
+- **Batch processing**: `chunk()`, `each()`, and `lazy()` for iterating large result sets in pages without loading everything into memory at once.
 - **Row locking**: `lockForUpdate()` and `sharedLock()` add `FOR UPDATE` / `LOCK IN SHARE MODE` clauses to generated `SELECT` queries for concurrent-write protection.
 - **Serialization**: `toArray()`/`toJson()`/`__toString()` on both models and collections, with `$hidden`/`$visible` support and safe (exception-on-failure) JSON encoding.
 - **Raw SQL expressions**: `selectRaw()`, `whereRaw()`/`orWhereRaw()`, `groupByRaw()`, `havingRaw()`/`orHavingRaw()`, and `orderByRaw()` for dropping down to raw SQL with safe, bound placeholders.
@@ -795,9 +795,9 @@ $result = User::query()->where('active', true)->simplePaginate(10, 2);
 
 See [Methods.md](./Methods.md) for more details and options.
 
-## Processing Large Datasets: chunk() and each()
+## Processing Large Datasets: chunk(), each(), and lazy()
 
-When you need to iterate over a large number of records, loading them all into memory at once with `get()` isn't practical. `chunk()` and `each()` solve this Eloquent-style, by running the query in pages (using the same `limit()`/`offset()` mechanism as `paginate()`) and feeding results to a callback as they come in.
+When you need to iterate over a large number of records, loading them all into memory at once with `get()` isn't practical. `chunk()`, `each()`, and `lazy()` run the query in pages (using the same `limit()`/`offset()` mechanism as `paginate()`); `chunk()` and `each()` feed results to a callback, while `lazy()` yields them as a stream.
 
 ### chunk($count, $callback)
 
@@ -842,6 +842,23 @@ Just like `chunk()`, returning `false` from the callback stops processing early.
 
 Both methods automatically respect any `where()`/`join()`/soft-delete scoping already applied to the query, since they're built on the same query builder instance. The builder's state is also fully restored afterwards — even if your callback throws an exception — so reusing the query won't see a leftover limit/offset or a duplicated soft-delete constraint.
 
+### lazy($chunkSize = 1000)
+
+Returns a generator that yields matching records one at a time while fetching them in pages. Like Eloquent's `lazy()`, it presents paged results as one continuous stream without loading the full result set at once:
+
+```php
+foreach (User::query()->where('active', true)->lazy(500) as $user) {
+    // Process each user; at most 500 results are fetched per query.
+}
+
+// Also available through the model's static query proxy
+foreach (User::lazy() as $user) {
+    // ...
+}
+```
+
+The default page size is 1000; a size below 1 throws `InvalidArgumentException`. Each page uses the normal `get()` hydration path, including eager loads and `retrieved` events. WPORM returns a native PHP generator rather than Laravel's chainable `LazyCollection`. Iteration uses `LIMIT`/`OFFSET`; add a deterministic `orderBy()` when order matters. As with Eloquent `lazy()`, changing which rows match or their ordering during iteration can cause records to be skipped; use key-based pagination for that workflow.
+
 ## Row locking
 
 WPORM supports Eloquent-style row locking for concurrent writes. Use `lockForUpdate()` to emit `FOR UPDATE`, or `sharedLock()` to emit `LOCK IN SHARE MODE`.
@@ -875,14 +892,14 @@ foreach (User::cursor() as $user) {
 }
 ```
 
-**cursor() vs chunk()/each():**
+**cursor() vs chunk()/each()/lazy():**
 
-| | `cursor()` | `chunk()` / `each()` |
+| | `cursor()` | `chunk()` / `each()` / `lazy()` |
 |---|---|---|
 | Query execution | Single query | Multiple paginated queries |
 | Memory model | One model at a time | One page at a time |
-| Early stop | Break out of `foreach` | Return `false` from callback |
-| Best for | Simple iteration over huge sets | Complex per-page logic or early-stop |
+| Early stop | Break out of `foreach` | Break out of `foreach` for `lazy()`; return `false` from callback for the others |
+| Best for | One query with simple iteration | Bounded page fetching |
 
 Both approaches keep memory low — `cursor()` is simpler when you just need to loop through everything once.
 

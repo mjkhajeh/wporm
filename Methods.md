@@ -1656,10 +1656,10 @@ User::query()->where('subscription', 'expired')->decrement('seats', 1);
 ## Batch Processing
 
 These methods process query results in pages instead of loading the entire
-result set into memory at once — essential for iterating over large tables
-(Eloquent-style `chunk()`/`each()`). Both are built on the same `limit()`/
-`offset()` mechanism as `paginate()`, so they respect whatever `where()`/
-`join()`/soft-delete scoping is already on the query.
+result set into memory at once — essential for iterating over large tables.
+They use the same `limit()`/`offset()` mechanism as `paginate()`, so they
+respect whatever `where()`/`join()`/soft-delete scoping is already on the
+query.
 
 ### chunk($count, callable $callback)
 **Description:** Run the query in pages of `$count` records, invoking `$callback` once per page with a `Collection` of up to `$count` models and the current page number (`function(Collection $chunk, int $page)`). Returning `false` from the callback stops processing early. Returns `false` if iteration was stopped early, `true` otherwise. The query builder's state (`limit()`/`offset()`, plus any soft-delete scoping applied internally) is always restored when `chunk()` finishes — including when your callback throws an exception — so the builder can be reused safely afterwards without duplicated constraints or a stale limit/offset.
@@ -1696,6 +1696,40 @@ User::query()->each(function($user) {
     // ...
 }, 500);
 ```
+
+### lazy($chunkSize = 1000)
+**Description:** Return a `Generator` that yields individual query results as
+a continuous stream, fetching up to `$chunkSize` records per query. Unlike
+Eloquent's `Illuminate\Support\LazyCollection`, WPORM returns a native
+generator and does not require Laravel's collections package. Query execution
+is deferred until iteration begins. The query is cloned for paging, so its
+limit/offset and soft-delete state are not changed on the original builder.
+Each page is obtained through `get()`, preserving eager loading and
+`retrieved` events. Throws `InvalidArgumentException` if `$chunkSize` is less
+than 1. Available through both `QueryBuilder` and the model's static query
+proxy.
+
+**Example:**
+```php
+foreach (User::query()->where('active', true)->lazy(500) as $user) {
+    // process one model at a time
+}
+
+// Static model proxy, with the default page size of 1000
+foreach (User::lazy() as $user) {
+    // ...
+}
+```
+
+**Notes:**
+- Applies `LIMIT`/`OFFSET` paging and fetches one additional page when the
+  previous page was full, to detect the end of the result set.
+- Add an `orderBy()` when stable ordering matters.
+- Like Eloquent's `lazy()`, offset paging can skip or repeat records if the
+  result set changes during iteration. Prefer key-based pagination when
+  modifying records in a way that affects the query.
+- The returned native `Generator` supports `foreach`; it is not Laravel's
+  chainable/replayable `LazyCollection`.
 
 ### cursor()
 **Description:** Execute the query and return a `Generator` that yields models one at a time. The SQL query executes once, but models are hydrated lazily as you iterate — only one model is in memory at a time. This is ideal for huge result sets where you want `foreach` simplicity without the memory overhead of loading everything into a Collection upfront. Available as both a QueryBuilder instance method and a static Model method.
