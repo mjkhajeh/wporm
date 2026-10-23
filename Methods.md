@@ -1740,6 +1740,11 @@ foreach (User::lazy() as $user) {
   `Generator` cannot.
 - `all()`, `collect()`, `toArray()`, `toJson()`, and `count()` consume the
   stream; use lazy transforms before these terminal operations.
+- `unique()` uses indexed lookup for scalar values. Array/object uniqueness
+  retains strict comparisons and may require more comparisons as the number
+  of complex values grows.
+- `Collection::lazy()` wraps an already-materialized collection for lazy
+  transformations; it does not undo the original query's memory use.
 
 ### cursor()
 **Description:** Return a `LazyCollection` backed by one SELECT query. Rows

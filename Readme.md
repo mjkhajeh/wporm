@@ -870,7 +870,7 @@ The default page size is 1000; a size below 1 throws `InvalidArgumentException`.
 
 `get()` returns the eager `Collection`; call its `lazy()` method to wrap those already-loaded items in a `LazyCollection` for subsequent lazy transformations. Query `lazy()` and `cursor()` instead defer fetching until iteration. A `LazyCollection` is replayable when its source is a callable (as query methods provide); a directly supplied one-shot `Generator` cannot be restarted.
 
-The WPORM lazy collection includes streaming `map()`, `filter()`, `reject()`, `mapWithKeys()`, `flatMap()`, `take()`/`takeWhile()`, `skip()`/`skipWhile()`, `values()`, `keys()`, `pluck()`, `unique()`, `keyBy()`, and `chunk()`, plus terminal methods such as `all()`, `collect()`, `first()`, `last()`, `count()`, `contains()`, `reduce()`, `sum()`, `avg()`, `min()`, and `max()`. Terminal methods consume the source; `all()`, `collect()`, `toArray()`, `toJson()`, and `count()` materialize or traverse all remaining items.
+The WPORM lazy collection includes streaming `map()`, `filter()`, `reject()`, `mapWithKeys()`, `flatMap()`, `take()`/`takeWhile()`, `skip()`/`skipWhile()`, `values()`, `keys()`, `pluck()`, `unique()`, `keyBy()`, and `chunk()`, plus terminal methods such as `all()`, `collect()`, `first()`, `last()`, `count()`, `contains()`, `reduce()`, `sum()`, `avg()`, `min()`, and `max()`. `unique()` indexes scalar values for near-linear lookup; arrays and objects retain strict comparison semantics. Terminal methods consume the source; `all()`, `collect()`, `toArray()`, `toJson()`, and `count()` materialize or traverse all remaining items.
 
 ## Row locking
 

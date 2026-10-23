@@ -265,13 +265,31 @@ class LazyCollection implements \IteratorAggregate, \Countable {
     public function unique($key = null) {
         $source = $this;
         return new static(function () use ($source, $key) {
-            $seen = [];
+            $seenScalars = [];
+            $seenComplex = [];
             foreach ($source as $itemKey => $item) {
                 $value = $this->valueFor($item, $key);
-                if (in_array($value, $seen, true)) {
-                    continue;
+
+                if (is_scalar($value) || $value === null) {
+                    if (is_float($value) && is_nan($value)) {
+                        yield $itemKey => $item;
+                        continue;
+                    }
+
+                    $identity = is_float($value) && $value == 0.0
+                        ? 'float:0'
+                        : gettype($value) . ':' . serialize($value);
+                    if (isset($seenScalars[$identity])) {
+                        continue;
+                    }
+                    $seenScalars[$identity] = true;
+                } else {
+                    if (in_array($value, $seenComplex, true)) {
+                        continue;
+                    }
+                    $seenComplex[] = $value;
                 }
-                $seen[] = $value;
+
                 yield $itemKey => $item;
             }
         }, $this->modelClass);
