@@ -1683,31 +1683,32 @@ class QueryBuilder {
     }
 
     /**
-     * Execute the query and return a generator that yields models one at a time.
+     * Execute one query lazily and return models as a LazyCollection.
      *
-     * Unlike get(), which hydrates all models into memory at once, cursor()
-     * uses a generator to yield models individually — reducing peak memory
-     * usage for large result sets. The underlying SQL query is executed once.
+     * Unlike lazy(), cursor() runs one SELECT and cannot eager load relations.
      *
-     * Usage:
-     *   foreach (User::query()->cursor() as $user) {
-     *       // process $user one at a time
-     *   }
-     *
-     *   // Convert to LazyCollection for lazy higher-order methods
-     *   $lazy = User::query()->cursor()->map(fn($u) => $u->name);
-     *
-     * @return \Generator<int, \MJ\WPORM\Model>
+     * @return LazyCollection
      */
-    public function cursor(): \Generator {
-        $this->applySoftDeleteScope();
-        $sql = $this->buildSelectQuery();
-        $bindings = $this->getBindings();
+    public function cursor(): LazyCollection {
+        $modelClass = $this->model instanceof Model ? get_class($this->model) : null;
+        return new LazyCollection(function () {
+            return $this->cursorGenerator();
+        }, $modelClass);
+    }
+
+    /**
+     * @return \Generator<int, Model|object>
+     */
+    protected function cursorGenerator(): \Generator {
+        $query = clone $this;
+        $query->applySoftDeleteScope();
+        $sql = $query->buildSelectQuery();
+        $bindings = $query->getBindings();
         if (!empty($bindings)) {
-            $sql = $this->wpdb->prepare($sql, ...$bindings);
+            $sql = $query->wpdb->prepare($sql, ...$bindings);
         }
-        $results = $this->executeWithLogging(
-            fn() => $this->wpdb->get_results($sql, ARRAY_A),
+        $results = $query->executeWithLogging(
+            fn() => $query->wpdb->get_results($sql, ARRAY_A),
             $sql,
             $bindings
         );
@@ -1721,7 +1722,7 @@ class QueryBuilder {
             }
             return;
         }
-        $modelClass = get_class($this->model);
+        $modelClass = get_class($query->model);
         foreach ($results as $row) {
             $instance = (new $modelClass)->newFromBuilder($row);
             $instance->fireModelEvent('retrieved');
@@ -4503,16 +4504,19 @@ class QueryBuilder {
      * retrieved events behave the same as they do for regular query results.
      *
      * @param int $chunkSize Number of records to fetch per query
-     * @return \Generator<int, Model|object>
+     * @return LazyCollection<int, Model|object>
      * @throws \InvalidArgumentException
      */
-    public function lazy($chunkSize = 1000): \Generator {
+    public function lazy($chunkSize = 1000): LazyCollection {
         $chunkSize = (int) $chunkSize;
         if ($chunkSize < 1) {
             throw new \InvalidArgumentException('The chunk size must be greater than zero.');
         }
 
-        return $this->lazyGenerator($chunkSize);
+        $modelClass = $this->model instanceof Model ? get_class($this->model) : null;
+        return new LazyCollection(function () use ($chunkSize) {
+            return $this->lazyGenerator($chunkSize);
+        }, $modelClass);
     }
 
     /**

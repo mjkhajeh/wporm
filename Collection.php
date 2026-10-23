@@ -77,6 +77,15 @@ class Collection implements \ArrayAccess, \IteratorAggregate, \Countable {
     }
 
     /**
+     * Return a LazyCollection backed by this collection's items.
+     *
+     * @return LazyCollection
+     */
+    public function lazy() {
+        return new LazyCollection($this->items, $this->modelClass);
+    }
+
+    /**
      * Reverse the order of the items in the collection.
      *
      * @return static

@@ -3159,12 +3159,11 @@ public function forceDelete() {
     }
 
     /**
-     * Start a query with relationship counts (Eloquent-style static withCount()).
-     * Usage: User::withCount('posts')->get(); // each $user->posts_count
-     * @param array|string $relations
-     * @return \MJ\WPORM\QueryBuilder
+     * Return a LazyCollection backed by a single query.
+     *
+     * @return \MJ\WPORM\LazyCollection
      */
-    public static function cursor(): \Generator {
+    public static function cursor(): \MJ\WPORM\LazyCollection {
         return static::query()->cursor();
     }
 

@@ -1698,11 +1698,12 @@ User::query()->each(function($user) {
 ```
 
 ### lazy($chunkSize = 1000)
-**Description:** Return a `Generator` that yields individual query results as
-a continuous stream, fetching up to `$chunkSize` records per query. Unlike
-Eloquent's `Illuminate\Support\LazyCollection`, WPORM returns a native
-generator and does not require Laravel's collections package. Query execution
-is deferred until iteration begins. The query is cloned for paging, so its
+**Description:** Return a WPORM `LazyCollection` that yields individual
+results as one stream, fetching up to `$chunkSize` records per query. It
+supports lazy transformations such as `map()`, `filter()`, `take()`,
+`flatMap()`, `pluck()`, and `chunk()`, as well as terminal operations such as
+`all()`, `collect()`, `first()`, `reduce()`, and `sum()`. Query execution is
+deferred until iteration begins. The query is cloned for paging, so its
 limit/offset and soft-delete state are not changed on the original builder.
 Each page is obtained through `get()`, preserving eager loading and
 `retrieved` events. Throws `InvalidArgumentException` if `$chunkSize` is less
@@ -1714,6 +1715,12 @@ proxy.
 foreach (User::query()->where('active', true)->lazy(500) as $user) {
     // process one model at a time
 }
+
+$names = User::lazy(500)
+    ->filter(fn($user) => $user->active)
+    ->map(fn($user) => $user->name)
+    ->take(20)
+    ->all();
 
 // Static model proxy, with the default page size of 1000
 foreach (User::lazy() as $user) {
@@ -1728,11 +1735,19 @@ foreach (User::lazy() as $user) {
 - Like Eloquent's `lazy()`, offset paging can skip or repeat records if the
   result set changes during iteration. Prefer key-based pagination when
   modifying records in a way that affects the query.
-- The returned native `Generator` supports `foreach`; it is not Laravel's
-  chainable/replayable `LazyCollection`.
+- WPORM provides its own `MJ\WPORM\LazyCollection` and does not depend on
+  Laravel. Query-backed sources can be traversed again; a supplied one-shot
+  `Generator` cannot.
+- `all()`, `collect()`, `toArray()`, `toJson()`, and `count()` consume the
+  stream; use lazy transforms before these terminal operations.
 
 ### cursor()
-**Description:** Execute the query and return a `Generator` that yields models one at a time. The SQL query executes once, but models are hydrated lazily as you iterate — only one model is in memory at a time. This is ideal for huge result sets where you want `foreach` simplicity without the memory overhead of loading everything into a Collection upfront. Available as both a QueryBuilder instance method and a static Model method.
+**Description:** Return a `LazyCollection` backed by one SELECT query. Rows
+are hydrated one at a time while iterating and can be transformed lazily.
+Unlike `lazy()`, `cursor()` cannot eager load relationships. WPORM's `$wpdb`
+adapter calls `get_results()`, which buffers all raw rows in memory; use
+`lazy()` when bounded database fetch sizes matter. Available as both a
+`QueryBuilder` instance method and a static `Model` method.
 
 **Example:**
 ```php
@@ -1746,10 +1761,12 @@ foreach (User::cursor() as $user) {
     // ...
 }
 
-// Combine with other query methods
-foreach (Post::query()->where('published', true)->orderBy('created_at')->cursor() as $post) {
-    // each $post is yielded individually
-}
+// Chain lazy transformations before consuming the results
+$emails = User::cursor()
+    ->filter(fn($user) => $user->active)
+    ->map(fn($user) => $user->email)
+    ->take(100)
+    ->all();
 
 // Use with generator functions
 function processLargeExport(): \Generator {
@@ -1759,19 +1776,21 @@ function processLargeExport(): \Generator {
 }
 ```
 
-**cursor() vs chunk()/each():**
+**cursor() vs lazy():**
 
-| | `cursor()` | `chunk()` / `each()` |
+| | `cursor()` | `lazy()` |
 |---|---|---|
 | Query execution | Single query | Multiple paginated queries |
-| Memory model | One model at a time | One page at a time |
-| Early stop | `break` out of `foreach` | Return `false` from callback |
-| Best for | Simple iteration over huge sets | Complex per-page logic or early-stop |
+| Memory model | `$wpdb` buffers raw rows; models hydrate as iterated | One hydrated page at a time |
+| Eager loading | No | Yes |
+| Best for | Single-query iteration without eager loads | Large result sets, especially with eager loads |
 
 **Notes:**
-- The generator executes the full query upfront (one `SELECT`), then yields hydrated models lazily.
+- Query execution is deferred until iteration starts.
+- `$wpdb->get_results()` buffers the raw query result before models are yielded.
 - Does **not** support eager loading (`with()`) — relations are not loaded on cursor models.
 - Respects soft-delete scoping and `where()`/`join()` conditions on the query.
+- `Collection::lazy()` wraps an already-materialized collection; it does not undo the original query's memory use.
 
 ---
 

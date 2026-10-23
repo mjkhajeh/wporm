@@ -74,7 +74,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - **Aggregates & utilities**: `sum()`, `avg()`, `min()`, `max()`, `value()`, `pluck()`, `exists()`/`doesntExist()`, and `increment()`/`decrement()`.
 - **Fail-fast lookups**: `findOrFail()`/`firstOrFail()` (including array-of-ids lookups, and `Collection::firstOrFail()`) throw a `ModelNotFoundException` instead of silently returning `null`.
 - **Re-fetching**: `fresh()` returns a new instance with the current database state (optionally eager-loading relations); `refresh()` re-syncs the current instance in place — both Eloquent-style.
-- **Batch processing**: `chunk()`, `each()`, and `lazy()` for iterating large result sets in pages without loading everything into memory at once.
+- **Batch processing**: `chunk()`, `each()`, and `lazy()` for iterating large result sets in pages without loading everything into memory at once. `lazy()` and `cursor()` return WPORM's generator-backed `LazyCollection` for fluent lazy transformations.
 - **Row locking**: `lockForUpdate()` and `sharedLock()` add `FOR UPDATE` / `LOCK IN SHARE MODE` clauses to generated `SELECT` queries for concurrent-write protection.
 - **Serialization**: `toArray()`/`toJson()`/`__toString()` on both models and collections, with `$hidden`/`$visible` support and safe (exception-on-failure) JSON encoding.
 - **Raw SQL expressions**: `selectRaw()`, `whereRaw()`/`orWhereRaw()`, `groupByRaw()`, `havingRaw()`/`orHavingRaw()`, and `orderByRaw()` for dropping down to raw SQL with safe, bound placeholders.
@@ -844,12 +844,19 @@ Both methods automatically respect any `where()`/`join()`/soft-delete scoping al
 
 ### lazy($chunkSize = 1000)
 
-Returns a generator that yields matching records one at a time while fetching them in pages. Like Eloquent's `lazy()`, it presents paged results as one continuous stream without loading the full result set at once:
+Returns a WPORM `LazyCollection` that yields matching records one at a time while fetching them in pages. Like Eloquent's `lazy()`, it presents paged results as one continuous stream without loading the full result set at once:
 
 ```php
 foreach (User::query()->where('active', true)->lazy(500) as $user) {
     // Process each user; at most 500 results are fetched per query.
 }
+
+// Lazy transformations and early limiting
+$names = User::query()->lazy(500)
+    ->filter(fn($user) => $user->active)
+    ->map(fn($user) => $user->name)
+    ->take(20)
+    ->all();
 
 // Also available through the model's static query proxy
 foreach (User::lazy() as $user) {
@@ -857,7 +864,13 @@ foreach (User::lazy() as $user) {
 }
 ```
 
-The default page size is 1000; a size below 1 throws `InvalidArgumentException`. Each page uses the normal `get()` hydration path, including eager loads and `retrieved` events. WPORM returns a native PHP generator rather than Laravel's chainable `LazyCollection`. Iteration uses `LIMIT`/`OFFSET`; add a deterministic `orderBy()` when order matters. As with Eloquent `lazy()`, changing which rows match or their ordering during iteration can cause records to be skipped; use key-based pagination for that workflow.
+The default page size is 1000; a size below 1 throws `InvalidArgumentException`. Each page uses the normal `get()` hydration path, including eager loads and `retrieved` events. The returned `MJ\WPORM\LazyCollection` supports lazy `map()`, `filter()`, `take()`, `each()`, `pluck()`, and other transformations; use `collect()` or `all()` to materialize it. This is WPORM's own implementation and does not require Laravel or expose Laravel's exact full API. Iteration uses `LIMIT`/`OFFSET`; add a deterministic `orderBy()` when order matters. As with Eloquent `lazy()`, changing which rows match or their ordering during iteration can cause records to be skipped; use key-based pagination for that workflow.
+
+### LazyCollection
+
+`get()` returns the eager `Collection`; call its `lazy()` method to wrap those already-loaded items in a `LazyCollection` for subsequent lazy transformations. Query `lazy()` and `cursor()` instead defer fetching until iteration. A `LazyCollection` is replayable when its source is a callable (as query methods provide); a directly supplied one-shot `Generator` cannot be restarted.
+
+The WPORM lazy collection includes streaming `map()`, `filter()`, `reject()`, `mapWithKeys()`, `flatMap()`, `take()`/`takeWhile()`, `skip()`/`skipWhile()`, `values()`, `keys()`, `pluck()`, `unique()`, `keyBy()`, and `chunk()`, plus terminal methods such as `all()`, `collect()`, `first()`, `last()`, `count()`, `contains()`, `reduce()`, `sum()`, `avg()`, `min()`, and `max()`. Terminal methods consume the source; `all()`, `collect()`, `toArray()`, `toJson()`, and `count()` materialize or traverse all remaining items.
 
 ## Row locking
 
@@ -879,29 +892,35 @@ These are appended to the generated `SELECT` SQL and are useful when you need to
 
 ### cursor()
 
-Returns a **generator** that yields models one at a time — the query executes once, but models are hydrated lazily as you iterate. This is ideal for huge datasets where you want `foreach` simplicity without loading every model into memory upfront:
+Returns a **LazyCollection** that yields models one at a time — the query executes once, but models are hydrated lazily as you iterate. It supports fluent lazy transformations:
 
 ```php
 foreach (User::query()->where('active', true)->cursor() as $user) {
-    // process $user one at a time — only one model in memory at a time
+    // process each hydrated model as it is yielded
 }
 
 // Works with static method too
 foreach (User::cursor() as $user) {
     // ...
 }
+
+$emails = User::cursor()
+    ->filter(fn($user) => $user->active)
+    ->map(fn($user) => $user->email)
+    ->take(100)
+    ->all();
 ```
 
-**cursor() vs chunk()/each()/lazy():**
+**cursor() vs lazy():**
 
-| | `cursor()` | `chunk()` / `each()` / `lazy()` |
+| | `cursor()` | `lazy()` |
 |---|---|---|
 | Query execution | Single query | Multiple paginated queries |
-| Memory model | One model at a time | One page at a time |
-| Early stop | Break out of `foreach` | Break out of `foreach` for `lazy()`; return `false` from callback for the others |
-| Best for | One query with simple iteration | Bounded page fetching |
+| Memory model | `$wpdb` buffers raw rows; models hydrate as iterated | One hydrated page at a time |
+| Eager loading | No | Yes |
+| Best for | Single-query iteration without eager loads | Large result sets, especially with eager loads |
 
-Both approaches keep memory low — `cursor()` is simpler when you just need to loop through everything once.
+Both return a `LazyCollection`. `cursor()` still buffers the raw result set because WPORM relies on `$wpdb->get_results()`; use `lazy()` when bounding the fetched page size is important.
 
 ## Attribute Casting
 Add a `$casts` property to your model:
