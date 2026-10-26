@@ -61,6 +61,7 @@ WPORM is a lightweight Object-Relational Mapping (ORM) library for WordPress plu
 - [Blueprint and column types documents](./Blueprint.md)
 - [Casts types and define custom casts](./CastsType.md)
 - [DB usage and raw queries](./DB.md)
+- [SchemaBuilder guide](./SchemaBuilder.md)
 - [WordPress core table models](./WordPressCore.md)
 - [Debugging tips](./Debugging.md)
 
@@ -190,6 +191,9 @@ try {
 ```
 
 ## Schema Management
+For the complete `SchemaBuilder` API, examples, and schema-inspection result
+formats, see the [SchemaBuilder guide](./SchemaBuilder.md).
+
 Create or update tables using the model's `up` method and the `SchemaBuilder`:
 
 ```php
