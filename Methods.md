@@ -31,6 +31,7 @@ This document describes all public and static methods of the `MJ\WPORM\Model` cl
 - [JSON Where Clauses](#json-where-clauses)
 - [Transactions](#transactions)
 - [Raw Table Queries with DB::table()](#raw-table-queries-with-dbtable)
+- [SchemaBuilder](#schemabuilder)
 - [Pagination](#pagination)
 - [Soft Deletes](#soft-deletes)
 - [Prunable / MassPrunable Traits](#prunable--massprunable-traits)
@@ -3348,6 +3349,92 @@ DB::table('custom_table')->where('status', 'active')->get();
 ```
 
 See [DB.md](./DB.md) for more details.
+
+---
+
+## SchemaBuilder
+
+`SchemaBuilder` provides Eloquent-style schema inspection and migration helpers backed by WordPress's `$wpdb`. Table names may be passed bare (for example, `users`) or already prefixed (for example, `wp_users`); WPORM avoids adding the WordPress prefix twice.
+
+### hasTable($table) / hasView($view)
+**Description:** Return whether the prefixed database object exists as a base table or view, respectively. A view is not considered a table by `hasTable()`.
+
+```php
+$schema->hasTable('users');
+$schema->hasView('active_users');
+```
+
+### hasColumn($table, $column) / hasColumns($table, array $columns)
+**Description:** Check for one column or for all requested columns. Column matching is case-insensitive; `hasColumns()` returns `true` for an empty list.
+
+```php
+$schema->hasColumn('users', 'email');
+$schema->hasColumns('users', ['email', 'created_at']);
+```
+
+### whenTableHasColumn($table, $column, Closure $callback) / whenTableDoesntHaveColumn($table, $column, Closure $callback)
+**Description:** Run the callback through `table()` when the table does or does not contain the specified column. The callback receives a `Blueprint`, so it can declare schema alterations.
+
+```php
+$schema->whenTableDoesntHaveColumn('users', 'nickname', function ($table) {
+    $table->string('nickname')->nullable();
+});
+```
+
+### whenTableHasIndex($table, $index, Closure $callback, $type = null) / whenTableDoesntHaveIndex($table, $index, Closure $callback, $type = null)
+**Description:** Conditionally run a `table()` callback based on an index name or an exact ordered list of indexed columns. `$type` may be `primary`, `unique`, or a database index type such as `btree`.
+
+```php
+$schema->whenTableDoesntHaveIndex('users', ['email'], function ($table) {
+    $table->index('email');
+});
+```
+
+### getColumnType($table, $column, $fullDefinition = false)
+**Description:** Return a column's normalized type name (for example, `varchar`) or, when `$fullDefinition` is `true`, its full database type (for example, `varchar(255)`). Throws `\InvalidArgumentException` if the column is missing.
+
+```php
+$schema->getColumnType('users', 'email');      // varchar
+$schema->getColumnType('users', 'email', true); // varchar(255)
+```
+
+### getColumnListing($table) / getColumns($table)
+**Description:** Return the ordered column names or full metadata for every column. Each metadata item has the Laravel-style keys `name`, `type`, `type_name`, `collation`, `nullable`, `default`, `auto_increment`, `comment`, and `generation`.
+
+```php
+$names = $schema->getColumnListing('users');
+$columns = $schema->getColumns('users');
+```
+
+### getIndexes($table) / getIndexListing($table) / hasIndex($table, $index, $type = null)
+**Description:** Return index metadata, list index names, or check for an index by name or by its exact ordered column list. Each index item contains `name`, `columns`, `type`, `unique`, and `primary`. `$type` accepts `primary`, `unique`, or a database index type such as `btree`.
+
+```php
+$indexes = $schema->getIndexes('users');
+$names = $schema->getIndexListing('users');
+$schema->hasIndex('users', ['email'], 'unique');
+```
+
+### getForeignKeys($table)
+**Description:** Return foreign key metadata. Each item contains `name`, local `columns`, `foreign_schema`, `foreign_table`, `foreign_columns`, `on_update`, and `on_delete`. Multi-column keys retain their declared column order.
+
+```php
+$foreignKeys = $schema->getForeignKeys('orders');
+```
+
+### dropIfExists($table)
+**Description:** Drop a table if it exists. This is equivalent to `drop()` in WPORM.
+
+```php
+$schema->dropIfExists('temporary_records');
+```
+
+### dropColumns($table, $columns)
+**Description:** Drop one column or an array of columns from a table using `table()` alterations.
+
+```php
+$schema->dropColumns('users', ['nickname', 'legacy_email']);
+```
 
 ---
 

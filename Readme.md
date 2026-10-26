@@ -243,6 +243,34 @@ $schema->table('products', function (Blueprint $table) {
 
 `SchemaBuilder::table()` throws a `\RuntimeException` when an `ALTER TABLE` statement fails, so schema changes cannot silently continue after a database error.
 
+### Inspecting and Conditionally Changing Schema
+
+`SchemaBuilder` can inspect tables, views, columns, indexes, and foreign keys. Pass either the bare table name or a name that already includes the WordPress prefix:
+
+```php
+if ($schema->hasTable('users') && $schema->hasColumn('users', 'email')) {
+    $type = $schema->getColumnType('users', 'email');
+}
+
+$columns = $schema->getColumnListing('users');
+$indexes = $schema->getIndexes('users');
+$foreignKeys = $schema->getForeignKeys('users');
+```
+
+Use the conditional helpers to run a `table()` callback only when the requested column or index exists (or does not exist):
+
+```php
+$schema->whenTableDoesntHaveColumn('users', 'nickname', function ($table) {
+    $table->string('nickname')->nullable();
+});
+
+$schema->whenTableHasIndex('users', ['email'], function ($table) {
+    $table->dropColumn('legacy_email');
+});
+```
+
+Use `dropIfExists('users')` to drop a table if present, or `dropColumns('users', ['nickname', 'legacy_email'])` to drop one or more columns. See [SchemaBuilder methods](./Methods.md#schemabuilder) for all inspection methods and metadata formats.
+
 ### Unique Indexes (Eloquent-style)
 
 You can add a unique index to a column using Eloquent-style chaining:
