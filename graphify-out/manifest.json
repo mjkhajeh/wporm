@@ -1,0 +1,416 @@
+{
+  "Blueprint.php": {
+    "mtime": 1787726519.2989805,
+    "seen": 1793055643.1431406,
+    "ast_hash": "395ad4d7b299114cfe0b80398a7e9177",
+    "semantic_hash": "395ad4d7b299114cfe0b80398a7e9177"
+  },
+  "Casts/CastableInterface.php": {
+    "mtime": 1755380132.0990582,
+    "seen": 1793055643.143144,
+    "ast_hash": "32cdc584f7feee89800b7bef986e46e5",
+    "semantic_hash": "32cdc584f7feee89800b7bef986e46e5"
+  },
+  "Casts/JsonCast.php": {
+    "mtime": 1782931253.928265,
+    "seen": 1793055643.1431456,
+    "ast_hash": "5d3c3d75193e19c7face44f4a3e57941",
+    "semantic_hash": "5d3c3d75193e19c7face44f4a3e57941"
+  },
+  "Collection.php": {
+    "mtime": 1792775791.5594225,
+    "seen": 1793055643.1431463,
+    "ast_hash": "5699f9e098a97068da552352906e2867",
+    "semantic_hash": "5699f9e098a97068da552352906e2867"
+  },
+  "ColumnDefinition.php": {
+    "mtime": 1787726516.5339026,
+    "seen": 1793055643.1431468,
+    "ast_hash": "0b3c6c76c263722ce8b3ab056474abb9",
+    "semantic_hash": "0b3c6c76c263722ce8b3ab056474abb9"
+  },
+  "DB.php": {
+    "mtime": 1787721549.6973035,
+    "seen": 1793055643.1431472,
+    "ast_hash": "2cbb28cc44345a0aea6f80b9fc8b9344",
+    "semantic_hash": "2cbb28cc44345a0aea6f80b9fc8b9344"
+  },
+  "EventDispatcher.php": {
+    "mtime": 1782931113.2976434,
+    "seen": 1793055643.1431477,
+    "ast_hash": "8a9e0b021a99a857775db91df9b0d864",
+    "semantic_hash": "8a9e0b021a99a857775db91df9b0d864"
+  },
+  "Events.php": {
+    "mtime": 1782146826.0,
+    "seen": 1793055643.1431482,
+    "ast_hash": "3ba292e016f1911c8634e76dfe8e548a",
+    "semantic_hash": "3ba292e016f1911c8634e76dfe8e548a"
+  },
+  "Example/AllFeatures.php": {
+    "mtime": 1781897325.2057755,
+    "seen": 1793055643.143149,
+    "ast_hash": "bc81ec32fa8dad2e94a711ce149ae197",
+    "semantic_hash": "bc81ec32fa8dad2e94a711ce149ae197"
+  },
+  "Example/BlueprintAfterExample.php": {
+    "mtime": 1785247056.4566696,
+    "seen": 1793055643.1431494,
+    "ast_hash": "79d8f8b78aafa68af9c2bcac5ebcd9c6",
+    "semantic_hash": "79d8f8b78aafa68af9c2bcac5ebcd9c6"
+  },
+  "Example/BlueprintChangeExample.php": {
+    "mtime": 1785253196.847402,
+    "seen": 1793055643.1431499,
+    "ast_hash": "3c2b07e056ae52bc7cb3eb42b9148cf6",
+    "semantic_hash": "3c2b07e056ae52bc7cb3eb42b9148cf6"
+  },
+  "Example/CollectionFilterExample.php": {
+    "mtime": 1785708849.7212915,
+    "seen": 1793055643.1431506,
+    "ast_hash": "9c76535c3445891abcd142850bb959ba",
+    "semantic_hash": "9c76535c3445891abcd142850bb959ba"
+  },
+  "Example/CompositeRelations.php": {
+    "mtime": 1789734179.3732204,
+    "seen": 1793055643.143151,
+    "ast_hash": "bf503617137fffbcfed32b89fc6608f4",
+    "semantic_hash": "bf503617137fffbcfed32b89fc6608f4"
+  },
+  "Example/DynamicWhereExample.php": {
+    "mtime": 1785163710.4394033,
+    "seen": 1793055643.1431515,
+    "ast_hash": "10626dd8d424e43b750a2ef55e502481",
+    "semantic_hash": "10626dd8d424e43b750a2ef55e502481"
+  },
+  "Example/LazyExample.php": {
+    "mtime": 1792775980.003186,
+    "seen": 1793055643.1431518,
+    "ast_hash": "dfc2d7a12499399358348082782449e6",
+    "semantic_hash": "dfc2d7a12499399358348082782449e6"
+  },
+  "Example/OrderByRawExample.php": {
+    "mtime": 1779183198.1341515,
+    "seen": 1793055643.1431525,
+    "ast_hash": "a5fd032f21606975f5e3d6d57c29ff65",
+    "semantic_hash": "a5fd032f21606975f5e3d6d57c29ff65"
+  },
+  "Example/OtherFeatures.php": {
+    "mtime": 1785708461.3327222,
+    "seen": 1793055643.1431527,
+    "ast_hash": "0a2ae957522b6dbbeaf3eb8e42ac9582",
+    "semantic_hash": "0a2ae957522b6dbbeaf3eb8e42ac9582"
+  },
+  "Example/Product.php": {
+    "mtime": 1779183198.1351514,
+    "seen": 1793055643.1431532,
+    "ast_hash": "12cd061afc2ef6d7eb6e92ca2ef9442f",
+    "semantic_hash": "12cd061afc2ef6d7eb6e92ca2ef9442f"
+  },
+  "Example/ProductExample.php": {
+    "mtime": 1779183198.1351514,
+    "seen": 1793055643.1431537,
+    "ast_hash": "2b358fbb4b81a804a6c13857d9ad5344",
+    "semantic_hash": "2b358fbb4b81a804a6c13857d9ad5344"
+  },
+  "Example/ProductSaveManyExample.php": {
+    "mtime": 1779183198.1360676,
+    "seen": 1793055643.1431541,
+    "ast_hash": "ad5e418f25218233f930596d5da8631e",
+    "semantic_hash": "ad5e418f25218233f930596d5da8631e"
+  },
+  "Example/ReviewExample.php": {
+    "mtime": 1781897553.54546,
+    "seen": 1793055643.1431544,
+    "ast_hash": "b83198b8c15979eb2325a9276db47cf9",
+    "semantic_hash": "b83198b8c15979eb2325a9276db47cf9"
+  },
+  "Example/TruncateExample.php": {
+    "mtime": 1779183198.1363797,
+    "seen": 1793055643.1431549,
+    "ast_hash": "01a179bf9291f18d307866ba032e507c",
+    "semantic_hash": "01a179bf9291f18d307866ba032e507c"
+  },
+  "Example/UserExample.php": {
+    "mtime": 1790260628.9900637,
+    "seen": 1793055643.1431558,
+    "ast_hash": "3084265c21764574f02a25ddd2630685",
+    "semantic_hash": "3084265c21764574f02a25ddd2630685"
+  },
+  "Example/WhenExample.php": {
+    "mtime": 1779183198.1363797,
+    "seen": 1793055643.1431563,
+    "ast_hash": "e15cb06ec8217c1067a70aed62157e53",
+    "semantic_hash": "e15cb06ec8217c1067a70aed62157e53"
+  },
+  "Example/WhereRelationExample.php": {
+    "mtime": 1788625048.8493335,
+    "seen": 1793055643.1431568,
+    "ast_hash": "0848efbd473f0df2c1da1fd9f83f8fa6",
+    "semantic_hash": "0848efbd473f0df2c1da1fd9f83f8fa6"
+  },
+  "Example/WithAndScopesExample.php": {
+    "mtime": 1779183198.1363797,
+    "seen": 1793055643.1431572,
+    "ast_hash": "b0bf2592b2722c868f646e090d7a3577",
+    "semantic_hash": "b0bf2592b2722c868f646e090d7a3577"
+  },
+  "Example/db-table-examples.php": {
+    "mtime": 1781900800.3579123,
+    "seen": 1793055643.1431577,
+    "ast_hash": "8dd59dbdeca4663b9314f4f741407063",
+    "semantic_hash": "8dd59dbdeca4663b9314f4f741407063"
+  },
+  "Helpers.php": {
+    "mtime": 1789585015.0085151,
+    "seen": 1793055643.1431582,
+    "ast_hash": "83d9ac186012ee21af467cda9707b8a0",
+    "semantic_hash": "83d9ac186012ee21af467cda9707b8a0"
+  },
+  "LazyCollection.php": {
+    "mtime": 1792776162.0718951,
+    "seen": 1793055643.1431587,
+    "ast_hash": "7cc2e821d38bebd0e5a957455ce07487",
+    "semantic_hash": "7cc2e821d38bebd0e5a957455ce07487"
+  },
+  "MassAssignmentException.php": {
+    "mtime": 1783523197.9730904,
+    "seen": 1793055643.1431618,
+    "ast_hash": "3d46cc613c4937898814b55ec494941e",
+    "semantic_hash": "3d46cc613c4937898814b55ec494941e"
+  },
+  "MassPrunable.php": {
+    "mtime": 1782820419.8188686,
+    "seen": 1793055643.1431623,
+    "ast_hash": "7f656232c09f6203d25ea223abda6b98",
+    "semantic_hash": "7f656232c09f6203d25ea223abda6b98"
+  },
+  "Model.php": {
+    "mtime": 1792775924.3475633,
+    "seen": 1793055643.143163,
+    "ast_hash": "88fe987f2f7639aa31d22c4d46572599",
+    "semantic_hash": "88fe987f2f7639aa31d22c4d46572599"
+  },
+  "ModelEvent.php": {
+    "mtime": 1782146826.0,
+    "seen": 1793055643.1431634,
+    "ast_hash": "88ebae89dee002f9c64c2fbacabf41e6",
+    "semantic_hash": "88ebae89dee002f9c64c2fbacabf41e6"
+  },
+  "ModelNotFoundException.php": {
+    "mtime": 1782931352.4730723,
+    "seen": 1793055643.143164,
+    "ast_hash": "d4fdb3f56f86cae025a4f4823d653a80",
+    "semantic_hash": "d4fdb3f56f86cae025a4f4823d653a80"
+  },
+  "Pivot.php": {
+    "mtime": 1782822829.4713855,
+    "seen": 1793055643.1431644,
+    "ast_hash": "09a82ffc2720ee45a9e2d446540e0dc1",
+    "semantic_hash": "09a82ffc2720ee45a9e2d446540e0dc1"
+  },
+  "Prunable.php": {
+    "mtime": 1782820406.3615537,
+    "seen": 1793055643.1431646,
+    "ast_hash": "b429a882e56290a1cafca4adcb0317ff",
+    "semantic_hash": "b429a882e56290a1cafca4adcb0317ff"
+  },
+  "QueryBuilder.php": {
+    "mtime": 1792775791.5554225,
+    "seen": 1793055643.143165,
+    "ast_hash": "72236db02ae12ab2b675b5c4cfbef924",
+    "semantic_hash": "72236db02ae12ab2b675b5c4cfbef924"
+  },
+  "QueryLogger.php": {
+    "mtime": 1782830695.2446954,
+    "seen": 1793055643.1431656,
+    "ast_hash": "08df1ef94afb2118f6832a1c1fa37e87",
+    "semantic_hash": "08df1ef94afb2118f6832a1c1fa37e87"
+  },
+  "SchemaBuilder.php": {
+    "mtime": 1789585112.227356,
+    "seen": 1793055643.1431663,
+    "ast_hash": "5f73279ef69ee6893503e2482ef9834a",
+    "semantic_hash": "5f73279ef69ee6893503e2482ef9834a"
+  },
+  "Scopes/Scope.php": {
+    "mtime": 1782819414.7772322,
+    "seen": 1793055643.1431665,
+    "ast_hash": "e7b1a1805a853f6c754b155578078fad",
+    "semantic_hash": "e7b1a1805a853f6c754b155578078fad"
+  },
+  "Scopes/ScopeInterface.php": {
+    "mtime": 1782819403.2938476,
+    "seen": 1793055643.143167,
+    "ast_hash": "b8edc7d072136e5e2b95806855a9b30a",
+    "semantic_hash": "b8edc7d072136e5e2b95806855a9b30a"
+  },
+  "WordPress/Blog.php": {
+    "mtime": 1789635189.2118828,
+    "seen": 1793055643.1431675,
+    "ast_hash": "d5c5e7af1fdc4ad154fc6140b6d978c3",
+    "semantic_hash": "d5c5e7af1fdc4ad154fc6140b6d978c3"
+  },
+  "WordPress/BlogMeta.php": {
+    "mtime": 1789635189.209126,
+    "seen": 1793055643.1431677,
+    "ast_hash": "47ea54c8d6bee6af6ef6c7f0fe0e615d",
+    "semantic_hash": "47ea54c8d6bee6af6ef6c7f0fe0e615d"
+  },
+  "WordPress/Comment.php": {
+    "mtime": 1789634952.3706095,
+    "seen": 1793055643.143169,
+    "ast_hash": "b359fa12d4866567f0b1c9b37187d812",
+    "semantic_hash": "b359fa12d4866567f0b1c9b37187d812"
+  },
+  "WordPress/CommentMeta.php": {
+    "mtime": 1789634952.3710525,
+    "seen": 1793055643.1431696,
+    "ast_hash": "de3a7c77a67df8c712521389de8f791a",
+    "semantic_hash": "de3a7c77a67df8c712521389de8f791a"
+  },
+  "WordPress/Link.php": {
+    "mtime": 1789634952.3736424,
+    "seen": 1793055643.1431699,
+    "ast_hash": "4206fce0b4ce1094439290eb1647b235",
+    "semantic_hash": "4206fce0b4ce1094439290eb1647b235"
+  },
+  "WordPress/Option.php": {
+    "mtime": 1789634952.3732245,
+    "seen": 1793055643.1431704,
+    "ast_hash": "8cb690ded06b5fc2b292d1d8165c11ed",
+    "semantic_hash": "8cb690ded06b5fc2b292d1d8165c11ed"
+  },
+  "WordPress/Post.php": {
+    "mtime": 1789634952.3680854,
+    "seen": 1793055643.1431708,
+    "ast_hash": "88d40dd23829159aa4ae114eccb3fbae",
+    "semantic_hash": "88d40dd23829159aa4ae114eccb3fbae"
+  },
+  "WordPress/PostMeta.php": {
+    "mtime": 1789634952.3691702,
+    "seen": 1793055643.1431713,
+    "ast_hash": "b21010ed64ae1fd0008e256caa1d7ef3",
+    "semantic_hash": "b21010ed64ae1fd0008e256caa1d7ef3"
+  },
+  "WordPress/RegistrationLog.php": {
+    "mtime": 1789635189.2124865,
+    "seen": 1793055643.1431718,
+    "ast_hash": "69f97ea9ee92c4560b599b971b9494b9",
+    "semantic_hash": "69f97ea9ee92c4560b599b971b9494b9"
+  },
+  "WordPress/Signup.php": {
+    "mtime": 1789635189.2113228,
+    "seen": 1793055643.143172,
+    "ast_hash": "53b19ef085d5d658c8b27b08bec6351e",
+    "semantic_hash": "53b19ef085d5d658c8b27b08bec6351e"
+  },
+  "WordPress/Site.php": {
+    "mtime": 1789635189.20976,
+    "seen": 1793055643.1431725,
+    "ast_hash": "7119b4ded7aea7f277b06ec50ee58d80",
+    "semantic_hash": "7119b4ded7aea7f277b06ec50ee58d80"
+  },
+  "WordPress/SiteMeta.php": {
+    "mtime": 1789635189.2103202,
+    "seen": 1793055643.1431732,
+    "ast_hash": "cd7423e0fb62b0964f06219564835987",
+    "semantic_hash": "cd7423e0fb62b0964f06219564835987"
+  },
+  "WordPress/Term.php": {
+    "mtime": 1789634952.3710854,
+    "seen": 1793055643.1431737,
+    "ast_hash": "26a3523a8ddf33acc75689a55de487d8",
+    "semantic_hash": "26a3523a8ddf33acc75689a55de487d8"
+  },
+  "WordPress/TermMeta.php": {
+    "mtime": 1789634952.3728201,
+    "seen": 1793055643.1431742,
+    "ast_hash": "184ea131637b39e13fbd0cd027542e4e",
+    "semantic_hash": "184ea131637b39e13fbd0cd027542e4e"
+  },
+  "WordPress/TermRelationship.php": {
+    "mtime": 1789634952.3723943,
+    "seen": 1793055643.1431744,
+    "ast_hash": "33d46dd3a2b90e0f375a172536d7b3bc",
+    "semantic_hash": "33d46dd3a2b90e0f375a172536d7b3bc"
+  },
+  "WordPress/TermTaxonomy.php": {
+    "mtime": 1789634952.3719575,
+    "seen": 1793055643.143175,
+    "ast_hash": "a4abe2c857a830edbda3875d2e796efa",
+    "semantic_hash": "a4abe2c857a830edbda3875d2e796efa"
+  },
+  "WordPress/User.php": {
+    "mtime": 1789634952.369673,
+    "seen": 1793055643.1431754,
+    "ast_hash": "453f12680998e4b5044bad3e32c2d037",
+    "semantic_hash": "453f12680998e4b5044bad3e32c2d037"
+  },
+  "WordPress/UserMeta.php": {
+    "mtime": 1789634952.3701477,
+    "seen": 1793055643.1431758,
+    "ast_hash": "afddd40a13cb6900553486ff6b744266",
+    "semantic_hash": "afddd40a13cb6900553486ff6b744266"
+  },
+  "WordPress/WordPressModel.php": {
+    "mtime": 1789634952.368022,
+    "seen": 1793055643.1431766,
+    "ast_hash": "41a9c0cfc6cd080447d1486449746fd8",
+    "semantic_hash": "41a9c0cfc6cd080447d1486449746fd8"
+  },
+  "composer.json": {
+    "mtime": 1783442954.6981032,
+    "seen": 1793055643.1431768,
+    "ast_hash": "175adda33415aab03a6330596496cb17",
+    "semantic_hash": "175adda33415aab03a6330596496cb17"
+  },
+  "AGENTS.md": {
+    "mtime": 1785162245.2078307,
+    "seen": 1793055643.1431785,
+    "ast_hash": "cf405005153a45b4e3b74e1f681a5b54",
+    "semantic_hash": "cf405005153a45b4e3b74e1f681a5b54"
+  },
+  "Blueprint.md": {
+    "mtime": 1787726660.385811,
+    "seen": 1793055643.143179,
+    "ast_hash": "b172b28c8ba4a57986025618e0683325",
+    "semantic_hash": "b172b28c8ba4a57986025618e0683325"
+  },
+  "CastsType.md": {
+    "mtime": 1783361624.6836138,
+    "seen": 1793055643.1431792,
+    "ast_hash": "06a21a162910489a1fc505e4890bf681",
+    "semantic_hash": "06a21a162910489a1fc505e4890bf681"
+  },
+  "DB.md": {
+    "mtime": 1785159995.6583138,
+    "seen": 1793055643.14318,
+    "ast_hash": "f380d88728cda5a8982b8011a11fbf28",
+    "semantic_hash": "f380d88728cda5a8982b8011a11fbf28"
+  },
+  "Debugging.md": {
+    "mtime": 1782380259.9088368,
+    "seen": 1793055643.1431804,
+    "ast_hash": "9fe2cb613f352b5eacc8f86215657feb",
+    "semantic_hash": "9fe2cb613f352b5eacc8f86215657feb"
+  },
+  "Methods.md": {
+    "mtime": 1792776169.9278378,
+    "seen": 1793055643.1431808,
+    "ast_hash": "972ed714d597cd67bf4148992117cdc4",
+    "semantic_hash": "972ed714d597cd67bf4148992117cdc4"
+  },
+  "Readme.md": {
+    "mtime": 1792776162.0748951,
+    "seen": 1793055643.143181,
+    "ast_hash": "0f2de18cf9a9dfebecde6e4d20ae651e",
+    "semantic_hash": "0f2de18cf9a9dfebecde6e4d20ae651e"
+  },
+  "WordPressCore.md": {
+    "mtime": 1789635362.784217,
+    "seen": 1793055643.1431816,
+    "ast_hash": "fdf3bc5a749f67835094a40032103eae",
+    "semantic_hash": "fdf3bc5a749f67835094a40032103eae"
+  }
+}
